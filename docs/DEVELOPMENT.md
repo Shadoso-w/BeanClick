@@ -171,19 +171,48 @@ _db.delete(_db.brewLogs);
 `schemaVersion` 目前是 **4**。历史只有 `1 → 4` 一次变化（v2 / v3 从未存在过，
 `git log -L` 可以确认）。迁移写在 `lib/data/database.dart` 的 `_upgradeToV4`。
 
+**M2.6（v4）及以后的数据，任何升级都必须保住。** 这件事由工具锁住，不靠记性：
+
+| 文件 | 作用 |
+|---|---|
+| `test/drift/schemas/drift_schema_v4.json` | v4 的**冻结快照** |
+| `test/drift/generated/` | 配套校验代码（由快照生成） |
+| `test/data/schema_snapshot_test.dart` | 两个守门用例（见下） |
+
+```powershell
+# 改完表结构后重新生成快照与校验代码（两个命令都要跑）
+dart run drift_dev schema dump lib/data/database.dart test/drift/schemas
+dart run drift_dev schema generate test/drift/schemas test/drift/generated
+```
+
+两个守门用例分别挡住两类事故：
+
+1. **改了表却忘了 dump 新快照** → `migrateAndValidate(db, 当前版本)` 逐列比对
+   （类型、NOT NULL、DEFAULT、外键、索引都算），失败信息会直接点名
+   `Contains the following unexpected entries: xxx_column`。
+2. **改了表却没写迁移** → 第二个用例拿 v4 快照灌入真实数据（两支豆子 / 两袋 /
+   一条拼配记录 + 用量行 / 一条扩展属性 / 两个改过的设置项），用当前代码打开
+   （**真的跑 `onUpgrade`**），再断言数据一条不少、值没变、迁移后余量扣减照常工作。
+
+  它的 `oldVersion` 永远钉在 `4`：以后每次升 `schemaVersion`，这个用例**自动变成
+   「v4 → 新版本」的数据保活测试**，不需要改代码。`newVersion` 取的是
+   `AppDatabase.schemaVersion`，所以版本一升就会被覆盖到。
+
 三条硬规矩：
 
 1. **`onUpgrade` 必须是逐列迁移**，不能删表重建。用户的数据只有这一份。
 2. **搬迁顺序不能变**：先建新表 → 搬数据到新表 → 最后才删旧列。
    旧列一删，数据就没有第二个来源了。
-3. **改表必须配一个「旧库升上来」的测试**。照
-   `test/data/migration_v1_to_v4_test.dart` 的模式写：
-   造一个旧版本库（建表语句从旧提交 dump 出来）、跑迁移、
-   断言数据没丢 **且结构与全新建库完全一致**（用 `PRAGMA table_info` /
-   `foreign_key_list` / `sqlite_master` 对比）。只比列名不够，
-   `NOT NULL`、`DEFAULT`、漏建索引都要能测出来。
+3. **改表必须配一个「旧库升上来」的测试**。v1 → v4 那次的写法见
+   `test/data/migration_v1_to_v4_test.dart`：造一个旧版本库（建表语句从旧提交
+   dump 出来）、跑迁移、断言数据没丢 **且结构与全新建库完全一致**
+   （`PRAGMA table_info` / `foreign_key_list` / `sqlite_master` 对比）。
+   只比列名不够，`NOT NULL`、`DEFAULT`、漏建索引都要能测出来。
 
-**为什么用 `dropColumn` 而不是 `alterTable` 重建表**：
+> 写新迁移时可以先用 `dart run drift_dev schema steps test/drift/schemas lib/data/migrations.dart`
+> 生成 `stepByStep` 辅助代码，逐版本搬运更省事。
+
+**为什么 v1 → v4 用 `dropColumn` 而不是 `alterTable` 重建表**：
 重建要 DROP 掉父表，而 `coffee_beans` 被 `bean_batches` / `brew_log_beans` /
 `brew_logs` 用外键引用着，删父表会触发级联删除，把刚搬好的数据一起删掉。
 `ALTER TABLE ... DROP COLUMN` 不动表本身，没有这个风险
@@ -402,7 +431,7 @@ keytool -genkeypair -v `
 | `flutter analyze` | `No issues found!`，退出码 0 |
 | `dart format --output=none --set-exit-if-changed .` | 0 处改动，退出码 0（CI 同款检查） |
 | `dart run build_runner build --delete-conflicting-outputs` | 成功；生成物与仓库里的 `database.g.dart` 完全一致（无 diff） |
-| `flutter test` | **240 个测试全部通过**，退出码 0（M2.6：批次/拼配/扩展属性/迁移） |
+| `flutter test` | **242 个测试全部通过**，退出码 0（M2.6：批次/拼配/扩展属性/迁移/快照） |
 | `flutter build apk --release --split-per-abi` | 成功，**2.39 分钟**（M2.6，release 签名） |
 
 包体（验收清单要求 < 30MB）：
