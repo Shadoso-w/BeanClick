@@ -5,9 +5,12 @@
 豆刻是一款面向**手冲**与**摩卡壶**用户的轻量咖啡参数记录 App。
 本地优先、无账号、无追踪、无广告。
 
+[![Flutter CI](https://github.com/Shadoso-w/BeanClick/actions/workflows/flutter.yml/badge.svg)](https://github.com/Shadoso-w/BeanClick/actions/workflows/flutter.yml)
 [![Flutter](https://img.shields.io/badge/Flutter-3.47.5-02569B?logo=flutter)](https://flutter.dev)
-[![Platform](https://img.shields.io/badge/Platform-Android%208%2B-3DDC84?logo=android)](https://developer.android.com)
+[![Platform](https://img.shields.io/badge/Platform-Android%207%2B-3DDC84?logo=android)](https://developer.android.com)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
+
+> 当前状态：**M2.5**（P0 仅剩独立搜索页）。已出内测 APK，见 [RELEASING.md](RELEASING.md)。
 
 ---
 
