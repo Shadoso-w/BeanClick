@@ -29,11 +29,12 @@ void main() {
     );
   });
 
+  /// 进入设置页。三栏 dock 之后「我的」不再占栏位，改走右上角入口。
   Future<void> gotoSettings(WidgetTester tester) async {
     await tester.pumpWidget(harness.app(const BeanClickApp()));
     await tester.pump(const Duration(milliseconds: 100));
-    await tester.tap(find.text('我的').last);
-    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byIcon(Icons.person_outline));
+    await tester.pumpAndSettle();
   }
 
   Future<void> openExportDialog(WidgetTester tester) async {
