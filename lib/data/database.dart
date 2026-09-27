@@ -514,13 +514,15 @@ class AppDatabase extends _$AppDatabase {
   /// 打开指定文件的数据库。
   AppDatabase.file(File file) : super(NativeDatabase(file));
 
-  /// v4：新增 `extra_attributes`（豆子/磨豆机的任意扩展属性）。
+  /// v4：批次模型 + 多豆冲煮 + 扩展属性。
   ///
-  /// 版本历史：
-  /// - v1：最初的 5 张表
-  /// - v2：引入 batches 与 brew_log_beans（未随任何发布版本出去）
-  /// - v3：索引、豆名快照、brew_log_beans 自增主键
-  /// - v4：extra_attributes 扩展属性表
+  /// 版本历史（**真实情况**，代码里只出现过这两个版本号）：
+  /// - v1：M1 的 5 张表，烘焙日期/烘焙度/余量/购入总重/价格都在 `coffee_beans` 上
+  /// - v4：批次（`bean_batches`）+ 多豆（`brew_log_beans`）+ 扩展属性
+  ///   （`extra_attributes`），烘焙信息与余量下移到批次
+  ///
+  /// ⚠️ v2 / v3 从未在任何提交或安装包里出现过（`git log -L` 里 schemaVersion
+  /// 只有 `1` → `4` 这一次变化），所以迁移只需要处理 v1 → v4 这一条路。
   @override
   int get schemaVersion => 4;
 
@@ -532,16 +534,11 @@ class AppDatabase extends _$AppDatabase {
       await _seedDefaultSettings();
     },
     onUpgrade: (m, from, to) async {
-      // 当前尚无正式用户数据（v0.1.0 之前的开发阶段），因此不做逐列数据搬迁，
-      // 直接重建表结构。
-      //
-      // ⚠️ 一旦发布正式版本，这里必须改成**真正的逐列迁移**：
-      // 见 docs/DEVELOPMENT.md「数据库迁移」，其中也写了
-      // 「用户自行导出的 JSON/CSV 作为兜底恢复途径」这一约定。
-      for (final table in allTables) {
-        await m.deleteTable(table.actualTableName);
+      if (from < 4) {
+        await _upgradeToV4(m);
       }
-      await m.createAll();
+      // 索引与默认设置都是幂等的，迁移后统一兜一次：
+      // 旧库没有索引（v1 一个都没建），而少了索引会让查批次、拉时间线全表扫描。
       await _createIndexes();
       await _seedDefaultSettings();
     },
@@ -551,10 +548,92 @@ class AppDatabase extends _$AppDatabase {
     },
   );
 
+  /// v1 → v4 的**逐列迁移**（保住用户已经记下的数据）。
+  ///
+  /// 顺序不能变，每一步都有原因：
+  ///
+  /// 1. 先建三张新表（批次 / 豆子用量 / 扩展属性）；
+  /// 2. **先**把 `coffee_beans` 上的烘焙日期、烘焙度、余量、购入总重、价格
+  ///    原样搬成每支豆子的第一个批次；
+  /// 3. **先**用 `brew_logs.bean_id` 回填 `brew_log_beans` 用量行，并把当时的
+  ///    豆名与烘焙日期存成快照；记录上的 `bean_roast_*` 快照列也在这时填上；
+  /// 4. **最后**才改 `coffee_beans` 的形状：加 `is_favorite`、删掉搬走的 5 列。
+  ///
+  /// 2、3 必须排在 4 前面——那几列一旦删掉，数据就没有第二个来源了。
+  ///
+  /// 为什么用 `dropColumn` 而不是 `alterTable` 重建表：重建要 DROP 掉
+  /// `coffee_beans`，而它被 `bean_batches` / `brew_log_beans` / `brew_logs`
+  /// 用外键引用着，删父表会连带触发级联删除（把刚搬好的批次一起删掉）。
+  /// `ALTER TABLE ... DROP COLUMN` 不动表本身，没有这个风险。
+  /// 它要求 SQLite ≥ 3.35，本项目通过 `sqlite3_flutter_libs` 自带较新的
+  /// SQLite，Android 端不受系统版本限制。
+  Future<void> _upgradeToV4(Migrator m) async {
+    await m.createTable(beanBatches);
+    await m.createTable(brewLogBeans);
+    await m.createTable(extraAttributes);
+
+    // 一支豆子一袋：v1 的余量就是这一袋的余量。
+    // 批次的 notes 留空——v1 的 notes 是「这款豆子」的备注，留在豆子上。
+    await customStatement('''
+      INSERT INTO bean_batches
+        (bean_id, roast_date, roast_level, remaining_grams, initial_grams,
+         price, created_at, updated_at)
+      SELECT id, roast_date, roast_level, remaining_grams, initial_grams,
+             price, created_at, updated_at
+      FROM coffee_beans
+    ''');
+
+    // v1 一条记录只挂一支豆子（brew_logs.bean_id），补成一条 position=0 的用量行。
+    // 批次取这支豆子最早的那一袋：v1 的豆子此时正好只有一袋，写 MIN(id) 只是
+    // 为了万一将来有人手工插过多余批次时不会一行变多行。
+    await customStatement('''
+      INSERT INTO brew_log_beans
+        (brew_log_id, bean_id, batch_id, bean_name_snapshot,
+         roast_date_snapshot, dose_grams, position)
+      SELECT l.id,
+             l.bean_id,
+             (SELECT MIN(b.id) FROM bean_batches b WHERE b.bean_id = l.bean_id),
+             (SELECT c.name FROM coffee_beans c WHERE c.id = l.bean_id),
+             (SELECT c.roast_date FROM coffee_beans c WHERE c.id = l.bean_id),
+             COALESCE(l.dose_grams, 0),
+             0
+      FROM brew_logs l
+      WHERE l.bean_id IS NOT NULL
+    ''');
+
+    // 记录自己的烘焙快照列（v4 新增）：拿当时豆子上的值填，
+    // 之后再改豆子/批次也不会影响历史。
+    await m.addColumn(brewLogs, brewLogs.beanRoastDate);
+    await m.addColumn(brewLogs, brewLogs.beanRoastLevel);
+    await customStatement('''
+      UPDATE brew_logs SET
+        bean_roast_date = (
+          SELECT c.roast_date FROM coffee_beans c WHERE c.id = brew_logs.bean_id
+        ),
+        bean_roast_level = (
+          SELECT c.roast_level FROM coffee_beans c WHERE c.id = brew_logs.bean_id
+        )
+      WHERE bean_id IS NOT NULL
+    ''');
+
+    // 最后改 coffee_beans：加收藏标记（默认未收藏），删掉已经搬去批次的列。
+    await m.addColumn(coffeeBeans, coffeeBeans.isFavorite);
+    for (final String column in const <String>[
+      'roast_level',
+      'roast_date',
+      'remaining_grams',
+      'initial_grams',
+      'price',
+    ]) {
+      await m.dropColumn(coffeeBeans, column);
+    }
+  }
+
   /// 建索引。
   ///
-  /// Drift 的 `@TableIndex` 会随 `createAll()` 一起建，但 `onUpgrade` 里
-  /// 我们是删表重建，所以这里再显式保证一次，避免漏建导致全表扫描。
+  /// Drift 的 `@TableIndex` 会随 `createTable` / `createAll` 一起建，
+  /// 这里再显式保证一次（`IF NOT EXISTS`，幂等），
+  /// 免得**从 v1 升上来的旧库**漏建索引——v1 一个索引都没有。
   Future<void> _createIndexes() async {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_bean_batches_bean_id '

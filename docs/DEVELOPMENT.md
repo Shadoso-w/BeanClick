@@ -166,6 +166,43 @@ _db.delete(_db.brewLogs);
 
 `AppSettings` 用 `key` 作主键，写入走 `insertOnConflictUpdate` 实现 upsert。
 
+### 7.4 数据库迁移（改表结构时必读）
+
+`schemaVersion` 目前是 **4**。历史只有 `1 → 4` 一次变化（v2 / v3 从未存在过，
+`git log -L` 可以确认）。迁移写在 `lib/data/database.dart` 的 `_upgradeToV4`。
+
+三条硬规矩：
+
+1. **`onUpgrade` 必须是逐列迁移**，不能删表重建。用户的数据只有这一份。
+2. **搬迁顺序不能变**：先建新表 → 搬数据到新表 → 最后才删旧列。
+   旧列一删，数据就没有第二个来源了。
+3. **改表必须配一个「旧库升上来」的测试**。照
+   `test/data/migration_v1_to_v4_test.dart` 的模式写：
+   造一个旧版本库（建表语句从旧提交 dump 出来）、跑迁移、
+   断言数据没丢 **且结构与全新建库完全一致**（用 `PRAGMA table_info` /
+   `foreign_key_list` / `sqlite_master` 对比）。只比列名不够，
+   `NOT NULL`、`DEFAULT`、漏建索引都要能测出来。
+
+**为什么用 `dropColumn` 而不是 `alterTable` 重建表**：
+重建要 DROP 掉父表，而 `coffee_beans` 被 `bean_batches` / `brew_log_beans` /
+`brew_logs` 用外键引用着，删父表会触发级联删除，把刚搬好的数据一起删掉。
+`ALTER TABLE ... DROP COLUMN` 不动表本身，没有这个风险
+（要求 SQLite ≥ 3.35；本项目通过 `sqlite3_flutter_libs` 自带较新的 SQLite，
+不受 Android 系统版本限制）。
+
+**造旧库来测迁移**：不要手抄旧建表语句。用 `git worktree` 把旧提交检出到另一个目录，
+写个临时的 test 打印 `sqlite_master`：
+
+```dart
+final rows = await db.customSelect(
+  "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL "
+  "AND name NOT LIKE 'sqlite_%' ORDER BY type, name").get();
+```
+
+> 工作树里跑 `dart run` 会要求重新下载 sqlite3 原生库（GitHub 直连会超时）。
+> 把主仓库的 `.dart_tool\hooks_runner\shared`（以及根目录的 `sqlite3.dll`，
+> 它是 gitignore 的）拷过去，然后用 `flutter test`（不是 `dart run`）执行那个临时脚本。
+
 ---
 
 ## 8. 测试注意事项
