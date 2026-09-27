@@ -61,27 +61,7 @@ class $CoffeeBeansTable extends CoffeeBeans
         true,
         type: DriftSqlType.string,
         requiredDuringInsert: false,
-      ).withConverter<ProcessMethod?>($CoffeeBeansTable.$converterprocessn);
-  @override
-  late final GeneratedColumnWithTypeConverter<RoastLevel?, String> roastLevel =
-      GeneratedColumn<String>(
-        'roast_level',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      ).withConverter<RoastLevel?>($CoffeeBeansTable.$converterroastLeveln);
-  static const VerificationMeta _roastDateMeta = const VerificationMeta(
-    'roastDate',
-  );
-  @override
-  late final GeneratedColumn<DateTime> roastDate = GeneratedColumn<DateTime>(
-    'roast_date',
-    aliasedName,
-    true,
-    type: DriftSqlType.dateTime,
-    requiredDuringInsert: false,
-  );
+      ).withConverter<ProcessMethod?>($CoffeeBeansTable.$converterprocess);
   @override
   late final GeneratedColumnWithTypeConverter<List<String>, String> flavorTags =
       GeneratedColumn<String>(
@@ -92,37 +72,20 @@ class $CoffeeBeansTable extends CoffeeBeans
         requiredDuringInsert: false,
         defaultValue: const Constant('[]'),
       ).withConverter<List<String>>($CoffeeBeansTable.$converterflavorTags);
-  static const VerificationMeta _remainingGramsMeta = const VerificationMeta(
-    'remainingGrams',
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
   );
   @override
-  late final GeneratedColumn<double> remainingGrams = GeneratedColumn<double>(
-    'remaining_grams',
+  late final GeneratedColumn<bool> isFavorite = GeneratedColumn<bool>(
+    'is_favorite',
     aliasedName,
     false,
-    type: DriftSqlType.double,
+    type: DriftSqlType.bool,
     requiredDuringInsert: false,
-    defaultValue: const Constant(0.0),
-  );
-  static const VerificationMeta _initialGramsMeta = const VerificationMeta(
-    'initialGrams',
-  );
-  @override
-  late final GeneratedColumn<double> initialGrams = GeneratedColumn<double>(
-    'initial_grams',
-    aliasedName,
-    true,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
-  );
-  static const VerificationMeta _priceMeta = const VerificationMeta('price');
-  @override
-  late final GeneratedColumn<double> price = GeneratedColumn<double>(
-    'price',
-    aliasedName,
-    true,
-    type: DriftSqlType.double,
-    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
   );
   static const VerificationMeta _photoPathMeta = const VerificationMeta(
     'photoPath',
@@ -175,12 +138,8 @@ class $CoffeeBeansTable extends CoffeeBeans
     origin,
     farm,
     process,
-    roastLevel,
-    roastDate,
     flavorTags,
-    remainingGrams,
-    initialGrams,
-    price,
+    isFavorite,
     photoPath,
     notes,
     createdAt,
@@ -221,34 +180,10 @@ class $CoffeeBeansTable extends CoffeeBeans
         farm.isAcceptableOrUnknown(data['farm']!, _farmMeta),
       );
     }
-    if (data.containsKey('roast_date')) {
+    if (data.containsKey('is_favorite')) {
       context.handle(
-        _roastDateMeta,
-        roastDate.isAcceptableOrUnknown(data['roast_date']!, _roastDateMeta),
-      );
-    }
-    if (data.containsKey('remaining_grams')) {
-      context.handle(
-        _remainingGramsMeta,
-        remainingGrams.isAcceptableOrUnknown(
-          data['remaining_grams']!,
-          _remainingGramsMeta,
-        ),
-      );
-    }
-    if (data.containsKey('initial_grams')) {
-      context.handle(
-        _initialGramsMeta,
-        initialGrams.isAcceptableOrUnknown(
-          data['initial_grams']!,
-          _initialGramsMeta,
-        ),
-      );
-    }
-    if (data.containsKey('price')) {
-      context.handle(
-        _priceMeta,
-        price.isAcceptableOrUnknown(data['price']!, _priceMeta),
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
       );
     }
     if (data.containsKey('photo_path')) {
@@ -300,21 +235,11 @@ class $CoffeeBeansTable extends CoffeeBeans
         DriftSqlType.string,
         data['${effectivePrefix}farm'],
       ),
-      process: $CoffeeBeansTable.$converterprocessn.fromSql(
+      process: $CoffeeBeansTable.$converterprocess.fromSql(
         attachedDatabase.typeMapping.read(
           DriftSqlType.string,
           data['${effectivePrefix}process'],
         ),
-      ),
-      roastLevel: $CoffeeBeansTable.$converterroastLeveln.fromSql(
-        attachedDatabase.typeMapping.read(
-          DriftSqlType.string,
-          data['${effectivePrefix}roast_level'],
-        ),
-      ),
-      roastDate: attachedDatabase.typeMapping.read(
-        DriftSqlType.dateTime,
-        data['${effectivePrefix}roast_date'],
       ),
       flavorTags: $CoffeeBeansTable.$converterflavorTags.fromSql(
         attachedDatabase.typeMapping.read(
@@ -322,18 +247,10 @@ class $CoffeeBeansTable extends CoffeeBeans
           data['${effectivePrefix}flavor_tags'],
         )!,
       ),
-      remainingGrams: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}remaining_grams'],
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_favorite'],
       )!,
-      initialGrams: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}initial_grams'],
-      ),
-      price: attachedDatabase.typeMapping.read(
-        DriftSqlType.double,
-        data['${effectivePrefix}price'],
-      ),
       photoPath: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}photo_path'],
@@ -358,14 +275,8 @@ class $CoffeeBeansTable extends CoffeeBeans
     return $CoffeeBeansTable(attachedDatabase, alias);
   }
 
-  static JsonTypeConverter2<ProcessMethod, String, String> $converterprocess =
-      const EnumNameConverter<ProcessMethod>(ProcessMethod.values);
-  static JsonTypeConverter2<ProcessMethod?, String?, String?>
-  $converterprocessn = JsonTypeConverter2.asNullable($converterprocess);
-  static JsonTypeConverter2<RoastLevel, String, String> $converterroastLevel =
-      const EnumNameConverter<RoastLevel>(RoastLevel.values);
-  static JsonTypeConverter2<RoastLevel?, String?, String?>
-  $converterroastLeveln = JsonTypeConverter2.asNullable($converterroastLevel);
+  static TypeConverter<ProcessMethod?, String?> $converterprocess =
+      const TolerantEnumConverter<ProcessMethod>(ProcessMethod.values);
   static TypeConverter<List<String>, String> $converterflavorTags =
       const StringListConverter();
 }
@@ -379,19 +290,11 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
   /// 处理法，存枚举 name。
   final ProcessMethod? process;
 
-  /// 烘焙度，存枚举 name。
-  final RoastLevel? roastLevel;
-  final DateTime? roastDate;
-
-  /// 风味标签，JSON 数组。
+  /// 风味标签，JSON 数组。属于「这款豆子」而不是某个批次。
   final List<String> flavorTags;
 
-  /// 余量（g），下限 0，由 Repository 保证。
-  final double remainingGrams;
-
-  /// 购入总重（g），用于算消耗比例。
-  final double? initialGrams;
-  final double? price;
+  /// 收藏标记：豆库可只看收藏，复购时也先从这里挑。
+  final bool isFavorite;
   final String? photoPath;
   final String? notes;
   final DateTime createdAt;
@@ -402,12 +305,8 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     this.origin,
     this.farm,
     this.process,
-    this.roastLevel,
-    this.roastDate,
     required this.flavorTags,
-    required this.remainingGrams,
-    this.initialGrams,
-    this.price,
+    required this.isFavorite,
     this.photoPath,
     this.notes,
     required this.createdAt,
@@ -426,29 +325,15 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     }
     if (!nullToAbsent || process != null) {
       map['process'] = Variable<String>(
-        $CoffeeBeansTable.$converterprocessn.toSql(process),
+        $CoffeeBeansTable.$converterprocess.toSql(process),
       );
-    }
-    if (!nullToAbsent || roastLevel != null) {
-      map['roast_level'] = Variable<String>(
-        $CoffeeBeansTable.$converterroastLeveln.toSql(roastLevel),
-      );
-    }
-    if (!nullToAbsent || roastDate != null) {
-      map['roast_date'] = Variable<DateTime>(roastDate);
     }
     {
       map['flavor_tags'] = Variable<String>(
         $CoffeeBeansTable.$converterflavorTags.toSql(flavorTags),
       );
     }
-    map['remaining_grams'] = Variable<double>(remainingGrams);
-    if (!nullToAbsent || initialGrams != null) {
-      map['initial_grams'] = Variable<double>(initialGrams);
-    }
-    if (!nullToAbsent || price != null) {
-      map['price'] = Variable<double>(price);
-    }
+    map['is_favorite'] = Variable<bool>(isFavorite);
     if (!nullToAbsent || photoPath != null) {
       map['photo_path'] = Variable<String>(photoPath);
     }
@@ -471,20 +356,8 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
       process: process == null && nullToAbsent
           ? const Value.absent()
           : Value(process),
-      roastLevel: roastLevel == null && nullToAbsent
-          ? const Value.absent()
-          : Value(roastLevel),
-      roastDate: roastDate == null && nullToAbsent
-          ? const Value.absent()
-          : Value(roastDate),
       flavorTags: Value(flavorTags),
-      remainingGrams: Value(remainingGrams),
-      initialGrams: initialGrams == null && nullToAbsent
-          ? const Value.absent()
-          : Value(initialGrams),
-      price: price == null && nullToAbsent
-          ? const Value.absent()
-          : Value(price),
+      isFavorite: Value(isFavorite),
       photoPath: photoPath == null && nullToAbsent
           ? const Value.absent()
           : Value(photoPath),
@@ -506,17 +379,9 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
       name: serializer.fromJson<String>(json['name']),
       origin: serializer.fromJson<String?>(json['origin']),
       farm: serializer.fromJson<String?>(json['farm']),
-      process: $CoffeeBeansTable.$converterprocessn.fromJson(
-        serializer.fromJson<String?>(json['process']),
-      ),
-      roastLevel: $CoffeeBeansTable.$converterroastLeveln.fromJson(
-        serializer.fromJson<String?>(json['roastLevel']),
-      ),
-      roastDate: serializer.fromJson<DateTime?>(json['roastDate']),
+      process: serializer.fromJson<ProcessMethod?>(json['process']),
       flavorTags: serializer.fromJson<List<String>>(json['flavorTags']),
-      remainingGrams: serializer.fromJson<double>(json['remainingGrams']),
-      initialGrams: serializer.fromJson<double?>(json['initialGrams']),
-      price: serializer.fromJson<double?>(json['price']),
+      isFavorite: serializer.fromJson<bool>(json['isFavorite']),
       photoPath: serializer.fromJson<String?>(json['photoPath']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -531,17 +396,9 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
       'name': serializer.toJson<String>(name),
       'origin': serializer.toJson<String?>(origin),
       'farm': serializer.toJson<String?>(farm),
-      'process': serializer.toJson<String?>(
-        $CoffeeBeansTable.$converterprocessn.toJson(process),
-      ),
-      'roastLevel': serializer.toJson<String?>(
-        $CoffeeBeansTable.$converterroastLeveln.toJson(roastLevel),
-      ),
-      'roastDate': serializer.toJson<DateTime?>(roastDate),
+      'process': serializer.toJson<ProcessMethod?>(process),
       'flavorTags': serializer.toJson<List<String>>(flavorTags),
-      'remainingGrams': serializer.toJson<double>(remainingGrams),
-      'initialGrams': serializer.toJson<double?>(initialGrams),
-      'price': serializer.toJson<double?>(price),
+      'isFavorite': serializer.toJson<bool>(isFavorite),
       'photoPath': serializer.toJson<String?>(photoPath),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -555,12 +412,8 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     Value<String?> origin = const Value.absent(),
     Value<String?> farm = const Value.absent(),
     Value<ProcessMethod?> process = const Value.absent(),
-    Value<RoastLevel?> roastLevel = const Value.absent(),
-    Value<DateTime?> roastDate = const Value.absent(),
     List<String>? flavorTags,
-    double? remainingGrams,
-    Value<double?> initialGrams = const Value.absent(),
-    Value<double?> price = const Value.absent(),
+    bool? isFavorite,
     Value<String?> photoPath = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     DateTime? createdAt,
@@ -571,12 +424,8 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     origin: origin.present ? origin.value : this.origin,
     farm: farm.present ? farm.value : this.farm,
     process: process.present ? process.value : this.process,
-    roastLevel: roastLevel.present ? roastLevel.value : this.roastLevel,
-    roastDate: roastDate.present ? roastDate.value : this.roastDate,
     flavorTags: flavorTags ?? this.flavorTags,
-    remainingGrams: remainingGrams ?? this.remainingGrams,
-    initialGrams: initialGrams.present ? initialGrams.value : this.initialGrams,
-    price: price.present ? price.value : this.price,
+    isFavorite: isFavorite ?? this.isFavorite,
     photoPath: photoPath.present ? photoPath.value : this.photoPath,
     notes: notes.present ? notes.value : this.notes,
     createdAt: createdAt ?? this.createdAt,
@@ -589,20 +438,12 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
       origin: data.origin.present ? data.origin.value : this.origin,
       farm: data.farm.present ? data.farm.value : this.farm,
       process: data.process.present ? data.process.value : this.process,
-      roastLevel: data.roastLevel.present
-          ? data.roastLevel.value
-          : this.roastLevel,
-      roastDate: data.roastDate.present ? data.roastDate.value : this.roastDate,
       flavorTags: data.flavorTags.present
           ? data.flavorTags.value
           : this.flavorTags,
-      remainingGrams: data.remainingGrams.present
-          ? data.remainingGrams.value
-          : this.remainingGrams,
-      initialGrams: data.initialGrams.present
-          ? data.initialGrams.value
-          : this.initialGrams,
-      price: data.price.present ? data.price.value : this.price,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
       photoPath: data.photoPath.present ? data.photoPath.value : this.photoPath,
       notes: data.notes.present ? data.notes.value : this.notes,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -618,12 +459,8 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
           ..write('origin: $origin, ')
           ..write('farm: $farm, ')
           ..write('process: $process, ')
-          ..write('roastLevel: $roastLevel, ')
-          ..write('roastDate: $roastDate, ')
           ..write('flavorTags: $flavorTags, ')
-          ..write('remainingGrams: $remainingGrams, ')
-          ..write('initialGrams: $initialGrams, ')
-          ..write('price: $price, ')
+          ..write('isFavorite: $isFavorite, ')
           ..write('photoPath: $photoPath, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
@@ -639,12 +476,8 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     origin,
     farm,
     process,
-    roastLevel,
-    roastDate,
     flavorTags,
-    remainingGrams,
-    initialGrams,
-    price,
+    isFavorite,
     photoPath,
     notes,
     createdAt,
@@ -659,12 +492,8 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
           other.origin == this.origin &&
           other.farm == this.farm &&
           other.process == this.process &&
-          other.roastLevel == this.roastLevel &&
-          other.roastDate == this.roastDate &&
           other.flavorTags == this.flavorTags &&
-          other.remainingGrams == this.remainingGrams &&
-          other.initialGrams == this.initialGrams &&
-          other.price == this.price &&
+          other.isFavorite == this.isFavorite &&
           other.photoPath == this.photoPath &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
@@ -677,12 +506,8 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
   final Value<String?> origin;
   final Value<String?> farm;
   final Value<ProcessMethod?> process;
-  final Value<RoastLevel?> roastLevel;
-  final Value<DateTime?> roastDate;
   final Value<List<String>> flavorTags;
-  final Value<double> remainingGrams;
-  final Value<double?> initialGrams;
-  final Value<double?> price;
+  final Value<bool> isFavorite;
   final Value<String?> photoPath;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
@@ -693,12 +518,8 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
     this.origin = const Value.absent(),
     this.farm = const Value.absent(),
     this.process = const Value.absent(),
-    this.roastLevel = const Value.absent(),
-    this.roastDate = const Value.absent(),
     this.flavorTags = const Value.absent(),
-    this.remainingGrams = const Value.absent(),
-    this.initialGrams = const Value.absent(),
-    this.price = const Value.absent(),
+    this.isFavorite = const Value.absent(),
     this.photoPath = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -710,12 +531,8 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
     this.origin = const Value.absent(),
     this.farm = const Value.absent(),
     this.process = const Value.absent(),
-    this.roastLevel = const Value.absent(),
-    this.roastDate = const Value.absent(),
     this.flavorTags = const Value.absent(),
-    this.remainingGrams = const Value.absent(),
-    this.initialGrams = const Value.absent(),
-    this.price = const Value.absent(),
+    this.isFavorite = const Value.absent(),
     this.photoPath = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -727,12 +544,8 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
     Expression<String>? origin,
     Expression<String>? farm,
     Expression<String>? process,
-    Expression<String>? roastLevel,
-    Expression<DateTime>? roastDate,
     Expression<String>? flavorTags,
-    Expression<double>? remainingGrams,
-    Expression<double>? initialGrams,
-    Expression<double>? price,
+    Expression<bool>? isFavorite,
     Expression<String>? photoPath,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
@@ -744,12 +557,8 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
       if (origin != null) 'origin': origin,
       if (farm != null) 'farm': farm,
       if (process != null) 'process': process,
-      if (roastLevel != null) 'roast_level': roastLevel,
-      if (roastDate != null) 'roast_date': roastDate,
       if (flavorTags != null) 'flavor_tags': flavorTags,
-      if (remainingGrams != null) 'remaining_grams': remainingGrams,
-      if (initialGrams != null) 'initial_grams': initialGrams,
-      if (price != null) 'price': price,
+      if (isFavorite != null) 'is_favorite': isFavorite,
       if (photoPath != null) 'photo_path': photoPath,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
@@ -763,12 +572,8 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
     Value<String?>? origin,
     Value<String?>? farm,
     Value<ProcessMethod?>? process,
-    Value<RoastLevel?>? roastLevel,
-    Value<DateTime?>? roastDate,
     Value<List<String>>? flavorTags,
-    Value<double>? remainingGrams,
-    Value<double?>? initialGrams,
-    Value<double?>? price,
+    Value<bool>? isFavorite,
     Value<String?>? photoPath,
     Value<String?>? notes,
     Value<DateTime>? createdAt,
@@ -780,12 +585,8 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
       origin: origin ?? this.origin,
       farm: farm ?? this.farm,
       process: process ?? this.process,
-      roastLevel: roastLevel ?? this.roastLevel,
-      roastDate: roastDate ?? this.roastDate,
       flavorTags: flavorTags ?? this.flavorTags,
-      remainingGrams: remainingGrams ?? this.remainingGrams,
-      initialGrams: initialGrams ?? this.initialGrams,
-      price: price ?? this.price,
+      isFavorite: isFavorite ?? this.isFavorite,
       photoPath: photoPath ?? this.photoPath,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
@@ -810,30 +611,16 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
     }
     if (process.present) {
       map['process'] = Variable<String>(
-        $CoffeeBeansTable.$converterprocessn.toSql(process.value),
+        $CoffeeBeansTable.$converterprocess.toSql(process.value),
       );
-    }
-    if (roastLevel.present) {
-      map['roast_level'] = Variable<String>(
-        $CoffeeBeansTable.$converterroastLeveln.toSql(roastLevel.value),
-      );
-    }
-    if (roastDate.present) {
-      map['roast_date'] = Variable<DateTime>(roastDate.value);
     }
     if (flavorTags.present) {
       map['flavor_tags'] = Variable<String>(
         $CoffeeBeansTable.$converterflavorTags.toSql(flavorTags.value),
       );
     }
-    if (remainingGrams.present) {
-      map['remaining_grams'] = Variable<double>(remainingGrams.value);
-    }
-    if (initialGrams.present) {
-      map['initial_grams'] = Variable<double>(initialGrams.value);
-    }
-    if (price.present) {
-      map['price'] = Variable<double>(price.value);
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<bool>(isFavorite.value);
     }
     if (photoPath.present) {
       map['photo_path'] = Variable<String>(photoPath.value);
@@ -858,13 +645,624 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
           ..write('origin: $origin, ')
           ..write('farm: $farm, ')
           ..write('process: $process, ')
-          ..write('roastLevel: $roastLevel, ')
-          ..write('roastDate: $roastDate, ')
           ..write('flavorTags: $flavorTags, ')
+          ..write('isFavorite: $isFavorite, ')
+          ..write('photoPath: $photoPath, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BeanBatchesTable extends BeanBatches
+    with TableInfo<$BeanBatchesTable, BeanBatchRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BeanBatchesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _beanIdMeta = const VerificationMeta('beanId');
+  @override
+  late final GeneratedColumn<int> beanId = GeneratedColumn<int>(
+    'bean_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES coffee_beans (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _roastDateMeta = const VerificationMeta(
+    'roastDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> roastDate = GeneratedColumn<DateTime>(
+    'roast_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<RoastLevel?, String> roastLevel =
+      GeneratedColumn<String>(
+        'roast_level',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<RoastLevel?>($BeanBatchesTable.$converterroastLevel);
+  static const VerificationMeta _remainingGramsMeta = const VerificationMeta(
+    'remainingGrams',
+  );
+  @override
+  late final GeneratedColumn<double> remainingGrams = GeneratedColumn<double>(
+    'remaining_grams',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
+  static const VerificationMeta _initialGramsMeta = const VerificationMeta(
+    'initialGrams',
+  );
+  @override
+  late final GeneratedColumn<double> initialGrams = GeneratedColumn<double>(
+    'initial_grams',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _priceMeta = const VerificationMeta('price');
+  @override
+  late final GeneratedColumn<double> price = GeneratedColumn<double>(
+    'price',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _notesMeta = const VerificationMeta('notes');
+  @override
+  late final GeneratedColumn<String> notes = GeneratedColumn<String>(
+    'notes',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    beanId,
+    roastDate,
+    roastLevel,
+    remainingGrams,
+    initialGrams,
+    price,
+    notes,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'bean_batches';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BeanBatchRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('bean_id')) {
+      context.handle(
+        _beanIdMeta,
+        beanId.isAcceptableOrUnknown(data['bean_id']!, _beanIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_beanIdMeta);
+    }
+    if (data.containsKey('roast_date')) {
+      context.handle(
+        _roastDateMeta,
+        roastDate.isAcceptableOrUnknown(data['roast_date']!, _roastDateMeta),
+      );
+    }
+    if (data.containsKey('remaining_grams')) {
+      context.handle(
+        _remainingGramsMeta,
+        remainingGrams.isAcceptableOrUnknown(
+          data['remaining_grams']!,
+          _remainingGramsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('initial_grams')) {
+      context.handle(
+        _initialGramsMeta,
+        initialGrams.isAcceptableOrUnknown(
+          data['initial_grams']!,
+          _initialGramsMeta,
+        ),
+      );
+    }
+    if (data.containsKey('price')) {
+      context.handle(
+        _priceMeta,
+        price.isAcceptableOrUnknown(data['price']!, _priceMeta),
+      );
+    }
+    if (data.containsKey('notes')) {
+      context.handle(
+        _notesMeta,
+        notes.isAcceptableOrUnknown(data['notes']!, _notesMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BeanBatchRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BeanBatchRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      beanId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}bean_id'],
+      )!,
+      roastDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}roast_date'],
+      ),
+      roastLevel: $BeanBatchesTable.$converterroastLevel.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}roast_level'],
+        ),
+      ),
+      remainingGrams: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}remaining_grams'],
+      )!,
+      initialGrams: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}initial_grams'],
+      ),
+      price: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}price'],
+      ),
+      notes: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}notes'],
+      ),
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $BeanBatchesTable createAlias(String alias) {
+    return $BeanBatchesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<RoastLevel?, String?> $converterroastLevel =
+      const TolerantEnumConverter<RoastLevel>(RoastLevel.values);
+}
+
+class BeanBatchRow extends DataClass implements Insertable<BeanBatchRow> {
+  final int id;
+  final int beanId;
+
+  /// 烘焙日期。
+  final DateTime? roastDate;
+
+  /// 这一袋的烘焙度（同款豆子不同批次可能不同）。
+  final RoastLevel? roastLevel;
+
+  /// 剩余克数（g），下限 0，由 Repository 保证。
+  final double remainingGrams;
+
+  /// 购入总重（g），用于算消耗比例。
+  final double? initialGrams;
+  final double? price;
+  final String? notes;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const BeanBatchRow({
+    required this.id,
+    required this.beanId,
+    this.roastDate,
+    this.roastLevel,
+    required this.remainingGrams,
+    this.initialGrams,
+    this.price,
+    this.notes,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['bean_id'] = Variable<int>(beanId);
+    if (!nullToAbsent || roastDate != null) {
+      map['roast_date'] = Variable<DateTime>(roastDate);
+    }
+    if (!nullToAbsent || roastLevel != null) {
+      map['roast_level'] = Variable<String>(
+        $BeanBatchesTable.$converterroastLevel.toSql(roastLevel),
+      );
+    }
+    map['remaining_grams'] = Variable<double>(remainingGrams);
+    if (!nullToAbsent || initialGrams != null) {
+      map['initial_grams'] = Variable<double>(initialGrams);
+    }
+    if (!nullToAbsent || price != null) {
+      map['price'] = Variable<double>(price);
+    }
+    if (!nullToAbsent || notes != null) {
+      map['notes'] = Variable<String>(notes);
+    }
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  BeanBatchesCompanion toCompanion(bool nullToAbsent) {
+    return BeanBatchesCompanion(
+      id: Value(id),
+      beanId: Value(beanId),
+      roastDate: roastDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(roastDate),
+      roastLevel: roastLevel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(roastLevel),
+      remainingGrams: Value(remainingGrams),
+      initialGrams: initialGrams == null && nullToAbsent
+          ? const Value.absent()
+          : Value(initialGrams),
+      price: price == null && nullToAbsent
+          ? const Value.absent()
+          : Value(price),
+      notes: notes == null && nullToAbsent
+          ? const Value.absent()
+          : Value(notes),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory BeanBatchRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BeanBatchRow(
+      id: serializer.fromJson<int>(json['id']),
+      beanId: serializer.fromJson<int>(json['beanId']),
+      roastDate: serializer.fromJson<DateTime?>(json['roastDate']),
+      roastLevel: serializer.fromJson<RoastLevel?>(json['roastLevel']),
+      remainingGrams: serializer.fromJson<double>(json['remainingGrams']),
+      initialGrams: serializer.fromJson<double?>(json['initialGrams']),
+      price: serializer.fromJson<double?>(json['price']),
+      notes: serializer.fromJson<String?>(json['notes']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'beanId': serializer.toJson<int>(beanId),
+      'roastDate': serializer.toJson<DateTime?>(roastDate),
+      'roastLevel': serializer.toJson<RoastLevel?>(roastLevel),
+      'remainingGrams': serializer.toJson<double>(remainingGrams),
+      'initialGrams': serializer.toJson<double?>(initialGrams),
+      'price': serializer.toJson<double?>(price),
+      'notes': serializer.toJson<String?>(notes),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  BeanBatchRow copyWith({
+    int? id,
+    int? beanId,
+    Value<DateTime?> roastDate = const Value.absent(),
+    Value<RoastLevel?> roastLevel = const Value.absent(),
+    double? remainingGrams,
+    Value<double?> initialGrams = const Value.absent(),
+    Value<double?> price = const Value.absent(),
+    Value<String?> notes = const Value.absent(),
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => BeanBatchRow(
+    id: id ?? this.id,
+    beanId: beanId ?? this.beanId,
+    roastDate: roastDate.present ? roastDate.value : this.roastDate,
+    roastLevel: roastLevel.present ? roastLevel.value : this.roastLevel,
+    remainingGrams: remainingGrams ?? this.remainingGrams,
+    initialGrams: initialGrams.present ? initialGrams.value : this.initialGrams,
+    price: price.present ? price.value : this.price,
+    notes: notes.present ? notes.value : this.notes,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  BeanBatchRow copyWithCompanion(BeanBatchesCompanion data) {
+    return BeanBatchRow(
+      id: data.id.present ? data.id.value : this.id,
+      beanId: data.beanId.present ? data.beanId.value : this.beanId,
+      roastDate: data.roastDate.present ? data.roastDate.value : this.roastDate,
+      roastLevel: data.roastLevel.present
+          ? data.roastLevel.value
+          : this.roastLevel,
+      remainingGrams: data.remainingGrams.present
+          ? data.remainingGrams.value
+          : this.remainingGrams,
+      initialGrams: data.initialGrams.present
+          ? data.initialGrams.value
+          : this.initialGrams,
+      price: data.price.present ? data.price.value : this.price,
+      notes: data.notes.present ? data.notes.value : this.notes,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BeanBatchRow(')
+          ..write('id: $id, ')
+          ..write('beanId: $beanId, ')
+          ..write('roastDate: $roastDate, ')
+          ..write('roastLevel: $roastLevel, ')
           ..write('remainingGrams: $remainingGrams, ')
           ..write('initialGrams: $initialGrams, ')
           ..write('price: $price, ')
-          ..write('photoPath: $photoPath, ')
+          ..write('notes: $notes, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    beanId,
+    roastDate,
+    roastLevel,
+    remainingGrams,
+    initialGrams,
+    price,
+    notes,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BeanBatchRow &&
+          other.id == this.id &&
+          other.beanId == this.beanId &&
+          other.roastDate == this.roastDate &&
+          other.roastLevel == this.roastLevel &&
+          other.remainingGrams == this.remainingGrams &&
+          other.initialGrams == this.initialGrams &&
+          other.price == this.price &&
+          other.notes == this.notes &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class BeanBatchesCompanion extends UpdateCompanion<BeanBatchRow> {
+  final Value<int> id;
+  final Value<int> beanId;
+  final Value<DateTime?> roastDate;
+  final Value<RoastLevel?> roastLevel;
+  final Value<double> remainingGrams;
+  final Value<double?> initialGrams;
+  final Value<double?> price;
+  final Value<String?> notes;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  const BeanBatchesCompanion({
+    this.id = const Value.absent(),
+    this.beanId = const Value.absent(),
+    this.roastDate = const Value.absent(),
+    this.roastLevel = const Value.absent(),
+    this.remainingGrams = const Value.absent(),
+    this.initialGrams = const Value.absent(),
+    this.price = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  });
+  BeanBatchesCompanion.insert({
+    this.id = const Value.absent(),
+    required int beanId,
+    this.roastDate = const Value.absent(),
+    this.roastLevel = const Value.absent(),
+    this.remainingGrams = const Value.absent(),
+    this.initialGrams = const Value.absent(),
+    this.price = const Value.absent(),
+    this.notes = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+  }) : beanId = Value(beanId);
+  static Insertable<BeanBatchRow> custom({
+    Expression<int>? id,
+    Expression<int>? beanId,
+    Expression<DateTime>? roastDate,
+    Expression<String>? roastLevel,
+    Expression<double>? remainingGrams,
+    Expression<double>? initialGrams,
+    Expression<double>? price,
+    Expression<String>? notes,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (beanId != null) 'bean_id': beanId,
+      if (roastDate != null) 'roast_date': roastDate,
+      if (roastLevel != null) 'roast_level': roastLevel,
+      if (remainingGrams != null) 'remaining_grams': remainingGrams,
+      if (initialGrams != null) 'initial_grams': initialGrams,
+      if (price != null) 'price': price,
+      if (notes != null) 'notes': notes,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+    });
+  }
+
+  BeanBatchesCompanion copyWith({
+    Value<int>? id,
+    Value<int>? beanId,
+    Value<DateTime?>? roastDate,
+    Value<RoastLevel?>? roastLevel,
+    Value<double>? remainingGrams,
+    Value<double?>? initialGrams,
+    Value<double?>? price,
+    Value<String?>? notes,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+  }) {
+    return BeanBatchesCompanion(
+      id: id ?? this.id,
+      beanId: beanId ?? this.beanId,
+      roastDate: roastDate ?? this.roastDate,
+      roastLevel: roastLevel ?? this.roastLevel,
+      remainingGrams: remainingGrams ?? this.remainingGrams,
+      initialGrams: initialGrams ?? this.initialGrams,
+      price: price ?? this.price,
+      notes: notes ?? this.notes,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (beanId.present) {
+      map['bean_id'] = Variable<int>(beanId.value);
+    }
+    if (roastDate.present) {
+      map['roast_date'] = Variable<DateTime>(roastDate.value);
+    }
+    if (roastLevel.present) {
+      map['roast_level'] = Variable<String>(
+        $BeanBatchesTable.$converterroastLevel.toSql(roastLevel.value),
+      );
+    }
+    if (remainingGrams.present) {
+      map['remaining_grams'] = Variable<double>(remainingGrams.value);
+    }
+    if (initialGrams.present) {
+      map['initial_grams'] = Variable<double>(initialGrams.value);
+    }
+    if (price.present) {
+      map['price'] = Variable<double>(price.value);
+    }
+    if (notes.present) {
+      map['notes'] = Variable<String>(notes.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BeanBatchesCompanion(')
+          ..write('id: $id, ')
+          ..write('beanId: $beanId, ')
+          ..write('roastDate: $roastDate, ')
+          ..write('roastLevel: $roastLevel, ')
+          ..write('remainingGrams: $remainingGrams, ')
+          ..write('initialGrams: $initialGrams, ')
+          ..write('price: $price, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
@@ -930,7 +1328,7 @@ class $GrindersTable extends Grinders
     requiredDuringInsert: false,
   );
   @override
-  late final GeneratedColumnWithTypeConverter<GrindScaleUnit, String>
+  late final GeneratedColumnWithTypeConverter<GrindScaleUnit?, String>
   scaleUnit = GeneratedColumn<String>(
     'scale_unit',
     aliasedName,
@@ -938,7 +1336,7 @@ class $GrindersTable extends Grinders
     type: DriftSqlType.string,
     requiredDuringInsert: false,
     defaultValue: const Constant('click'),
-  ).withConverter<GrindScaleUnit>($GrindersTable.$converterscaleUnit);
+  ).withConverter<GrindScaleUnit?>($GrindersTable.$converterscaleUnit);
   static const VerificationMeta _zeroPointMeta = const VerificationMeta(
     'zeroPoint',
   );
@@ -1161,10 +1559,8 @@ class $GrindersTable extends Grinders
     return $GrindersTable(attachedDatabase, alias);
   }
 
-  static JsonTypeConverter2<GrindScaleUnit, String, String>
-  $converterscaleUnit = const EnumNameConverter<GrindScaleUnit>(
-    GrindScaleUnit.values,
-  );
+  static TypeConverter<GrindScaleUnit?, String?> $converterscaleUnit =
+      const TolerantEnumConverter<GrindScaleUnit>(GrindScaleUnit.values);
 }
 
 class GrinderRow extends DataClass implements Insertable<GrinderRow> {
@@ -1174,7 +1570,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
 
   /// 刀盘类型：锥刀 / 平刀 / 鬼齿。
   final String? burrType;
-  final GrindScaleUnit scaleUnit;
+  final GrindScaleUnit? scaleUnit;
   final double? zeroPoint;
   final int? clicksPerRevolution;
   final String? calibrationNote;
@@ -1186,7 +1582,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     required this.brand,
     required this.model,
     this.burrType,
-    required this.scaleUnit,
+    this.scaleUnit,
     this.zeroPoint,
     this.clicksPerRevolution,
     this.calibrationNote,
@@ -1203,7 +1599,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     if (!nullToAbsent || burrType != null) {
       map['burr_type'] = Variable<String>(burrType);
     }
-    {
+    if (!nullToAbsent || scaleUnit != null) {
       map['scale_unit'] = Variable<String>(
         $GrindersTable.$converterscaleUnit.toSql(scaleUnit),
       );
@@ -1233,7 +1629,9 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
       burrType: burrType == null && nullToAbsent
           ? const Value.absent()
           : Value(burrType),
-      scaleUnit: Value(scaleUnit),
+      scaleUnit: scaleUnit == null && nullToAbsent
+          ? const Value.absent()
+          : Value(scaleUnit),
       zeroPoint: zeroPoint == null && nullToAbsent
           ? const Value.absent()
           : Value(zeroPoint),
@@ -1261,9 +1659,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
       brand: serializer.fromJson<String>(json['brand']),
       model: serializer.fromJson<String>(json['model']),
       burrType: serializer.fromJson<String?>(json['burrType']),
-      scaleUnit: $GrindersTable.$converterscaleUnit.fromJson(
-        serializer.fromJson<String>(json['scaleUnit']),
-      ),
+      scaleUnit: serializer.fromJson<GrindScaleUnit?>(json['scaleUnit']),
       zeroPoint: serializer.fromJson<double?>(json['zeroPoint']),
       clicksPerRevolution: serializer.fromJson<int?>(
         json['clicksPerRevolution'],
@@ -1282,9 +1678,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
       'brand': serializer.toJson<String>(brand),
       'model': serializer.toJson<String>(model),
       'burrType': serializer.toJson<String?>(burrType),
-      'scaleUnit': serializer.toJson<String>(
-        $GrindersTable.$converterscaleUnit.toJson(scaleUnit),
-      ),
+      'scaleUnit': serializer.toJson<GrindScaleUnit?>(scaleUnit),
       'zeroPoint': serializer.toJson<double?>(zeroPoint),
       'clicksPerRevolution': serializer.toJson<int?>(clicksPerRevolution),
       'calibrationNote': serializer.toJson<String?>(calibrationNote),
@@ -1299,7 +1693,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     String? brand,
     String? model,
     Value<String?> burrType = const Value.absent(),
-    GrindScaleUnit? scaleUnit,
+    Value<GrindScaleUnit?> scaleUnit = const Value.absent(),
     Value<double?> zeroPoint = const Value.absent(),
     Value<int?> clicksPerRevolution = const Value.absent(),
     Value<String?> calibrationNote = const Value.absent(),
@@ -1311,7 +1705,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     brand: brand ?? this.brand,
     model: model ?? this.model,
     burrType: burrType.present ? burrType.value : this.burrType,
-    scaleUnit: scaleUnit ?? this.scaleUnit,
+    scaleUnit: scaleUnit.present ? scaleUnit.value : this.scaleUnit,
     zeroPoint: zeroPoint.present ? zeroPoint.value : this.zeroPoint,
     clicksPerRevolution: clicksPerRevolution.present
         ? clicksPerRevolution.value
@@ -1397,7 +1791,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
   final Value<String> brand;
   final Value<String> model;
   final Value<String?> burrType;
-  final Value<GrindScaleUnit> scaleUnit;
+  final Value<GrindScaleUnit?> scaleUnit;
   final Value<double?> zeroPoint;
   final Value<int?> clicksPerRevolution;
   final Value<String?> calibrationNote;
@@ -1465,7 +1859,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
     Value<String>? brand,
     Value<String>? model,
     Value<String?>? burrType,
-    Value<GrindScaleUnit>? scaleUnit,
+    Value<GrindScaleUnit?>? scaleUnit,
     Value<double?>? zeroPoint,
     Value<int?>? clicksPerRevolution,
     Value<String?>? calibrationNote,
@@ -1580,7 +1974,7 @@ class $RecipesTable extends Recipes with TableInfo<$RecipesTable, RecipeRow> {
     requiredDuringInsert: true,
   );
   @override
-  late final GeneratedColumnWithTypeConverter<BrewMethod, String> method =
+  late final GeneratedColumnWithTypeConverter<BrewMethod?, String> method =
       GeneratedColumn<String>(
         'method',
         aliasedName,
@@ -1588,7 +1982,7 @@ class $RecipesTable extends Recipes with TableInfo<$RecipesTable, RecipeRow> {
         type: DriftSqlType.string,
         requiredDuringInsert: false,
         defaultValue: const Constant('pourOver'),
-      ).withConverter<BrewMethod>($RecipesTable.$convertermethod);
+      ).withConverter<BrewMethod?>($RecipesTable.$convertermethod);
   static const VerificationMeta _doseGramsMeta = const VerificationMeta(
     'doseGrams',
   );
@@ -1867,8 +2261,8 @@ class $RecipesTable extends Recipes with TableInfo<$RecipesTable, RecipeRow> {
     return $RecipesTable(attachedDatabase, alias);
   }
 
-  static JsonTypeConverter2<BrewMethod, String, String> $convertermethod =
-      const EnumNameConverter<BrewMethod>(BrewMethod.values);
+  static TypeConverter<BrewMethod?, String?> $convertermethod =
+      const TolerantEnumConverter<BrewMethod>(BrewMethod.values);
   static TypeConverter<List<PourStage>?, String?> $converterpourStages =
       const PourStageListConverter();
 }
@@ -1876,7 +2270,7 @@ class $RecipesTable extends Recipes with TableInfo<$RecipesTable, RecipeRow> {
 class RecipeRow extends DataClass implements Insertable<RecipeRow> {
   final int id;
   final String name;
-  final BrewMethod method;
+  final BrewMethod? method;
   final double? doseGrams;
   final double? waterGrams;
   final double? ratio;
@@ -1892,7 +2286,7 @@ class RecipeRow extends DataClass implements Insertable<RecipeRow> {
   const RecipeRow({
     required this.id,
     required this.name,
-    required this.method,
+    this.method,
     this.doseGrams,
     this.waterGrams,
     this.ratio,
@@ -1909,7 +2303,7 @@ class RecipeRow extends DataClass implements Insertable<RecipeRow> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['name'] = Variable<String>(name);
-    {
+    if (!nullToAbsent || method != null) {
       map['method'] = Variable<String>(
         $RecipesTable.$convertermethod.toSql(method),
       );
@@ -1949,7 +2343,9 @@ class RecipeRow extends DataClass implements Insertable<RecipeRow> {
     return RecipesCompanion(
       id: Value(id),
       name: Value(name),
-      method: Value(method),
+      method: method == null && nullToAbsent
+          ? const Value.absent()
+          : Value(method),
       doseGrams: doseGrams == null && nullToAbsent
           ? const Value.absent()
           : Value(doseGrams),
@@ -1987,9 +2383,7 @@ class RecipeRow extends DataClass implements Insertable<RecipeRow> {
     return RecipeRow(
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
-      method: $RecipesTable.$convertermethod.fromJson(
-        serializer.fromJson<String>(json['method']),
-      ),
+      method: serializer.fromJson<BrewMethod?>(json['method']),
       doseGrams: serializer.fromJson<double?>(json['doseGrams']),
       waterGrams: serializer.fromJson<double?>(json['waterGrams']),
       ratio: serializer.fromJson<double?>(json['ratio']),
@@ -2008,9 +2402,7 @@ class RecipeRow extends DataClass implements Insertable<RecipeRow> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
-      'method': serializer.toJson<String>(
-        $RecipesTable.$convertermethod.toJson(method),
-      ),
+      'method': serializer.toJson<BrewMethod?>(method),
       'doseGrams': serializer.toJson<double?>(doseGrams),
       'waterGrams': serializer.toJson<double?>(waterGrams),
       'ratio': serializer.toJson<double?>(ratio),
@@ -2027,7 +2419,7 @@ class RecipeRow extends DataClass implements Insertable<RecipeRow> {
   RecipeRow copyWith({
     int? id,
     String? name,
-    BrewMethod? method,
+    Value<BrewMethod?> method = const Value.absent(),
     Value<double?> doseGrams = const Value.absent(),
     Value<double?> waterGrams = const Value.absent(),
     Value<double?> ratio = const Value.absent(),
@@ -2041,7 +2433,7 @@ class RecipeRow extends DataClass implements Insertable<RecipeRow> {
   }) => RecipeRow(
     id: id ?? this.id,
     name: name ?? this.name,
-    method: method ?? this.method,
+    method: method.present ? method.value : this.method,
     doseGrams: doseGrams.present ? doseGrams.value : this.doseGrams,
     waterGrams: waterGrams.present ? waterGrams.value : this.waterGrams,
     ratio: ratio.present ? ratio.value : this.ratio,
@@ -2141,7 +2533,7 @@ class RecipeRow extends DataClass implements Insertable<RecipeRow> {
 class RecipesCompanion extends UpdateCompanion<RecipeRow> {
   final Value<int> id;
   final Value<String> name;
-  final Value<BrewMethod> method;
+  final Value<BrewMethod?> method;
   final Value<double?> doseGrams;
   final Value<double?> waterGrams;
   final Value<double?> ratio;
@@ -2217,7 +2609,7 @@ class RecipesCompanion extends UpdateCompanion<RecipeRow> {
   RecipesCompanion copyWith({
     Value<int>? id,
     Value<String>? name,
-    Value<BrewMethod>? method,
+    Value<BrewMethod?>? method,
     Value<double?>? doseGrams,
     Value<double?>? waterGrams,
     Value<double?>? ratio,
@@ -2376,7 +2768,7 @@ class $BrewLogsTable extends BrewLogs
     ),
   );
   @override
-  late final GeneratedColumnWithTypeConverter<BrewMethod, String> method =
+  late final GeneratedColumnWithTypeConverter<BrewMethod?, String> method =
       GeneratedColumn<String>(
         'method',
         aliasedName,
@@ -2384,7 +2776,7 @@ class $BrewLogsTable extends BrewLogs
         type: DriftSqlType.string,
         requiredDuringInsert: false,
         defaultValue: const Constant('pourOver'),
-      ).withConverter<BrewMethod>($BrewLogsTable.$convertermethod);
+      ).withConverter<BrewMethod?>($BrewLogsTable.$convertermethod);
   static const VerificationMeta _grindSettingMeta = const VerificationMeta(
     'grindSetting',
   );
@@ -2619,6 +3011,27 @@ class $BrewLogsTable extends BrewLogs
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   ).withConverter<List<PourStage>?>($BrewLogsTable.$converterpourStages);
+  static const VerificationMeta _beanRoastDateMeta = const VerificationMeta(
+    'beanRoastDate',
+  );
+  @override
+  late final GeneratedColumn<DateTime> beanRoastDate =
+      GeneratedColumn<DateTime>(
+        'bean_roast_date',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  @override
+  late final GeneratedColumnWithTypeConverter<RoastLevel?, String>
+  beanRoastLevel = GeneratedColumn<String>(
+    'bean_roast_level',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  ).withConverter<RoastLevel?>($BrewLogsTable.$converterbeanRoastLevel);
   static const VerificationMeta _heatLevelMeta = const VerificationMeta(
     'heatLevel',
   );
@@ -2707,6 +3120,8 @@ class $BrewLogsTable extends BrewLogs
     beanTemp,
     pressure,
     pourStages,
+    beanRoastDate,
+    beanRoastLevel,
     heatLevel,
     yieldGrams,
     preheatUpperChamber,
@@ -2884,6 +3299,15 @@ class $BrewLogsTable extends BrewLogs
         pressure.isAcceptableOrUnknown(data['pressure']!, _pressureMeta),
       );
     }
+    if (data.containsKey('bean_roast_date')) {
+      context.handle(
+        _beanRoastDateMeta,
+        beanRoastDate.isAcceptableOrUnknown(
+          data['bean_roast_date']!,
+          _beanRoastDateMeta,
+        ),
+      );
+    }
     if (data.containsKey('heat_level')) {
       context.handle(
         _heatLevelMeta,
@@ -3040,6 +3464,16 @@ class $BrewLogsTable extends BrewLogs
           data['${effectivePrefix}pour_stages'],
         ),
       ),
+      beanRoastDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}bean_roast_date'],
+      ),
+      beanRoastLevel: $BrewLogsTable.$converterbeanRoastLevel.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}bean_roast_level'],
+        ),
+      ),
       heatLevel: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}heat_level'],
@@ -3068,22 +3502,28 @@ class $BrewLogsTable extends BrewLogs
     return $BrewLogsTable(attachedDatabase, alias);
   }
 
-  static JsonTypeConverter2<BrewMethod, String, String> $convertermethod =
-      const EnumNameConverter<BrewMethod>(BrewMethod.values);
+  static TypeConverter<BrewMethod?, String?> $convertermethod =
+      const TolerantEnumConverter<BrewMethod>(BrewMethod.values);
   static TypeConverter<List<String>, String> $converterflavorTags =
       const StringListConverter();
   static TypeConverter<List<PourStage>?, String?> $converterpourStages =
       const PourStageListConverter();
+  static TypeConverter<RoastLevel?, String?> $converterbeanRoastLevel =
+      const TolerantEnumConverter<RoastLevel>(RoastLevel.values);
 }
 
 class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
   final int id;
+
+  /// 主豆（冗余，便于快速查询）。
   final int? beanId;
   final int? grinderId;
   final int? recipeId;
-  final BrewMethod method;
+  final BrewMethod? method;
   final double? grindSetting;
   final int? grindClicks;
+
+  /// 总粉量（拼配时是各支豆子之和）。
   final double? doseGrams;
   final double? waterGrams;
 
@@ -3112,6 +3552,12 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
 
   /// 分段注水，JSON 数组，可为空。
   final List<PourStage>? pourStages;
+
+  /// 烘焙日期。
+  final DateTime? beanRoastDate;
+
+  /// 烘焙度。
+  final RoastLevel? beanRoastLevel;
   final String? heatLevel;
   final double? yieldGrams;
   final bool? preheatUpperChamber;
@@ -3122,7 +3568,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     this.beanId,
     this.grinderId,
     this.recipeId,
-    required this.method,
+    this.method,
     this.grindSetting,
     this.grindClicks,
     this.doseGrams,
@@ -3145,6 +3591,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     this.beanTemp,
     this.pressure,
     this.pourStages,
+    this.beanRoastDate,
+    this.beanRoastLevel,
     this.heatLevel,
     this.yieldGrams,
     this.preheatUpperChamber,
@@ -3164,7 +3612,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     if (!nullToAbsent || recipeId != null) {
       map['recipe_id'] = Variable<int>(recipeId);
     }
-    {
+    if (!nullToAbsent || method != null) {
       map['method'] = Variable<String>(
         $BrewLogsTable.$convertermethod.toSql(method),
       );
@@ -3235,6 +3683,14 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
         $BrewLogsTable.$converterpourStages.toSql(pourStages),
       );
     }
+    if (!nullToAbsent || beanRoastDate != null) {
+      map['bean_roast_date'] = Variable<DateTime>(beanRoastDate);
+    }
+    if (!nullToAbsent || beanRoastLevel != null) {
+      map['bean_roast_level'] = Variable<String>(
+        $BrewLogsTable.$converterbeanRoastLevel.toSql(beanRoastLevel),
+      );
+    }
     if (!nullToAbsent || heatLevel != null) {
       map['heat_level'] = Variable<String>(heatLevel);
     }
@@ -3261,7 +3717,9 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       recipeId: recipeId == null && nullToAbsent
           ? const Value.absent()
           : Value(recipeId),
-      method: Value(method),
+      method: method == null && nullToAbsent
+          ? const Value.absent()
+          : Value(method),
       grindSetting: grindSetting == null && nullToAbsent
           ? const Value.absent()
           : Value(grindSetting),
@@ -3320,6 +3778,12 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       pourStages: pourStages == null && nullToAbsent
           ? const Value.absent()
           : Value(pourStages),
+      beanRoastDate: beanRoastDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(beanRoastDate),
+      beanRoastLevel: beanRoastLevel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(beanRoastLevel),
       heatLevel: heatLevel == null && nullToAbsent
           ? const Value.absent()
           : Value(heatLevel),
@@ -3344,9 +3808,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       beanId: serializer.fromJson<int?>(json['beanId']),
       grinderId: serializer.fromJson<int?>(json['grinderId']),
       recipeId: serializer.fromJson<int?>(json['recipeId']),
-      method: $BrewLogsTable.$convertermethod.fromJson(
-        serializer.fromJson<String>(json['method']),
-      ),
+      method: serializer.fromJson<BrewMethod?>(json['method']),
       grindSetting: serializer.fromJson<double?>(json['grindSetting']),
       grindClicks: serializer.fromJson<int?>(json['grindClicks']),
       doseGrams: serializer.fromJson<double?>(json['doseGrams']),
@@ -3369,6 +3831,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       beanTemp: serializer.fromJson<double?>(json['beanTemp']),
       pressure: serializer.fromJson<double?>(json['pressure']),
       pourStages: serializer.fromJson<List<PourStage>?>(json['pourStages']),
+      beanRoastDate: serializer.fromJson<DateTime?>(json['beanRoastDate']),
+      beanRoastLevel: serializer.fromJson<RoastLevel?>(json['beanRoastLevel']),
       heatLevel: serializer.fromJson<String?>(json['heatLevel']),
       yieldGrams: serializer.fromJson<double?>(json['yieldGrams']),
       preheatUpperChamber: serializer.fromJson<bool?>(
@@ -3386,9 +3850,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       'beanId': serializer.toJson<int?>(beanId),
       'grinderId': serializer.toJson<int?>(grinderId),
       'recipeId': serializer.toJson<int?>(recipeId),
-      'method': serializer.toJson<String>(
-        $BrewLogsTable.$convertermethod.toJson(method),
-      ),
+      'method': serializer.toJson<BrewMethod?>(method),
       'grindSetting': serializer.toJson<double?>(grindSetting),
       'grindClicks': serializer.toJson<int?>(grindClicks),
       'doseGrams': serializer.toJson<double?>(doseGrams),
@@ -3411,6 +3873,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       'beanTemp': serializer.toJson<double?>(beanTemp),
       'pressure': serializer.toJson<double?>(pressure),
       'pourStages': serializer.toJson<List<PourStage>?>(pourStages),
+      'beanRoastDate': serializer.toJson<DateTime?>(beanRoastDate),
+      'beanRoastLevel': serializer.toJson<RoastLevel?>(beanRoastLevel),
       'heatLevel': serializer.toJson<String?>(heatLevel),
       'yieldGrams': serializer.toJson<double?>(yieldGrams),
       'preheatUpperChamber': serializer.toJson<bool?>(preheatUpperChamber),
@@ -3424,7 +3888,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     Value<int?> beanId = const Value.absent(),
     Value<int?> grinderId = const Value.absent(),
     Value<int?> recipeId = const Value.absent(),
-    BrewMethod? method,
+    Value<BrewMethod?> method = const Value.absent(),
     Value<double?> grindSetting = const Value.absent(),
     Value<int?> grindClicks = const Value.absent(),
     Value<double?> doseGrams = const Value.absent(),
@@ -3447,6 +3911,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     Value<double?> beanTemp = const Value.absent(),
     Value<double?> pressure = const Value.absent(),
     Value<List<PourStage>?> pourStages = const Value.absent(),
+    Value<DateTime?> beanRoastDate = const Value.absent(),
+    Value<RoastLevel?> beanRoastLevel = const Value.absent(),
     Value<String?> heatLevel = const Value.absent(),
     Value<double?> yieldGrams = const Value.absent(),
     Value<bool?> preheatUpperChamber = const Value.absent(),
@@ -3457,7 +3923,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     beanId: beanId.present ? beanId.value : this.beanId,
     grinderId: grinderId.present ? grinderId.value : this.grinderId,
     recipeId: recipeId.present ? recipeId.value : this.recipeId,
-    method: method ?? this.method,
+    method: method.present ? method.value : this.method,
     grindSetting: grindSetting.present ? grindSetting.value : this.grindSetting,
     grindClicks: grindClicks.present ? grindClicks.value : this.grindClicks,
     doseGrams: doseGrams.present ? doseGrams.value : this.doseGrams,
@@ -3486,6 +3952,12 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     beanTemp: beanTemp.present ? beanTemp.value : this.beanTemp,
     pressure: pressure.present ? pressure.value : this.pressure,
     pourStages: pourStages.present ? pourStages.value : this.pourStages,
+    beanRoastDate: beanRoastDate.present
+        ? beanRoastDate.value
+        : this.beanRoastDate,
+    beanRoastLevel: beanRoastLevel.present
+        ? beanRoastLevel.value
+        : this.beanRoastLevel,
     heatLevel: heatLevel.present ? heatLevel.value : this.heatLevel,
     yieldGrams: yieldGrams.present ? yieldGrams.value : this.yieldGrams,
     preheatUpperChamber: preheatUpperChamber.present
@@ -3541,6 +4013,12 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       pourStages: data.pourStages.present
           ? data.pourStages.value
           : this.pourStages,
+      beanRoastDate: data.beanRoastDate.present
+          ? data.beanRoastDate.value
+          : this.beanRoastDate,
+      beanRoastLevel: data.beanRoastLevel.present
+          ? data.beanRoastLevel.value
+          : this.beanRoastLevel,
       heatLevel: data.heatLevel.present ? data.heatLevel.value : this.heatLevel,
       yieldGrams: data.yieldGrams.present
           ? data.yieldGrams.value
@@ -3583,6 +4061,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           ..write('beanTemp: $beanTemp, ')
           ..write('pressure: $pressure, ')
           ..write('pourStages: $pourStages, ')
+          ..write('beanRoastDate: $beanRoastDate, ')
+          ..write('beanRoastLevel: $beanRoastLevel, ')
           ..write('heatLevel: $heatLevel, ')
           ..write('yieldGrams: $yieldGrams, ')
           ..write('preheatUpperChamber: $preheatUpperChamber, ')
@@ -3621,6 +4101,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     beanTemp,
     pressure,
     pourStages,
+    beanRoastDate,
+    beanRoastLevel,
     heatLevel,
     yieldGrams,
     preheatUpperChamber,
@@ -3658,6 +4140,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           other.beanTemp == this.beanTemp &&
           other.pressure == this.pressure &&
           other.pourStages == this.pourStages &&
+          other.beanRoastDate == this.beanRoastDate &&
+          other.beanRoastLevel == this.beanRoastLevel &&
           other.heatLevel == this.heatLevel &&
           other.yieldGrams == this.yieldGrams &&
           other.preheatUpperChamber == this.preheatUpperChamber &&
@@ -3670,7 +4154,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
   final Value<int?> beanId;
   final Value<int?> grinderId;
   final Value<int?> recipeId;
-  final Value<BrewMethod> method;
+  final Value<BrewMethod?> method;
   final Value<double?> grindSetting;
   final Value<int?> grindClicks;
   final Value<double?> doseGrams;
@@ -3693,6 +4177,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
   final Value<double?> beanTemp;
   final Value<double?> pressure;
   final Value<List<PourStage>?> pourStages;
+  final Value<DateTime?> beanRoastDate;
+  final Value<RoastLevel?> beanRoastLevel;
   final Value<String?> heatLevel;
   final Value<double?> yieldGrams;
   final Value<bool?> preheatUpperChamber;
@@ -3726,6 +4212,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     this.beanTemp = const Value.absent(),
     this.pressure = const Value.absent(),
     this.pourStages = const Value.absent(),
+    this.beanRoastDate = const Value.absent(),
+    this.beanRoastLevel = const Value.absent(),
     this.heatLevel = const Value.absent(),
     this.yieldGrams = const Value.absent(),
     this.preheatUpperChamber = const Value.absent(),
@@ -3760,6 +4248,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     this.beanTemp = const Value.absent(),
     this.pressure = const Value.absent(),
     this.pourStages = const Value.absent(),
+    this.beanRoastDate = const Value.absent(),
+    this.beanRoastLevel = const Value.absent(),
     this.heatLevel = const Value.absent(),
     this.yieldGrams = const Value.absent(),
     this.preheatUpperChamber = const Value.absent(),
@@ -3794,6 +4284,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Expression<double>? beanTemp,
     Expression<double>? pressure,
     Expression<String>? pourStages,
+    Expression<DateTime>? beanRoastDate,
+    Expression<String>? beanRoastLevel,
     Expression<String>? heatLevel,
     Expression<double>? yieldGrams,
     Expression<bool>? preheatUpperChamber,
@@ -3828,6 +4320,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       if (beanTemp != null) 'bean_temp': beanTemp,
       if (pressure != null) 'pressure': pressure,
       if (pourStages != null) 'pour_stages': pourStages,
+      if (beanRoastDate != null) 'bean_roast_date': beanRoastDate,
+      if (beanRoastLevel != null) 'bean_roast_level': beanRoastLevel,
       if (heatLevel != null) 'heat_level': heatLevel,
       if (yieldGrams != null) 'yield_grams': yieldGrams,
       if (preheatUpperChamber != null)
@@ -3842,7 +4336,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Value<int?>? beanId,
     Value<int?>? grinderId,
     Value<int?>? recipeId,
-    Value<BrewMethod>? method,
+    Value<BrewMethod?>? method,
     Value<double?>? grindSetting,
     Value<int?>? grindClicks,
     Value<double?>? doseGrams,
@@ -3865,6 +4359,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Value<double?>? beanTemp,
     Value<double?>? pressure,
     Value<List<PourStage>?>? pourStages,
+    Value<DateTime?>? beanRoastDate,
+    Value<RoastLevel?>? beanRoastLevel,
     Value<String?>? heatLevel,
     Value<double?>? yieldGrams,
     Value<bool?>? preheatUpperChamber,
@@ -3899,6 +4395,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       beanTemp: beanTemp ?? this.beanTemp,
       pressure: pressure ?? this.pressure,
       pourStages: pourStages ?? this.pourStages,
+      beanRoastDate: beanRoastDate ?? this.beanRoastDate,
+      beanRoastLevel: beanRoastLevel ?? this.beanRoastLevel,
       heatLevel: heatLevel ?? this.heatLevel,
       yieldGrams: yieldGrams ?? this.yieldGrams,
       preheatUpperChamber: preheatUpperChamber ?? this.preheatUpperChamber,
@@ -3997,6 +4495,14 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
         $BrewLogsTable.$converterpourStages.toSql(pourStages.value),
       );
     }
+    if (beanRoastDate.present) {
+      map['bean_roast_date'] = Variable<DateTime>(beanRoastDate.value);
+    }
+    if (beanRoastLevel.present) {
+      map['bean_roast_level'] = Variable<String>(
+        $BrewLogsTable.$converterbeanRoastLevel.toSql(beanRoastLevel.value),
+      );
+    }
     if (heatLevel.present) {
       map['heat_level'] = Variable<String>(heatLevel.value);
     }
@@ -4045,11 +4551,551 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
           ..write('beanTemp: $beanTemp, ')
           ..write('pressure: $pressure, ')
           ..write('pourStages: $pourStages, ')
+          ..write('beanRoastDate: $beanRoastDate, ')
+          ..write('beanRoastLevel: $beanRoastLevel, ')
           ..write('heatLevel: $heatLevel, ')
           ..write('yieldGrams: $yieldGrams, ')
           ..write('preheatUpperChamber: $preheatUpperChamber, ')
           ..write('createdAt: $createdAt, ')
           ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BrewLogBeansTable extends BrewLogBeans
+    with TableInfo<$BrewLogBeansTable, BeanUsageRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BrewLogBeansTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _brewLogIdMeta = const VerificationMeta(
+    'brewLogId',
+  );
+  @override
+  late final GeneratedColumn<int> brewLogId = GeneratedColumn<int>(
+    'brew_log_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES brew_logs (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _beanIdMeta = const VerificationMeta('beanId');
+  @override
+  late final GeneratedColumn<int> beanId = GeneratedColumn<int>(
+    'bean_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES coffee_beans (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _batchIdMeta = const VerificationMeta(
+    'batchId',
+  );
+  @override
+  late final GeneratedColumn<int> batchId = GeneratedColumn<int>(
+    'batch_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES bean_batches (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _beanNameSnapshotMeta = const VerificationMeta(
+    'beanNameSnapshot',
+  );
+  @override
+  late final GeneratedColumn<String> beanNameSnapshot = GeneratedColumn<String>(
+    'bean_name_snapshot',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _roastDateSnapshotMeta = const VerificationMeta(
+    'roastDateSnapshot',
+  );
+  @override
+  late final GeneratedColumn<DateTime> roastDateSnapshot =
+      GeneratedColumn<DateTime>(
+        'roast_date_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.dateTime,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _doseGramsMeta = const VerificationMeta(
+    'doseGrams',
+  );
+  @override
+  late final GeneratedColumn<double> doseGrams = GeneratedColumn<double>(
+    'dose_grams',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0.0),
+  );
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    brewLogId,
+    beanId,
+    batchId,
+    beanNameSnapshot,
+    roastDateSnapshot,
+    doseGrams,
+    position,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'brew_log_beans';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BeanUsageRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('brew_log_id')) {
+      context.handle(
+        _brewLogIdMeta,
+        brewLogId.isAcceptableOrUnknown(data['brew_log_id']!, _brewLogIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_brewLogIdMeta);
+    }
+    if (data.containsKey('bean_id')) {
+      context.handle(
+        _beanIdMeta,
+        beanId.isAcceptableOrUnknown(data['bean_id']!, _beanIdMeta),
+      );
+    }
+    if (data.containsKey('batch_id')) {
+      context.handle(
+        _batchIdMeta,
+        batchId.isAcceptableOrUnknown(data['batch_id']!, _batchIdMeta),
+      );
+    }
+    if (data.containsKey('bean_name_snapshot')) {
+      context.handle(
+        _beanNameSnapshotMeta,
+        beanNameSnapshot.isAcceptableOrUnknown(
+          data['bean_name_snapshot']!,
+          _beanNameSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('roast_date_snapshot')) {
+      context.handle(
+        _roastDateSnapshotMeta,
+        roastDateSnapshot.isAcceptableOrUnknown(
+          data['roast_date_snapshot']!,
+          _roastDateSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('dose_grams')) {
+      context.handle(
+        _doseGramsMeta,
+        doseGrams.isAcceptableOrUnknown(data['dose_grams']!, _doseGramsMeta),
+      );
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BeanUsageRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BeanUsageRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      brewLogId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}brew_log_id'],
+      )!,
+      beanId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}bean_id'],
+      ),
+      batchId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}batch_id'],
+      ),
+      beanNameSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}bean_name_snapshot'],
+      ),
+      roastDateSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}roast_date_snapshot'],
+      ),
+      doseGrams: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}dose_grams'],
+      )!,
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+    );
+  }
+
+  @override
+  $BrewLogBeansTable createAlias(String alias) {
+    return $BrewLogBeansTable(attachedDatabase, alias);
+  }
+}
+
+class BeanUsageRow extends DataClass implements Insertable<BeanUsageRow> {
+  final int id;
+  final int brewLogId;
+
+  /// 豆子被删除时置空——用量行本身要保留。
+  final int? beanId;
+
+  /// 消费的批次。批次被删时置空，历史记录仍保留。
+  final int? batchId;
+
+  /// 当时的豆子名快照：豆子被删或改名后，记录仍能显示用的什么豆。
+  final String? beanNameSnapshot;
+
+  /// 当时的烘焙日期快照。
+  final DateTime? roastDateSnapshot;
+
+  /// 这一支豆子用了多少克。
+  final double doseGrams;
+
+  /// 顺序，0 是主豆。
+  final int position;
+  const BeanUsageRow({
+    required this.id,
+    required this.brewLogId,
+    this.beanId,
+    this.batchId,
+    this.beanNameSnapshot,
+    this.roastDateSnapshot,
+    required this.doseGrams,
+    required this.position,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['brew_log_id'] = Variable<int>(brewLogId);
+    if (!nullToAbsent || beanId != null) {
+      map['bean_id'] = Variable<int>(beanId);
+    }
+    if (!nullToAbsent || batchId != null) {
+      map['batch_id'] = Variable<int>(batchId);
+    }
+    if (!nullToAbsent || beanNameSnapshot != null) {
+      map['bean_name_snapshot'] = Variable<String>(beanNameSnapshot);
+    }
+    if (!nullToAbsent || roastDateSnapshot != null) {
+      map['roast_date_snapshot'] = Variable<DateTime>(roastDateSnapshot);
+    }
+    map['dose_grams'] = Variable<double>(doseGrams);
+    map['position'] = Variable<int>(position);
+    return map;
+  }
+
+  BrewLogBeansCompanion toCompanion(bool nullToAbsent) {
+    return BrewLogBeansCompanion(
+      id: Value(id),
+      brewLogId: Value(brewLogId),
+      beanId: beanId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(beanId),
+      batchId: batchId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(batchId),
+      beanNameSnapshot: beanNameSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(beanNameSnapshot),
+      roastDateSnapshot: roastDateSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(roastDateSnapshot),
+      doseGrams: Value(doseGrams),
+      position: Value(position),
+    );
+  }
+
+  factory BeanUsageRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BeanUsageRow(
+      id: serializer.fromJson<int>(json['id']),
+      brewLogId: serializer.fromJson<int>(json['brewLogId']),
+      beanId: serializer.fromJson<int?>(json['beanId']),
+      batchId: serializer.fromJson<int?>(json['batchId']),
+      beanNameSnapshot: serializer.fromJson<String?>(json['beanNameSnapshot']),
+      roastDateSnapshot: serializer.fromJson<DateTime?>(
+        json['roastDateSnapshot'],
+      ),
+      doseGrams: serializer.fromJson<double>(json['doseGrams']),
+      position: serializer.fromJson<int>(json['position']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'brewLogId': serializer.toJson<int>(brewLogId),
+      'beanId': serializer.toJson<int?>(beanId),
+      'batchId': serializer.toJson<int?>(batchId),
+      'beanNameSnapshot': serializer.toJson<String?>(beanNameSnapshot),
+      'roastDateSnapshot': serializer.toJson<DateTime?>(roastDateSnapshot),
+      'doseGrams': serializer.toJson<double>(doseGrams),
+      'position': serializer.toJson<int>(position),
+    };
+  }
+
+  BeanUsageRow copyWith({
+    int? id,
+    int? brewLogId,
+    Value<int?> beanId = const Value.absent(),
+    Value<int?> batchId = const Value.absent(),
+    Value<String?> beanNameSnapshot = const Value.absent(),
+    Value<DateTime?> roastDateSnapshot = const Value.absent(),
+    double? doseGrams,
+    int? position,
+  }) => BeanUsageRow(
+    id: id ?? this.id,
+    brewLogId: brewLogId ?? this.brewLogId,
+    beanId: beanId.present ? beanId.value : this.beanId,
+    batchId: batchId.present ? batchId.value : this.batchId,
+    beanNameSnapshot: beanNameSnapshot.present
+        ? beanNameSnapshot.value
+        : this.beanNameSnapshot,
+    roastDateSnapshot: roastDateSnapshot.present
+        ? roastDateSnapshot.value
+        : this.roastDateSnapshot,
+    doseGrams: doseGrams ?? this.doseGrams,
+    position: position ?? this.position,
+  );
+  BeanUsageRow copyWithCompanion(BrewLogBeansCompanion data) {
+    return BeanUsageRow(
+      id: data.id.present ? data.id.value : this.id,
+      brewLogId: data.brewLogId.present ? data.brewLogId.value : this.brewLogId,
+      beanId: data.beanId.present ? data.beanId.value : this.beanId,
+      batchId: data.batchId.present ? data.batchId.value : this.batchId,
+      beanNameSnapshot: data.beanNameSnapshot.present
+          ? data.beanNameSnapshot.value
+          : this.beanNameSnapshot,
+      roastDateSnapshot: data.roastDateSnapshot.present
+          ? data.roastDateSnapshot.value
+          : this.roastDateSnapshot,
+      doseGrams: data.doseGrams.present ? data.doseGrams.value : this.doseGrams,
+      position: data.position.present ? data.position.value : this.position,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BeanUsageRow(')
+          ..write('id: $id, ')
+          ..write('brewLogId: $brewLogId, ')
+          ..write('beanId: $beanId, ')
+          ..write('batchId: $batchId, ')
+          ..write('beanNameSnapshot: $beanNameSnapshot, ')
+          ..write('roastDateSnapshot: $roastDateSnapshot, ')
+          ..write('doseGrams: $doseGrams, ')
+          ..write('position: $position')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    id,
+    brewLogId,
+    beanId,
+    batchId,
+    beanNameSnapshot,
+    roastDateSnapshot,
+    doseGrams,
+    position,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BeanUsageRow &&
+          other.id == this.id &&
+          other.brewLogId == this.brewLogId &&
+          other.beanId == this.beanId &&
+          other.batchId == this.batchId &&
+          other.beanNameSnapshot == this.beanNameSnapshot &&
+          other.roastDateSnapshot == this.roastDateSnapshot &&
+          other.doseGrams == this.doseGrams &&
+          other.position == this.position);
+}
+
+class BrewLogBeansCompanion extends UpdateCompanion<BeanUsageRow> {
+  final Value<int> id;
+  final Value<int> brewLogId;
+  final Value<int?> beanId;
+  final Value<int?> batchId;
+  final Value<String?> beanNameSnapshot;
+  final Value<DateTime?> roastDateSnapshot;
+  final Value<double> doseGrams;
+  final Value<int> position;
+  const BrewLogBeansCompanion({
+    this.id = const Value.absent(),
+    this.brewLogId = const Value.absent(),
+    this.beanId = const Value.absent(),
+    this.batchId = const Value.absent(),
+    this.beanNameSnapshot = const Value.absent(),
+    this.roastDateSnapshot = const Value.absent(),
+    this.doseGrams = const Value.absent(),
+    this.position = const Value.absent(),
+  });
+  BrewLogBeansCompanion.insert({
+    this.id = const Value.absent(),
+    required int brewLogId,
+    this.beanId = const Value.absent(),
+    this.batchId = const Value.absent(),
+    this.beanNameSnapshot = const Value.absent(),
+    this.roastDateSnapshot = const Value.absent(),
+    this.doseGrams = const Value.absent(),
+    this.position = const Value.absent(),
+  }) : brewLogId = Value(brewLogId);
+  static Insertable<BeanUsageRow> custom({
+    Expression<int>? id,
+    Expression<int>? brewLogId,
+    Expression<int>? beanId,
+    Expression<int>? batchId,
+    Expression<String>? beanNameSnapshot,
+    Expression<DateTime>? roastDateSnapshot,
+    Expression<double>? doseGrams,
+    Expression<int>? position,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (brewLogId != null) 'brew_log_id': brewLogId,
+      if (beanId != null) 'bean_id': beanId,
+      if (batchId != null) 'batch_id': batchId,
+      if (beanNameSnapshot != null) 'bean_name_snapshot': beanNameSnapshot,
+      if (roastDateSnapshot != null) 'roast_date_snapshot': roastDateSnapshot,
+      if (doseGrams != null) 'dose_grams': doseGrams,
+      if (position != null) 'position': position,
+    });
+  }
+
+  BrewLogBeansCompanion copyWith({
+    Value<int>? id,
+    Value<int>? brewLogId,
+    Value<int?>? beanId,
+    Value<int?>? batchId,
+    Value<String?>? beanNameSnapshot,
+    Value<DateTime?>? roastDateSnapshot,
+    Value<double>? doseGrams,
+    Value<int>? position,
+  }) {
+    return BrewLogBeansCompanion(
+      id: id ?? this.id,
+      brewLogId: brewLogId ?? this.brewLogId,
+      beanId: beanId ?? this.beanId,
+      batchId: batchId ?? this.batchId,
+      beanNameSnapshot: beanNameSnapshot ?? this.beanNameSnapshot,
+      roastDateSnapshot: roastDateSnapshot ?? this.roastDateSnapshot,
+      doseGrams: doseGrams ?? this.doseGrams,
+      position: position ?? this.position,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (brewLogId.present) {
+      map['brew_log_id'] = Variable<int>(brewLogId.value);
+    }
+    if (beanId.present) {
+      map['bean_id'] = Variable<int>(beanId.value);
+    }
+    if (batchId.present) {
+      map['batch_id'] = Variable<int>(batchId.value);
+    }
+    if (beanNameSnapshot.present) {
+      map['bean_name_snapshot'] = Variable<String>(beanNameSnapshot.value);
+    }
+    if (roastDateSnapshot.present) {
+      map['roast_date_snapshot'] = Variable<DateTime>(roastDateSnapshot.value);
+    }
+    if (doseGrams.present) {
+      map['dose_grams'] = Variable<double>(doseGrams.value);
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BrewLogBeansCompanion(')
+          ..write('id: $id, ')
+          ..write('brewLogId: $brewLogId, ')
+          ..write('beanId: $beanId, ')
+          ..write('batchId: $batchId, ')
+          ..write('beanNameSnapshot: $beanNameSnapshot, ')
+          ..write('roastDateSnapshot: $roastDateSnapshot, ')
+          ..write('doseGrams: $doseGrams, ')
+          ..write('position: $position')
           ..write(')'))
         .toString();
   }
@@ -4319,27 +5365,702 @@ class AppSettingsCompanion extends UpdateCompanion<AppSettingRow> {
   }
 }
 
+class $ExtraAttributesTable extends ExtraAttributes
+    with TableInfo<$ExtraAttributesTable, ExtraAttributeRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ExtraAttributesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _ownerTypeMeta = const VerificationMeta(
+    'ownerType',
+  );
+  @override
+  late final GeneratedColumn<String> ownerType = GeneratedColumn<String>(
+    'owner_type',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 32,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _ownerIdMeta = const VerificationMeta(
+    'ownerId',
+  );
+  @override
+  late final GeneratedColumn<int> ownerId = GeneratedColumn<int>(
+    'owner_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _keyMeta = const VerificationMeta('key');
+  @override
+  late final GeneratedColumn<String> key = GeneratedColumn<String>(
+    'key',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 64,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<Object?, String> value =
+      GeneratedColumn<String>(
+        'value',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      ).withConverter<Object?>($ExtraAttributesTable.$convertervalue);
+  static const VerificationMeta _valueTypeMeta = const VerificationMeta(
+    'valueType',
+  );
+  @override
+  late final GeneratedColumn<String> valueType = GeneratedColumn<String>(
+    'value_type',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 16,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _labelMeta = const VerificationMeta('label');
+  @override
+  late final GeneratedColumn<String> label = GeneratedColumn<String>(
+    'label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _isBuiltinMeta = const VerificationMeta(
+    'isBuiltin',
+  );
+  @override
+  late final GeneratedColumn<bool> isBuiltin = GeneratedColumn<bool>(
+    'is_builtin',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_builtin" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  static const VerificationMeta _updatedAtMeta = const VerificationMeta(
+    'updatedAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> updatedAt = GeneratedColumn<DateTime>(
+    'updated_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    ownerType,
+    ownerId,
+    key,
+    value,
+    valueType,
+    label,
+    isBuiltin,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'extra_attributes';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ExtraAttributeRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('owner_type')) {
+      context.handle(
+        _ownerTypeMeta,
+        ownerType.isAcceptableOrUnknown(data['owner_type']!, _ownerTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerTypeMeta);
+    }
+    if (data.containsKey('owner_id')) {
+      context.handle(
+        _ownerIdMeta,
+        ownerId.isAcceptableOrUnknown(data['owner_id']!, _ownerIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_ownerIdMeta);
+    }
+    if (data.containsKey('key')) {
+      context.handle(
+        _keyMeta,
+        key.isAcceptableOrUnknown(data['key']!, _keyMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keyMeta);
+    }
+    if (data.containsKey('value_type')) {
+      context.handle(
+        _valueTypeMeta,
+        valueType.isAcceptableOrUnknown(data['value_type']!, _valueTypeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_valueTypeMeta);
+    }
+    if (data.containsKey('label')) {
+      context.handle(
+        _labelMeta,
+        label.isAcceptableOrUnknown(data['label']!, _labelMeta),
+      );
+    }
+    if (data.containsKey('is_builtin')) {
+      context.handle(
+        _isBuiltinMeta,
+        isBuiltin.isAcceptableOrUnknown(data['is_builtin']!, _isBuiltinMeta),
+      );
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    if (data.containsKey('updated_at')) {
+      context.handle(
+        _updatedAtMeta,
+        updatedAt.isAcceptableOrUnknown(data['updated_at']!, _updatedAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {ownerType, ownerId, key};
+  @override
+  ExtraAttributeRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ExtraAttributeRow(
+      ownerType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}owner_type'],
+      )!,
+      ownerId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}owner_id'],
+      )!,
+      key: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}key'],
+      )!,
+      value: $ExtraAttributesTable.$convertervalue.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}value'],
+        ),
+      ),
+      valueType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}value_type'],
+      )!,
+      label: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}label'],
+      ),
+      isBuiltin: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_builtin'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+      updatedAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}updated_at'],
+      )!,
+    );
+  }
+
+  @override
+  $ExtraAttributesTable createAlias(String alias) {
+    return $ExtraAttributesTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<Object?, String?> $convertervalue =
+      const JsonValueConverter();
+}
+
+class ExtraAttributeRow extends DataClass
+    implements Insertable<ExtraAttributeRow> {
+  /// 归属对象的类型：`bean` / `grinder`（见 `ExtraOwnerType`）。
+  final String ownerType;
+
+  /// 归属对象的 id。
+  final int ownerId;
+
+  /// 属性名（稳定标识，不随界面文案变化）。
+  final String key;
+
+  /// 属性值，JSON 编码。
+  final Object? value;
+
+  /// 值类型名（`ExtraValueType`），便于 UI 决定控件与展示。
+  final String valueType;
+
+  /// 展示名。留空时 UI 直接用 [key]。
+  final String? label;
+
+  /// 是否是 App 内置属性（内置的不可删除）。
+  final bool isBuiltin;
+
+  /// 展示顺序。
+  final int sortOrder;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  const ExtraAttributeRow({
+    required this.ownerType,
+    required this.ownerId,
+    required this.key,
+    this.value,
+    required this.valueType,
+    this.label,
+    required this.isBuiltin,
+    required this.sortOrder,
+    required this.createdAt,
+    required this.updatedAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['owner_type'] = Variable<String>(ownerType);
+    map['owner_id'] = Variable<int>(ownerId);
+    map['key'] = Variable<String>(key);
+    if (!nullToAbsent || value != null) {
+      map['value'] = Variable<String>(
+        $ExtraAttributesTable.$convertervalue.toSql(value),
+      );
+    }
+    map['value_type'] = Variable<String>(valueType);
+    if (!nullToAbsent || label != null) {
+      map['label'] = Variable<String>(label);
+    }
+    map['is_builtin'] = Variable<bool>(isBuiltin);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    map['updated_at'] = Variable<DateTime>(updatedAt);
+    return map;
+  }
+
+  ExtraAttributesCompanion toCompanion(bool nullToAbsent) {
+    return ExtraAttributesCompanion(
+      ownerType: Value(ownerType),
+      ownerId: Value(ownerId),
+      key: Value(key),
+      value: value == null && nullToAbsent
+          ? const Value.absent()
+          : Value(value),
+      valueType: Value(valueType),
+      label: label == null && nullToAbsent
+          ? const Value.absent()
+          : Value(label),
+      isBuiltin: Value(isBuiltin),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+      updatedAt: Value(updatedAt),
+    );
+  }
+
+  factory ExtraAttributeRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ExtraAttributeRow(
+      ownerType: serializer.fromJson<String>(json['ownerType']),
+      ownerId: serializer.fromJson<int>(json['ownerId']),
+      key: serializer.fromJson<String>(json['key']),
+      value: serializer.fromJson<Object?>(json['value']),
+      valueType: serializer.fromJson<String>(json['valueType']),
+      label: serializer.fromJson<String?>(json['label']),
+      isBuiltin: serializer.fromJson<bool>(json['isBuiltin']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+      updatedAt: serializer.fromJson<DateTime>(json['updatedAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'ownerType': serializer.toJson<String>(ownerType),
+      'ownerId': serializer.toJson<int>(ownerId),
+      'key': serializer.toJson<String>(key),
+      'value': serializer.toJson<Object?>(value),
+      'valueType': serializer.toJson<String>(valueType),
+      'label': serializer.toJson<String?>(label),
+      'isBuiltin': serializer.toJson<bool>(isBuiltin),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+      'updatedAt': serializer.toJson<DateTime>(updatedAt),
+    };
+  }
+
+  ExtraAttributeRow copyWith({
+    String? ownerType,
+    int? ownerId,
+    String? key,
+    Value<Object?> value = const Value.absent(),
+    String? valueType,
+    Value<String?> label = const Value.absent(),
+    bool? isBuiltin,
+    int? sortOrder,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) => ExtraAttributeRow(
+    ownerType: ownerType ?? this.ownerType,
+    ownerId: ownerId ?? this.ownerId,
+    key: key ?? this.key,
+    value: value.present ? value.value : this.value,
+    valueType: valueType ?? this.valueType,
+    label: label.present ? label.value : this.label,
+    isBuiltin: isBuiltin ?? this.isBuiltin,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+  ExtraAttributeRow copyWithCompanion(ExtraAttributesCompanion data) {
+    return ExtraAttributeRow(
+      ownerType: data.ownerType.present ? data.ownerType.value : this.ownerType,
+      ownerId: data.ownerId.present ? data.ownerId.value : this.ownerId,
+      key: data.key.present ? data.key.value : this.key,
+      value: data.value.present ? data.value.value : this.value,
+      valueType: data.valueType.present ? data.valueType.value : this.valueType,
+      label: data.label.present ? data.label.value : this.label,
+      isBuiltin: data.isBuiltin.present ? data.isBuiltin.value : this.isBuiltin,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+      updatedAt: data.updatedAt.present ? data.updatedAt.value : this.updatedAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExtraAttributeRow(')
+          ..write('ownerType: $ownerType, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('valueType: $valueType, ')
+          ..write('label: $label, ')
+          ..write('isBuiltin: $isBuiltin, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    ownerType,
+    ownerId,
+    key,
+    value,
+    valueType,
+    label,
+    isBuiltin,
+    sortOrder,
+    createdAt,
+    updatedAt,
+  );
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ExtraAttributeRow &&
+          other.ownerType == this.ownerType &&
+          other.ownerId == this.ownerId &&
+          other.key == this.key &&
+          other.value == this.value &&
+          other.valueType == this.valueType &&
+          other.label == this.label &&
+          other.isBuiltin == this.isBuiltin &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt &&
+          other.updatedAt == this.updatedAt);
+}
+
+class ExtraAttributesCompanion extends UpdateCompanion<ExtraAttributeRow> {
+  final Value<String> ownerType;
+  final Value<int> ownerId;
+  final Value<String> key;
+  final Value<Object?> value;
+  final Value<String> valueType;
+  final Value<String?> label;
+  final Value<bool> isBuiltin;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  final Value<DateTime> updatedAt;
+  final Value<int> rowid;
+  const ExtraAttributesCompanion({
+    this.ownerType = const Value.absent(),
+    this.ownerId = const Value.absent(),
+    this.key = const Value.absent(),
+    this.value = const Value.absent(),
+    this.valueType = const Value.absent(),
+    this.label = const Value.absent(),
+    this.isBuiltin = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ExtraAttributesCompanion.insert({
+    required String ownerType,
+    required int ownerId,
+    required String key,
+    this.value = const Value.absent(),
+    required String valueType,
+    this.label = const Value.absent(),
+    this.isBuiltin = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+    this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
+  }) : ownerType = Value(ownerType),
+       ownerId = Value(ownerId),
+       key = Value(key),
+       valueType = Value(valueType);
+  static Insertable<ExtraAttributeRow> custom({
+    Expression<String>? ownerType,
+    Expression<int>? ownerId,
+    Expression<String>? key,
+    Expression<String>? value,
+    Expression<String>? valueType,
+    Expression<String>? label,
+    Expression<bool>? isBuiltin,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+    Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (ownerType != null) 'owner_type': ownerType,
+      if (ownerId != null) 'owner_id': ownerId,
+      if (key != null) 'key': key,
+      if (value != null) 'value': value,
+      if (valueType != null) 'value_type': valueType,
+      if (label != null) 'label': label,
+      if (isBuiltin != null) 'is_builtin': isBuiltin,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+      if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ExtraAttributesCompanion copyWith({
+    Value<String>? ownerType,
+    Value<int>? ownerId,
+    Value<String>? key,
+    Value<Object?>? value,
+    Value<String>? valueType,
+    Value<String?>? label,
+    Value<bool>? isBuiltin,
+    Value<int>? sortOrder,
+    Value<DateTime>? createdAt,
+    Value<DateTime>? updatedAt,
+    Value<int>? rowid,
+  }) {
+    return ExtraAttributesCompanion(
+      ownerType: ownerType ?? this.ownerType,
+      ownerId: ownerId ?? this.ownerId,
+      key: key ?? this.key,
+      value: value ?? this.value,
+      valueType: valueType ?? this.valueType,
+      label: label ?? this.label,
+      isBuiltin: isBuiltin ?? this.isBuiltin,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (ownerType.present) {
+      map['owner_type'] = Variable<String>(ownerType.value);
+    }
+    if (ownerId.present) {
+      map['owner_id'] = Variable<int>(ownerId.value);
+    }
+    if (key.present) {
+      map['key'] = Variable<String>(key.value);
+    }
+    if (value.present) {
+      map['value'] = Variable<String>(
+        $ExtraAttributesTable.$convertervalue.toSql(value.value),
+      );
+    }
+    if (valueType.present) {
+      map['value_type'] = Variable<String>(valueType.value);
+    }
+    if (label.present) {
+      map['label'] = Variable<String>(label.value);
+    }
+    if (isBuiltin.present) {
+      map['is_builtin'] = Variable<bool>(isBuiltin.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    if (updatedAt.present) {
+      map['updated_at'] = Variable<DateTime>(updatedAt.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ExtraAttributesCompanion(')
+          ..write('ownerType: $ownerType, ')
+          ..write('ownerId: $ownerId, ')
+          ..write('key: $key, ')
+          ..write('value: $value, ')
+          ..write('valueType: $valueType, ')
+          ..write('label: $label, ')
+          ..write('isBuiltin: $isBuiltin, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt, ')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$AppDatabase extends GeneratedDatabase {
   _$AppDatabase(QueryExecutor e) : super(e);
   $AppDatabaseManager get managers => $AppDatabaseManager(this);
   late final $CoffeeBeansTable coffeeBeans = $CoffeeBeansTable(this);
+  late final $BeanBatchesTable beanBatches = $BeanBatchesTable(this);
   late final $GrindersTable grinders = $GrindersTable(this);
   late final $RecipesTable recipes = $RecipesTable(this);
   late final $BrewLogsTable brewLogs = $BrewLogsTable(this);
+  late final $BrewLogBeansTable brewLogBeans = $BrewLogBeansTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
+  late final $ExtraAttributesTable extraAttributes = $ExtraAttributesTable(
+    this,
+  );
+  late final Index idxBeanBatchesBeanId = Index(
+    'idx_bean_batches_bean_id',
+    'CREATE INDEX idx_bean_batches_bean_id ON bean_batches (bean_id)',
+  );
+  late final Index idxBrewLogsBrewedAt = Index(
+    'idx_brew_logs_brewed_at',
+    'CREATE INDEX idx_brew_logs_brewed_at ON brew_logs (brewed_at)',
+  );
+  late final Index idxBrewLogBeansBrewLogId = Index(
+    'idx_brew_log_beans_brew_log_id',
+    'CREATE INDEX idx_brew_log_beans_brew_log_id ON brew_log_beans (brew_log_id)',
+  );
+  late final Index idxBrewLogBeansBeanId = Index(
+    'idx_brew_log_beans_bean_id',
+    'CREATE INDEX idx_brew_log_beans_bean_id ON brew_log_beans (bean_id)',
+  );
+  late final Index idxExtraOwner = Index(
+    'idx_extra_owner',
+    'CREATE INDEX idx_extra_owner ON extra_attributes (owner_type, owner_id)',
+  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
   @override
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     coffeeBeans,
+    beanBatches,
     grinders,
     recipes,
     brewLogs,
+    brewLogBeans,
     appSettings,
+    extraAttributes,
+    idxBeanBatchesBeanId,
+    idxBrewLogsBrewedAt,
+    idxBrewLogBeansBrewLogId,
+    idxBrewLogBeansBeanId,
+    idxExtraOwner,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'coffee_beans',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('bean_batches', kind: UpdateKind.delete)],
+    ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
         'coffee_beans',
@@ -4361,6 +6082,27 @@ abstract class _$AppDatabase extends GeneratedDatabase {
       ),
       result: [TableUpdate('brew_logs', kind: UpdateKind.update)],
     ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'brew_logs',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('brew_log_beans', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'coffee_beans',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('brew_log_beans', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'bean_batches',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('brew_log_beans', kind: UpdateKind.update)],
+    ),
   ]);
 }
 
@@ -4371,12 +6113,8 @@ typedef $$CoffeeBeansTableCreateCompanionBuilder =
       Value<String?> origin,
       Value<String?> farm,
       Value<ProcessMethod?> process,
-      Value<RoastLevel?> roastLevel,
-      Value<DateTime?> roastDate,
       Value<List<String>> flavorTags,
-      Value<double> remainingGrams,
-      Value<double?> initialGrams,
-      Value<double?> price,
+      Value<bool> isFavorite,
       Value<String?> photoPath,
       Value<String?> notes,
       Value<DateTime> createdAt,
@@ -4389,12 +6127,8 @@ typedef $$CoffeeBeansTableUpdateCompanionBuilder =
       Value<String?> origin,
       Value<String?> farm,
       Value<ProcessMethod?> process,
-      Value<RoastLevel?> roastLevel,
-      Value<DateTime?> roastDate,
       Value<List<String>> flavorTags,
-      Value<double> remainingGrams,
-      Value<double?> initialGrams,
-      Value<double?> price,
+      Value<bool> isFavorite,
       Value<String?> photoPath,
       Value<String?> notes,
       Value<DateTime> createdAt,
@@ -4404,6 +6138,24 @@ typedef $$CoffeeBeansTableUpdateCompanionBuilder =
 final class $$CoffeeBeansTableReferences
     extends BaseReferences<_$AppDatabase, $CoffeeBeansTable, CoffeeBeanRow> {
   $$CoffeeBeansTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$BeanBatchesTable, List<BeanBatchRow>>
+  _beanBatchesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.beanBatches,
+    aliasName: 'coffee_beans__id__bean_batches__bean_id',
+  );
+
+  $$BeanBatchesTableProcessedTableManager get beanBatchesRefs {
+    final manager = $$BeanBatchesTableTableManager(
+      $_db,
+      $_db.beanBatches,
+    ).filter((f) => f.beanId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_beanBatchesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 
   static MultiTypedResultKey<$BrewLogsTable, List<BrewLogRow>>
   _brewLogsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -4418,6 +6170,24 @@ final class $$CoffeeBeansTableReferences
     ).filter((f) => f.beanId.id.sqlEquals($_itemColumn<int>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_brewLogsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+
+  static MultiTypedResultKey<$BrewLogBeansTable, List<BeanUsageRow>>
+  _brewLogBeansRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.brewLogBeans,
+    aliasName: 'coffee_beans__id__brew_log_beans__bean_id',
+  );
+
+  $$BrewLogBeansTableProcessedTableManager get brewLogBeansRefs {
+    final manager = $$BrewLogBeansTableTableManager(
+      $_db,
+      $_db.brewLogBeans,
+    ).filter((f) => f.beanId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_brewLogBeansRefsTable($_db));
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: cache),
     );
@@ -4459,35 +6229,14 @@ class $$CoffeeBeansTableFilterComposer
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<RoastLevel?, RoastLevel, String>
-  get roastLevel => $composableBuilder(
-    column: $table.roastLevel,
-    builder: (column) => ColumnWithTypeConverterFilters(column),
-  );
-
-  ColumnFilters<DateTime> get roastDate => $composableBuilder(
-    column: $table.roastDate,
-    builder: (column) => ColumnFilters(column),
-  );
-
   ColumnWithTypeConverterFilters<List<String>, List<String>, String>
   get flavorTags => $composableBuilder(
     column: $table.flavorTags,
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
-  ColumnFilters<double> get remainingGrams => $composableBuilder(
-    column: $table.remainingGrams,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<double> get initialGrams => $composableBuilder(
-    column: $table.initialGrams,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<double> get price => $composableBuilder(
-    column: $table.price,
+  ColumnFilters<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4511,6 +6260,31 @@ class $$CoffeeBeansTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  Expression<bool> beanBatchesRefs(
+    Expression<bool> Function($$BeanBatchesTableFilterComposer f) f,
+  ) {
+    final $$BeanBatchesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.beanBatches,
+      getReferencedColumn: (t) => t.beanId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BeanBatchesTableFilterComposer(
+            $db: $db,
+            $table: $db.beanBatches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
   Expression<bool> brewLogsRefs(
     Expression<bool> Function($$BrewLogsTableFilterComposer f) f,
   ) {
@@ -4527,6 +6301,31 @@ class $$CoffeeBeansTableFilterComposer
           }) => $$BrewLogsTableFilterComposer(
             $db: $db,
             $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> brewLogBeansRefs(
+    Expression<bool> Function($$BrewLogBeansTableFilterComposer f) f,
+  ) {
+    final $$BrewLogBeansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.brewLogBeans,
+      getReferencedColumn: (t) => t.beanId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogBeansTableFilterComposer(
+            $db: $db,
+            $table: $db.brewLogBeans,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -4571,33 +6370,13 @@ class $$CoffeeBeansTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<String> get roastLevel => $composableBuilder(
-    column: $table.roastLevel,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<DateTime> get roastDate => $composableBuilder(
-    column: $table.roastDate,
-    builder: (column) => ColumnOrderings(column),
-  );
-
   ColumnOrderings<String> get flavorTags => $composableBuilder(
     column: $table.flavorTags,
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get remainingGrams => $composableBuilder(
-    column: $table.remainingGrams,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<double> get initialGrams => $composableBuilder(
-    column: $table.initialGrams,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<double> get price => $composableBuilder(
-    column: $table.price,
+  ColumnOrderings<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4646,33 +6425,16 @@ class $$CoffeeBeansTableAnnotationComposer
   GeneratedColumnWithTypeConverter<ProcessMethod?, String> get process =>
       $composableBuilder(column: $table.process, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<RoastLevel?, String> get roastLevel =>
-      $composableBuilder(
-        column: $table.roastLevel,
-        builder: (column) => column,
-      );
-
-  GeneratedColumn<DateTime> get roastDate =>
-      $composableBuilder(column: $table.roastDate, builder: (column) => column);
-
   GeneratedColumnWithTypeConverter<List<String>, String> get flavorTags =>
       $composableBuilder(
         column: $table.flavorTags,
         builder: (column) => column,
       );
 
-  GeneratedColumn<double> get remainingGrams => $composableBuilder(
-    column: $table.remainingGrams,
+  GeneratedColumn<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
     builder: (column) => column,
   );
-
-  GeneratedColumn<double> get initialGrams => $composableBuilder(
-    column: $table.initialGrams,
-    builder: (column) => column,
-  );
-
-  GeneratedColumn<double> get price =>
-      $composableBuilder(column: $table.price, builder: (column) => column);
 
   GeneratedColumn<String> get photoPath =>
       $composableBuilder(column: $table.photoPath, builder: (column) => column);
@@ -4685,6 +6447,31 @@ class $$CoffeeBeansTableAnnotationComposer
 
   GeneratedColumn<DateTime> get updatedAt =>
       $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  Expression<T> beanBatchesRefs<T extends Object>(
+    Expression<T> Function($$BeanBatchesTableAnnotationComposer a) f,
+  ) {
+    final $$BeanBatchesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.beanBatches,
+      getReferencedColumn: (t) => t.beanId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BeanBatchesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.beanBatches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 
   Expression<T> brewLogsRefs<T extends Object>(
     Expression<T> Function($$BrewLogsTableAnnotationComposer a) f,
@@ -4710,6 +6497,31 @@ class $$CoffeeBeansTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> brewLogBeansRefs<T extends Object>(
+    Expression<T> Function($$BrewLogBeansTableAnnotationComposer a) f,
+  ) {
+    final $$BrewLogBeansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.brewLogBeans,
+      getReferencedColumn: (t) => t.beanId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogBeansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.brewLogBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$CoffeeBeansTableTableManager
@@ -4725,7 +6537,11 @@ class $$CoffeeBeansTableTableManager
           $$CoffeeBeansTableUpdateCompanionBuilder,
           (CoffeeBeanRow, $$CoffeeBeansTableReferences),
           CoffeeBeanRow,
-          PrefetchHooks Function({bool brewLogsRefs})
+          PrefetchHooks Function({
+            bool beanBatchesRefs,
+            bool brewLogsRefs,
+            bool brewLogBeansRefs,
+          })
         > {
   $$CoffeeBeansTableTableManager(_$AppDatabase db, $CoffeeBeansTable table)
     : super(
@@ -4745,12 +6561,8 @@ class $$CoffeeBeansTableTableManager
                 Value<String?> origin = const Value.absent(),
                 Value<String?> farm = const Value.absent(),
                 Value<ProcessMethod?> process = const Value.absent(),
-                Value<RoastLevel?> roastLevel = const Value.absent(),
-                Value<DateTime?> roastDate = const Value.absent(),
                 Value<List<String>> flavorTags = const Value.absent(),
-                Value<double> remainingGrams = const Value.absent(),
-                Value<double?> initialGrams = const Value.absent(),
-                Value<double?> price = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
                 Value<String?> photoPath = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -4761,12 +6573,8 @@ class $$CoffeeBeansTableTableManager
                 origin: origin,
                 farm: farm,
                 process: process,
-                roastLevel: roastLevel,
-                roastDate: roastDate,
                 flavorTags: flavorTags,
-                remainingGrams: remainingGrams,
-                initialGrams: initialGrams,
-                price: price,
+                isFavorite: isFavorite,
                 photoPath: photoPath,
                 notes: notes,
                 createdAt: createdAt,
@@ -4779,12 +6587,8 @@ class $$CoffeeBeansTableTableManager
                 Value<String?> origin = const Value.absent(),
                 Value<String?> farm = const Value.absent(),
                 Value<ProcessMethod?> process = const Value.absent(),
-                Value<RoastLevel?> roastLevel = const Value.absent(),
-                Value<DateTime?> roastDate = const Value.absent(),
                 Value<List<String>> flavorTags = const Value.absent(),
-                Value<double> remainingGrams = const Value.absent(),
-                Value<double?> initialGrams = const Value.absent(),
-                Value<double?> price = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
                 Value<String?> photoPath = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -4795,12 +6599,8 @@ class $$CoffeeBeansTableTableManager
                 origin: origin,
                 farm: farm,
                 process: process,
-                roastLevel: roastLevel,
-                roastDate: roastDate,
                 flavorTags: flavorTags,
-                remainingGrams: remainingGrams,
-                initialGrams: initialGrams,
-                price: price,
+                isFavorite: isFavorite,
                 photoPath: photoPath,
                 notes: notes,
                 createdAt: createdAt,
@@ -4814,36 +6614,89 @@ class $$CoffeeBeansTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({brewLogsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [if (brewLogsRefs) db.brewLogs],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (brewLogsRefs)
-                    await $_getPrefetchedData<
-                      CoffeeBeanRow,
-                      $CoffeeBeansTable,
-                      BrewLogRow
-                    >(
-                      currentTable: table,
-                      referencedTable: $$CoffeeBeansTableReferences
-                          ._brewLogsRefsTable(db),
-                      managerFromTypedResult: (p0) =>
-                          $$CoffeeBeansTableReferences(
-                            db,
-                            table,
-                            p0,
-                          ).brewLogsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.beanId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({
+                beanBatchesRefs = false,
+                brewLogsRefs = false,
+                brewLogBeansRefs = false,
+              }) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (beanBatchesRefs) db.beanBatches,
+                    if (brewLogsRefs) db.brewLogs,
+                    if (brewLogBeansRefs) db.brewLogBeans,
+                  ],
+                  addJoins: null,
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (beanBatchesRefs)
+                        await $_getPrefetchedData<
+                          CoffeeBeanRow,
+                          $CoffeeBeansTable,
+                          BeanBatchRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CoffeeBeansTableReferences
+                              ._beanBatchesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CoffeeBeansTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).beanBatchesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.beanId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (brewLogsRefs)
+                        await $_getPrefetchedData<
+                          CoffeeBeanRow,
+                          $CoffeeBeansTable,
+                          BrewLogRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CoffeeBeansTableReferences
+                              ._brewLogsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CoffeeBeansTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).brewLogsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.beanId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                      if (brewLogBeansRefs)
+                        await $_getPrefetchedData<
+                          CoffeeBeanRow,
+                          $CoffeeBeansTable,
+                          BeanUsageRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$CoffeeBeansTableReferences
+                              ._brewLogBeansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$CoffeeBeansTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).brewLogBeansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.beanId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -4860,14 +6713,518 @@ typedef $$CoffeeBeansTableProcessedTableManager =
       $$CoffeeBeansTableUpdateCompanionBuilder,
       (CoffeeBeanRow, $$CoffeeBeansTableReferences),
       CoffeeBeanRow,
-      PrefetchHooks Function({bool brewLogsRefs})
+      PrefetchHooks Function({
+        bool beanBatchesRefs,
+        bool brewLogsRefs,
+        bool brewLogBeansRefs,
+      })
+    >;
+typedef $$BeanBatchesTableCreateCompanionBuilder =
+    BeanBatchesCompanion Function({
+      Value<int> id,
+      required int beanId,
+      Value<DateTime?> roastDate,
+      Value<RoastLevel?> roastLevel,
+      Value<double> remainingGrams,
+      Value<double?> initialGrams,
+      Value<double?> price,
+      Value<String?> notes,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+typedef $$BeanBatchesTableUpdateCompanionBuilder =
+    BeanBatchesCompanion Function({
+      Value<int> id,
+      Value<int> beanId,
+      Value<DateTime?> roastDate,
+      Value<RoastLevel?> roastLevel,
+      Value<double> remainingGrams,
+      Value<double?> initialGrams,
+      Value<double?> price,
+      Value<String?> notes,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+    });
+
+final class $$BeanBatchesTableReferences
+    extends BaseReferences<_$AppDatabase, $BeanBatchesTable, BeanBatchRow> {
+  $$BeanBatchesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $CoffeeBeansTable _beanIdTable(_$AppDatabase db) =>
+      db.coffeeBeans.createAlias('bean_batches__bean_id__coffee_beans__id');
+
+  $$CoffeeBeansTableProcessedTableManager get beanId {
+    final $_column = $_itemColumn<int>('bean_id')!;
+
+    final manager = $$CoffeeBeansTableTableManager(
+      $_db,
+      $_db.coffeeBeans,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_beanIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static MultiTypedResultKey<$BrewLogBeansTable, List<BeanUsageRow>>
+  _brewLogBeansRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.brewLogBeans,
+    aliasName: 'bean_batches__id__brew_log_beans__batch_id',
+  );
+
+  $$BrewLogBeansTableProcessedTableManager get brewLogBeansRefs {
+    final manager = $$BrewLogBeansTableTableManager(
+      $_db,
+      $_db.brewLogBeans,
+    ).filter((f) => f.batchId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_brewLogBeansRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$BeanBatchesTableFilterComposer
+    extends Composer<_$AppDatabase, $BeanBatchesTable> {
+  $$BeanBatchesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get roastDate => $composableBuilder(
+    column: $table.roastDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<RoastLevel?, RoastLevel, String>
+  get roastLevel => $composableBuilder(
+    column: $table.roastLevel,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
+  ColumnFilters<double> get remainingGrams => $composableBuilder(
+    column: $table.remainingGrams,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get initialGrams => $composableBuilder(
+    column: $table.initialGrams,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get price => $composableBuilder(
+    column: $table.price,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$CoffeeBeansTableFilterComposer get beanId {
+    final $$CoffeeBeansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.beanId,
+      referencedTable: $db.coffeeBeans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CoffeeBeansTableFilterComposer(
+            $db: $db,
+            $table: $db.coffeeBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<bool> brewLogBeansRefs(
+    Expression<bool> Function($$BrewLogBeansTableFilterComposer f) f,
+  ) {
+    final $$BrewLogBeansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.brewLogBeans,
+      getReferencedColumn: (t) => t.batchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogBeansTableFilterComposer(
+            $db: $db,
+            $table: $db.brewLogBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$BeanBatchesTableOrderingComposer
+    extends Composer<_$AppDatabase, $BeanBatchesTable> {
+  $$BeanBatchesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get roastDate => $composableBuilder(
+    column: $table.roastDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get roastLevel => $composableBuilder(
+    column: $table.roastLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get remainingGrams => $composableBuilder(
+    column: $table.remainingGrams,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get initialGrams => $composableBuilder(
+    column: $table.initialGrams,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get price => $composableBuilder(
+    column: $table.price,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get notes => $composableBuilder(
+    column: $table.notes,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$CoffeeBeansTableOrderingComposer get beanId {
+    final $$CoffeeBeansTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.beanId,
+      referencedTable: $db.coffeeBeans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CoffeeBeansTableOrderingComposer(
+            $db: $db,
+            $table: $db.coffeeBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BeanBatchesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BeanBatchesTable> {
+  $$BeanBatchesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get roastDate =>
+      $composableBuilder(column: $table.roastDate, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<RoastLevel?, String> get roastLevel =>
+      $composableBuilder(
+        column: $table.roastLevel,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<double> get remainingGrams => $composableBuilder(
+    column: $table.remainingGrams,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get initialGrams => $composableBuilder(
+    column: $table.initialGrams,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get price =>
+      $composableBuilder(column: $table.price, builder: (column) => column);
+
+  GeneratedColumn<String> get notes =>
+      $composableBuilder(column: $table.notes, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+
+  $$CoffeeBeansTableAnnotationComposer get beanId {
+    final $$CoffeeBeansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.beanId,
+      referencedTable: $db.coffeeBeans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CoffeeBeansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.coffeeBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  Expression<T> brewLogBeansRefs<T extends Object>(
+    Expression<T> Function($$BrewLogBeansTableAnnotationComposer a) f,
+  ) {
+    final $$BrewLogBeansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.brewLogBeans,
+      getReferencedColumn: (t) => t.batchId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogBeansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.brewLogBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$BeanBatchesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BeanBatchesTable,
+          BeanBatchRow,
+          $$BeanBatchesTableFilterComposer,
+          $$BeanBatchesTableOrderingComposer,
+          $$BeanBatchesTableAnnotationComposer,
+          $$BeanBatchesTableCreateCompanionBuilder,
+          $$BeanBatchesTableUpdateCompanionBuilder,
+          (BeanBatchRow, $$BeanBatchesTableReferences),
+          BeanBatchRow,
+          PrefetchHooks Function({bool beanId, bool brewLogBeansRefs})
+        > {
+  $$BeanBatchesTableTableManager(_$AppDatabase db, $BeanBatchesTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BeanBatchesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BeanBatchesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BeanBatchesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> beanId = const Value.absent(),
+                Value<DateTime?> roastDate = const Value.absent(),
+                Value<RoastLevel?> roastLevel = const Value.absent(),
+                Value<double> remainingGrams = const Value.absent(),
+                Value<double?> initialGrams = const Value.absent(),
+                Value<double?> price = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => BeanBatchesCompanion(
+                id: id,
+                beanId: beanId,
+                roastDate: roastDate,
+                roastLevel: roastLevel,
+                remainingGrams: remainingGrams,
+                initialGrams: initialGrams,
+                price: price,
+                notes: notes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int beanId,
+                Value<DateTime?> roastDate = const Value.absent(),
+                Value<RoastLevel?> roastLevel = const Value.absent(),
+                Value<double> remainingGrams = const Value.absent(),
+                Value<double?> initialGrams = const Value.absent(),
+                Value<double?> price = const Value.absent(),
+                Value<String?> notes = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+              }) => BeanBatchesCompanion.insert(
+                id: id,
+                beanId: beanId,
+                roastDate: roastDate,
+                roastLevel: roastLevel,
+                remainingGrams: remainingGrams,
+                initialGrams: initialGrams,
+                price: price,
+                notes: notes,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$BeanBatchesTable, BeanBatchRow>(table),
+                  $$BeanBatchesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({beanId = false, brewLogBeansRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (brewLogBeansRefs) db.brewLogBeans],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (beanId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.beanId,
+                        referencedTable: $$BeanBatchesTableReferences
+                            ._beanIdTable(db),
+                        referencedColumn: $$BeanBatchesTableReferences
+                            ._beanIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (brewLogBeansRefs)
+                    await $_getPrefetchedData<
+                      BeanBatchRow,
+                      $BeanBatchesTable,
+                      BeanUsageRow
+                    >(
+                      currentTable: table,
+                      referencedTable: $$BeanBatchesTableReferences
+                          ._brewLogBeansRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$BeanBatchesTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).brewLogBeansRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.batchId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$BeanBatchesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BeanBatchesTable,
+      BeanBatchRow,
+      $$BeanBatchesTableFilterComposer,
+      $$BeanBatchesTableOrderingComposer,
+      $$BeanBatchesTableAnnotationComposer,
+      $$BeanBatchesTableCreateCompanionBuilder,
+      $$BeanBatchesTableUpdateCompanionBuilder,
+      (BeanBatchRow, $$BeanBatchesTableReferences),
+      BeanBatchRow,
+      PrefetchHooks Function({bool beanId, bool brewLogBeansRefs})
     >;
 typedef $$GrindersTableCreateCompanionBuilder = GrindersCompanion Function({
   Value<int> id,
   required String brand,
   required String model,
   Value<String?> burrType,
-  Value<GrindScaleUnit> scaleUnit,
+  Value<GrindScaleUnit?> scaleUnit,
   Value<double?> zeroPoint,
   Value<int?> clicksPerRevolution,
   Value<String?> calibrationNote,
@@ -4880,7 +7237,7 @@ typedef $$GrindersTableUpdateCompanionBuilder = GrindersCompanion Function({
   Value<String> brand,
   Value<String> model,
   Value<String?> burrType,
-  Value<GrindScaleUnit> scaleUnit,
+  Value<GrindScaleUnit?> scaleUnit,
   Value<double?> zeroPoint,
   Value<int?> clicksPerRevolution,
   Value<String?> calibrationNote,
@@ -4941,7 +7298,7 @@ class $$GrindersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<GrindScaleUnit, GrindScaleUnit, String>
+  ColumnWithTypeConverterFilters<GrindScaleUnit?, GrindScaleUnit, String>
   get scaleUnit => $composableBuilder(
     column: $table.scaleUnit,
     builder: (column) => ColumnWithTypeConverterFilters(column),
@@ -5089,7 +7446,7 @@ class $$GrindersTableAnnotationComposer
   GeneratedColumn<String> get burrType =>
       $composableBuilder(column: $table.burrType, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<GrindScaleUnit, String> get scaleUnit =>
+  GeneratedColumnWithTypeConverter<GrindScaleUnit?, String> get scaleUnit =>
       $composableBuilder(column: $table.scaleUnit, builder: (column) => column);
 
   GeneratedColumn<double> get zeroPoint =>
@@ -5172,7 +7529,7 @@ class $$GrindersTableTableManager
                 Value<String> brand = const Value.absent(),
                 Value<String> model = const Value.absent(),
                 Value<String?> burrType = const Value.absent(),
-                Value<GrindScaleUnit> scaleUnit = const Value.absent(),
+                Value<GrindScaleUnit?> scaleUnit = const Value.absent(),
                 Value<double?> zeroPoint = const Value.absent(),
                 Value<int?> clicksPerRevolution = const Value.absent(),
                 Value<String?> calibrationNote = const Value.absent(),
@@ -5198,7 +7555,7 @@ class $$GrindersTableTableManager
                 required String brand,
                 required String model,
                 Value<String?> burrType = const Value.absent(),
-                Value<GrindScaleUnit> scaleUnit = const Value.absent(),
+                Value<GrindScaleUnit?> scaleUnit = const Value.absent(),
                 Value<double?> zeroPoint = const Value.absent(),
                 Value<int?> clicksPerRevolution = const Value.absent(),
                 Value<String?> calibrationNote = const Value.absent(),
@@ -5273,7 +7630,7 @@ typedef $$GrindersTableProcessedTableManager =
 typedef $$RecipesTableCreateCompanionBuilder = RecipesCompanion Function({
   Value<int> id,
   required String name,
-  Value<BrewMethod> method,
+  Value<BrewMethod?> method,
   Value<double?> doseGrams,
   Value<double?> waterGrams,
   Value<double?> ratio,
@@ -5288,7 +7645,7 @@ typedef $$RecipesTableCreateCompanionBuilder = RecipesCompanion Function({
 typedef $$RecipesTableUpdateCompanionBuilder = RecipesCompanion Function({
   Value<int> id,
   Value<String> name,
-  Value<BrewMethod> method,
+  Value<BrewMethod?> method,
   Value<double?> doseGrams,
   Value<double?> waterGrams,
   Value<double?> ratio,
@@ -5343,7 +7700,7 @@ class $$RecipesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<BrewMethod, BrewMethod, String> get method =>
+  ColumnWithTypeConverterFilters<BrewMethod?, BrewMethod, String> get method =>
       $composableBuilder(
         column: $table.method,
         builder: (column) => ColumnWithTypeConverterFilters(column),
@@ -5516,7 +7873,7 @@ class $$RecipesTableAnnotationComposer
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<BrewMethod, String> get method =>
+  GeneratedColumnWithTypeConverter<BrewMethod?, String> get method =>
       $composableBuilder(column: $table.method, builder: (column) => column);
 
   GeneratedColumn<double> get doseGrams =>
@@ -5614,7 +7971,7 @@ class $$RecipesTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
-                Value<BrewMethod> method = const Value.absent(),
+                Value<BrewMethod?> method = const Value.absent(),
                 Value<double?> doseGrams = const Value.absent(),
                 Value<double?> waterGrams = const Value.absent(),
                 Value<double?> ratio = const Value.absent(),
@@ -5644,7 +8001,7 @@ class $$RecipesTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String name,
-                Value<BrewMethod> method = const Value.absent(),
+                Value<BrewMethod?> method = const Value.absent(),
                 Value<double?> doseGrams = const Value.absent(),
                 Value<double?> waterGrams = const Value.absent(),
                 Value<double?> ratio = const Value.absent(),
@@ -5727,7 +8084,7 @@ typedef $$BrewLogsTableCreateCompanionBuilder = BrewLogsCompanion Function({
   Value<int?> beanId,
   Value<int?> grinderId,
   Value<int?> recipeId,
-  Value<BrewMethod> method,
+  Value<BrewMethod?> method,
   Value<double?> grindSetting,
   Value<int?> grindClicks,
   Value<double?> doseGrams,
@@ -5750,6 +8107,8 @@ typedef $$BrewLogsTableCreateCompanionBuilder = BrewLogsCompanion Function({
   Value<double?> beanTemp,
   Value<double?> pressure,
   Value<List<PourStage>?> pourStages,
+  Value<DateTime?> beanRoastDate,
+  Value<RoastLevel?> beanRoastLevel,
   Value<String?> heatLevel,
   Value<double?> yieldGrams,
   Value<bool?> preheatUpperChamber,
@@ -5761,7 +8120,7 @@ typedef $$BrewLogsTableUpdateCompanionBuilder = BrewLogsCompanion Function({
   Value<int?> beanId,
   Value<int?> grinderId,
   Value<int?> recipeId,
-  Value<BrewMethod> method,
+  Value<BrewMethod?> method,
   Value<double?> grindSetting,
   Value<int?> grindClicks,
   Value<double?> doseGrams,
@@ -5784,6 +8143,8 @@ typedef $$BrewLogsTableUpdateCompanionBuilder = BrewLogsCompanion Function({
   Value<double?> beanTemp,
   Value<double?> pressure,
   Value<List<PourStage>?> pourStages,
+  Value<DateTime?> beanRoastDate,
+  Value<RoastLevel?> beanRoastLevel,
   Value<String?> heatLevel,
   Value<double?> yieldGrams,
   Value<bool?> preheatUpperChamber,
@@ -5845,6 +8206,24 @@ final class $$BrewLogsTableReferences
       manager.$state.copyWith(prefetchedData: [item]),
     );
   }
+
+  static MultiTypedResultKey<$BrewLogBeansTable, List<BeanUsageRow>>
+  _brewLogBeansRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.brewLogBeans,
+    aliasName: 'brew_logs__id__brew_log_beans__brew_log_id',
+  );
+
+  $$BrewLogBeansTableProcessedTableManager get brewLogBeansRefs {
+    final manager = $$BrewLogBeansTableTableManager(
+      $_db,
+      $_db.brewLogBeans,
+    ).filter((f) => f.brewLogId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_brewLogBeansRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$BrewLogsTableFilterComposer
@@ -5861,7 +8240,7 @@ class $$BrewLogsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<BrewMethod, BrewMethod, String> get method =>
+  ColumnWithTypeConverterFilters<BrewMethod?, BrewMethod, String> get method =>
       $composableBuilder(
         column: $table.method,
         builder: (column) => ColumnWithTypeConverterFilters(column),
@@ -5979,6 +8358,17 @@ class $$BrewLogsTableFilterComposer
     builder: (column) => ColumnWithTypeConverterFilters(column),
   );
 
+  ColumnFilters<DateTime> get beanRoastDate => $composableBuilder(
+    column: $table.beanRoastDate,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<RoastLevel?, RoastLevel, String>
+  get beanRoastLevel => $composableBuilder(
+    column: $table.beanRoastLevel,
+    builder: (column) => ColumnWithTypeConverterFilters(column),
+  );
+
   ColumnFilters<String> get heatLevel => $composableBuilder(
     column: $table.heatLevel,
     builder: (column) => ColumnFilters(column),
@@ -6071,6 +8461,31 @@ class $$BrewLogsTableFilterComposer
           ),
     );
     return composer;
+  }
+
+  Expression<bool> brewLogBeansRefs(
+    Expression<bool> Function($$BrewLogBeansTableFilterComposer f) f,
+  ) {
+    final $$BrewLogBeansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.brewLogBeans,
+      getReferencedColumn: (t) => t.brewLogId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogBeansTableFilterComposer(
+            $db: $db,
+            $table: $db.brewLogBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
   }
 }
 
@@ -6203,6 +8618,16 @@ class $$BrewLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<DateTime> get beanRoastDate => $composableBuilder(
+    column: $table.beanRoastDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get beanRoastLevel => $composableBuilder(
+    column: $table.beanRoastLevel,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get heatLevel => $composableBuilder(
     column: $table.heatLevel,
     builder: (column) => ColumnOrderings(column),
@@ -6310,7 +8735,7 @@ class $$BrewLogsTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<BrewMethod, String> get method =>
+  GeneratedColumnWithTypeConverter<BrewMethod?, String> get method =>
       $composableBuilder(column: $table.method, builder: (column) => column);
 
   GeneratedColumn<double> get grindSetting => $composableBuilder(
@@ -6396,6 +8821,17 @@ class $$BrewLogsTableAnnotationComposer
   GeneratedColumnWithTypeConverter<List<PourStage>?, String> get pourStages =>
       $composableBuilder(
         column: $table.pourStages,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<DateTime> get beanRoastDate => $composableBuilder(
+    column: $table.beanRoastDate,
+    builder: (column) => column,
+  );
+
+  GeneratedColumnWithTypeConverter<RoastLevel?, String> get beanRoastLevel =>
+      $composableBuilder(
+        column: $table.beanRoastLevel,
         builder: (column) => column,
       );
 
@@ -6486,6 +8922,31 @@ class $$BrewLogsTableAnnotationComposer
     );
     return composer;
   }
+
+  Expression<T> brewLogBeansRefs<T extends Object>(
+    Expression<T> Function($$BrewLogBeansTableAnnotationComposer a) f,
+  ) {
+    final $$BrewLogBeansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.brewLogBeans,
+      getReferencedColumn: (t) => t.brewLogId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogBeansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.brewLogBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$BrewLogsTableTableManager
@@ -6501,7 +8962,12 @@ class $$BrewLogsTableTableManager
           $$BrewLogsTableUpdateCompanionBuilder,
           (BrewLogRow, $$BrewLogsTableReferences),
           BrewLogRow,
-          PrefetchHooks Function({bool beanId, bool grinderId, bool recipeId})
+          PrefetchHooks Function({
+            bool beanId,
+            bool grinderId,
+            bool recipeId,
+            bool brewLogBeansRefs,
+          })
         > {
   $$BrewLogsTableTableManager(_$AppDatabase db, $BrewLogsTable table)
     : super(
@@ -6520,7 +8986,7 @@ class $$BrewLogsTableTableManager
                 Value<int?> beanId = const Value.absent(),
                 Value<int?> grinderId = const Value.absent(),
                 Value<int?> recipeId = const Value.absent(),
-                Value<BrewMethod> method = const Value.absent(),
+                Value<BrewMethod?> method = const Value.absent(),
                 Value<double?> grindSetting = const Value.absent(),
                 Value<int?> grindClicks = const Value.absent(),
                 Value<double?> doseGrams = const Value.absent(),
@@ -6543,6 +9009,8 @@ class $$BrewLogsTableTableManager
                 Value<double?> beanTemp = const Value.absent(),
                 Value<double?> pressure = const Value.absent(),
                 Value<List<PourStage>?> pourStages = const Value.absent(),
+                Value<DateTime?> beanRoastDate = const Value.absent(),
+                Value<RoastLevel?> beanRoastLevel = const Value.absent(),
                 Value<String?> heatLevel = const Value.absent(),
                 Value<double?> yieldGrams = const Value.absent(),
                 Value<bool?> preheatUpperChamber = const Value.absent(),
@@ -6576,6 +9044,8 @@ class $$BrewLogsTableTableManager
                 beanTemp: beanTemp,
                 pressure: pressure,
                 pourStages: pourStages,
+                beanRoastDate: beanRoastDate,
+                beanRoastLevel: beanRoastLevel,
                 heatLevel: heatLevel,
                 yieldGrams: yieldGrams,
                 preheatUpperChamber: preheatUpperChamber,
@@ -6588,7 +9058,7 @@ class $$BrewLogsTableTableManager
                 Value<int?> beanId = const Value.absent(),
                 Value<int?> grinderId = const Value.absent(),
                 Value<int?> recipeId = const Value.absent(),
-                Value<BrewMethod> method = const Value.absent(),
+                Value<BrewMethod?> method = const Value.absent(),
                 Value<double?> grindSetting = const Value.absent(),
                 Value<int?> grindClicks = const Value.absent(),
                 Value<double?> doseGrams = const Value.absent(),
@@ -6611,6 +9081,8 @@ class $$BrewLogsTableTableManager
                 Value<double?> beanTemp = const Value.absent(),
                 Value<double?> pressure = const Value.absent(),
                 Value<List<PourStage>?> pourStages = const Value.absent(),
+                Value<DateTime?> beanRoastDate = const Value.absent(),
+                Value<RoastLevel?> beanRoastLevel = const Value.absent(),
                 Value<String?> heatLevel = const Value.absent(),
                 Value<double?> yieldGrams = const Value.absent(),
                 Value<bool?> preheatUpperChamber = const Value.absent(),
@@ -6644,6 +9116,8 @@ class $$BrewLogsTableTableManager
                 beanTemp: beanTemp,
                 pressure: pressure,
                 pourStages: pourStages,
+                beanRoastDate: beanRoastDate,
+                beanRoastLevel: beanRoastLevel,
                 heatLevel: heatLevel,
                 yieldGrams: yieldGrams,
                 preheatUpperChamber: preheatUpperChamber,
@@ -6659,10 +9133,17 @@ class $$BrewLogsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({beanId = false, grinderId = false, recipeId = false}) {
+              ({
+                beanId = false,
+                grinderId = false,
+                recipeId = false,
+                brewLogBeansRefs = false,
+              }) {
                 return PrefetchHooks(
                   db: db,
-                  explicitlyWatchedTables: [],
+                  explicitlyWatchedTables: [
+                    if (brewLogBeansRefs) db.brewLogBeans,
+                  ],
                   addJoins:
                       <
                         T extends TableManagerState<
@@ -6716,7 +9197,29 @@ class $$BrewLogsTableTableManager
                         return state;
                       },
                   getPrefetchedDataCallback: (items) async {
-                    return [];
+                    return [
+                      if (brewLogBeansRefs)
+                        await $_getPrefetchedData<
+                          BrewLogRow,
+                          $BrewLogsTable,
+                          BeanUsageRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BrewLogsTableReferences
+                              ._brewLogBeansRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BrewLogsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).brewLogBeansRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.brewLogId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
                   },
                 );
               },
@@ -6736,7 +9239,551 @@ typedef $$BrewLogsTableProcessedTableManager =
       $$BrewLogsTableUpdateCompanionBuilder,
       (BrewLogRow, $$BrewLogsTableReferences),
       BrewLogRow,
-      PrefetchHooks Function({bool beanId, bool grinderId, bool recipeId})
+      PrefetchHooks Function({
+        bool beanId,
+        bool grinderId,
+        bool recipeId,
+        bool brewLogBeansRefs,
+      })
+    >;
+typedef $$BrewLogBeansTableCreateCompanionBuilder =
+    BrewLogBeansCompanion Function({
+      Value<int> id,
+      required int brewLogId,
+      Value<int?> beanId,
+      Value<int?> batchId,
+      Value<String?> beanNameSnapshot,
+      Value<DateTime?> roastDateSnapshot,
+      Value<double> doseGrams,
+      Value<int> position,
+    });
+typedef $$BrewLogBeansTableUpdateCompanionBuilder =
+    BrewLogBeansCompanion Function({
+      Value<int> id,
+      Value<int> brewLogId,
+      Value<int?> beanId,
+      Value<int?> batchId,
+      Value<String?> beanNameSnapshot,
+      Value<DateTime?> roastDateSnapshot,
+      Value<double> doseGrams,
+      Value<int> position,
+    });
+
+final class $$BrewLogBeansTableReferences
+    extends BaseReferences<_$AppDatabase, $BrewLogBeansTable, BeanUsageRow> {
+  $$BrewLogBeansTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $BrewLogsTable _brewLogIdTable(_$AppDatabase db) =>
+      db.brewLogs.createAlias('brew_log_beans__brew_log_id__brew_logs__id');
+
+  $$BrewLogsTableProcessedTableManager get brewLogId {
+    final $_column = $_itemColumn<int>('brew_log_id')!;
+
+    final manager = $$BrewLogsTableTableManager(
+      $_db,
+      $_db.brewLogs,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_brewLogIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $CoffeeBeansTable _beanIdTable(_$AppDatabase db) =>
+      db.coffeeBeans.createAlias('brew_log_beans__bean_id__coffee_beans__id');
+
+  $$CoffeeBeansTableProcessedTableManager? get beanId {
+    final $_column = $_itemColumn<int>('bean_id');
+    if ($_column == null) return null;
+    final manager = $$CoffeeBeansTableTableManager(
+      $_db,
+      $_db.coffeeBeans,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_beanIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $BeanBatchesTable _batchIdTable(_$AppDatabase db) =>
+      db.beanBatches.createAlias('brew_log_beans__batch_id__bean_batches__id');
+
+  $$BeanBatchesTableProcessedTableManager? get batchId {
+    final $_column = $_itemColumn<int>('batch_id');
+    if ($_column == null) return null;
+    final manager = $$BeanBatchesTableTableManager(
+      $_db,
+      $_db.beanBatches,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_batchIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$BrewLogBeansTableFilterComposer
+    extends Composer<_$AppDatabase, $BrewLogBeansTable> {
+  $$BrewLogBeansTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get beanNameSnapshot => $composableBuilder(
+    column: $table.beanNameSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get roastDateSnapshot => $composableBuilder(
+    column: $table.roastDateSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get doseGrams => $composableBuilder(
+    column: $table.doseGrams,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$BrewLogsTableFilterComposer get brewLogId {
+    final $$BrewLogsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableFilterComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CoffeeBeansTableFilterComposer get beanId {
+    final $$CoffeeBeansTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.beanId,
+      referencedTable: $db.coffeeBeans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CoffeeBeansTableFilterComposer(
+            $db: $db,
+            $table: $db.coffeeBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BeanBatchesTableFilterComposer get batchId {
+    final $$BeanBatchesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.batchId,
+      referencedTable: $db.beanBatches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BeanBatchesTableFilterComposer(
+            $db: $db,
+            $table: $db.beanBatches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogBeansTableOrderingComposer
+    extends Composer<_$AppDatabase, $BrewLogBeansTable> {
+  $$BrewLogBeansTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get beanNameSnapshot => $composableBuilder(
+    column: $table.beanNameSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get roastDateSnapshot => $composableBuilder(
+    column: $table.roastDateSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get doseGrams => $composableBuilder(
+    column: $table.doseGrams,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$BrewLogsTableOrderingComposer get brewLogId {
+    final $$BrewLogsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableOrderingComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CoffeeBeansTableOrderingComposer get beanId {
+    final $$CoffeeBeansTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.beanId,
+      referencedTable: $db.coffeeBeans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CoffeeBeansTableOrderingComposer(
+            $db: $db,
+            $table: $db.coffeeBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BeanBatchesTableOrderingComposer get batchId {
+    final $$BeanBatchesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.batchId,
+      referencedTable: $db.beanBatches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BeanBatchesTableOrderingComposer(
+            $db: $db,
+            $table: $db.beanBatches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogBeansTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BrewLogBeansTable> {
+  $$BrewLogBeansTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get beanNameSnapshot => $composableBuilder(
+    column: $table.beanNameSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<DateTime> get roastDateSnapshot => $composableBuilder(
+    column: $table.roastDateSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get doseGrams =>
+      $composableBuilder(column: $table.doseGrams, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  $$BrewLogsTableAnnotationComposer get brewLogId {
+    final $$BrewLogsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$CoffeeBeansTableAnnotationComposer get beanId {
+    final $$CoffeeBeansTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.beanId,
+      referencedTable: $db.coffeeBeans,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$CoffeeBeansTableAnnotationComposer(
+            $db: $db,
+            $table: $db.coffeeBeans,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$BeanBatchesTableAnnotationComposer get batchId {
+    final $$BeanBatchesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.batchId,
+      referencedTable: $db.beanBatches,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BeanBatchesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.beanBatches,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogBeansTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BrewLogBeansTable,
+          BeanUsageRow,
+          $$BrewLogBeansTableFilterComposer,
+          $$BrewLogBeansTableOrderingComposer,
+          $$BrewLogBeansTableAnnotationComposer,
+          $$BrewLogBeansTableCreateCompanionBuilder,
+          $$BrewLogBeansTableUpdateCompanionBuilder,
+          (BeanUsageRow, $$BrewLogBeansTableReferences),
+          BeanUsageRow,
+          PrefetchHooks Function({bool brewLogId, bool beanId, bool batchId})
+        > {
+  $$BrewLogBeansTableTableManager(_$AppDatabase db, $BrewLogBeansTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BrewLogBeansTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BrewLogBeansTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BrewLogBeansTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> brewLogId = const Value.absent(),
+                Value<int?> beanId = const Value.absent(),
+                Value<int?> batchId = const Value.absent(),
+                Value<String?> beanNameSnapshot = const Value.absent(),
+                Value<DateTime?> roastDateSnapshot = const Value.absent(),
+                Value<double> doseGrams = const Value.absent(),
+                Value<int> position = const Value.absent(),
+              }) => BrewLogBeansCompanion(
+                id: id,
+                brewLogId: brewLogId,
+                beanId: beanId,
+                batchId: batchId,
+                beanNameSnapshot: beanNameSnapshot,
+                roastDateSnapshot: roastDateSnapshot,
+                doseGrams: doseGrams,
+                position: position,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int brewLogId,
+                Value<int?> beanId = const Value.absent(),
+                Value<int?> batchId = const Value.absent(),
+                Value<String?> beanNameSnapshot = const Value.absent(),
+                Value<DateTime?> roastDateSnapshot = const Value.absent(),
+                Value<double> doseGrams = const Value.absent(),
+                Value<int> position = const Value.absent(),
+              }) => BrewLogBeansCompanion.insert(
+                id: id,
+                brewLogId: brewLogId,
+                beanId: beanId,
+                batchId: batchId,
+                beanNameSnapshot: beanNameSnapshot,
+                roastDateSnapshot: roastDateSnapshot,
+                doseGrams: doseGrams,
+                position: position,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$BrewLogBeansTable, BeanUsageRow>(table),
+                  $$BrewLogBeansTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback:
+              ({brewLogId = false, beanId = false, batchId = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (brewLogId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.brewLogId,
+                            referencedTable: $$BrewLogBeansTableReferences
+                                ._brewLogIdTable(db),
+                            referencedColumn: $$BrewLogBeansTableReferences
+                                ._brewLogIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (beanId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.beanId,
+                            referencedTable: $$BrewLogBeansTableReferences
+                                ._beanIdTable(db),
+                            referencedColumn: $$BrewLogBeansTableReferences
+                                ._beanIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+                        if (batchId) {
+                          state = state.withJoin(
+                            currentTable: table,
+                            currentColumn: table.batchId,
+                            referencedTable: $$BrewLogBeansTableReferences
+                                ._batchIdTable(db),
+                            referencedColumn: $$BrewLogBeansTableReferences
+                                ._batchIdTable(db)
+                                .id,
+                          ) as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [];
+                  },
+                );
+              },
+        ),
+      );
+}
+
+typedef $$BrewLogBeansTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BrewLogBeansTable,
+      BeanUsageRow,
+      $$BrewLogBeansTableFilterComposer,
+      $$BrewLogBeansTableOrderingComposer,
+      $$BrewLogBeansTableAnnotationComposer,
+      $$BrewLogBeansTableCreateCompanionBuilder,
+      $$BrewLogBeansTableUpdateCompanionBuilder,
+      (BeanUsageRow, $$BrewLogBeansTableReferences),
+      BeanUsageRow,
+      PrefetchHooks Function({bool brewLogId, bool beanId, bool batchId})
     >;
 typedef $$AppSettingsTableCreateCompanionBuilder =
     AppSettingsCompanion Function({
@@ -6909,18 +9956,335 @@ typedef $$AppSettingsTableProcessedTableManager =
       AppSettingRow,
       PrefetchHooks Function()
     >;
+typedef $$ExtraAttributesTableCreateCompanionBuilder =
+    ExtraAttributesCompanion Function({
+      required String ownerType,
+      required int ownerId,
+      required String key,
+      Value<Object?> value,
+      required String valueType,
+      Value<String?> label,
+      Value<bool> isBuiltin,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+typedef $$ExtraAttributesTableUpdateCompanionBuilder =
+    ExtraAttributesCompanion Function({
+      Value<String> ownerType,
+      Value<int> ownerId,
+      Value<String> key,
+      Value<Object?> value,
+      Value<String> valueType,
+      Value<String?> label,
+      Value<bool> isBuiltin,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+      Value<DateTime> updatedAt,
+      Value<int> rowid,
+    });
+
+class $$ExtraAttributesTableFilterComposer
+    extends Composer<_$AppDatabase, $ExtraAttributesTable> {
+  $$ExtraAttributesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get ownerType => $composableBuilder(
+    column: $table.ownerType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<Object?, Object, String> get value =>
+      $composableBuilder(
+        column: $table.value,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<String> get valueType => $composableBuilder(
+    column: $table.valueType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isBuiltin => $composableBuilder(
+    column: $table.isBuiltin,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$ExtraAttributesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ExtraAttributesTable> {
+  $$ExtraAttributesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get ownerType => $composableBuilder(
+    column: $table.ownerType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get ownerId => $composableBuilder(
+    column: $table.ownerId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get key => $composableBuilder(
+    column: $table.key,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get value => $composableBuilder(
+    column: $table.value,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get valueType => $composableBuilder(
+    column: $table.valueType,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get label => $composableBuilder(
+    column: $table.label,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<bool> get isBuiltin => $composableBuilder(
+    column: $table.isBuiltin,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get updatedAt => $composableBuilder(
+    column: $table.updatedAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ExtraAttributesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ExtraAttributesTable> {
+  $$ExtraAttributesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get ownerType =>
+      $composableBuilder(column: $table.ownerType, builder: (column) => column);
+
+  GeneratedColumn<int> get ownerId =>
+      $composableBuilder(column: $table.ownerId, builder: (column) => column);
+
+  GeneratedColumn<String> get key =>
+      $composableBuilder(column: $table.key, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<Object?, String> get value =>
+      $composableBuilder(column: $table.value, builder: (column) => column);
+
+  GeneratedColumn<String> get valueType =>
+      $composableBuilder(column: $table.valueType, builder: (column) => column);
+
+  GeneratedColumn<String> get label =>
+      $composableBuilder(column: $table.label, builder: (column) => column);
+
+  GeneratedColumn<bool> get isBuiltin =>
+      $composableBuilder(column: $table.isBuiltin, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get updatedAt =>
+      $composableBuilder(column: $table.updatedAt, builder: (column) => column);
+}
+
+class $$ExtraAttributesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ExtraAttributesTable,
+          ExtraAttributeRow,
+          $$ExtraAttributesTableFilterComposer,
+          $$ExtraAttributesTableOrderingComposer,
+          $$ExtraAttributesTableAnnotationComposer,
+          $$ExtraAttributesTableCreateCompanionBuilder,
+          $$ExtraAttributesTableUpdateCompanionBuilder,
+          (
+            ExtraAttributeRow,
+            BaseReferences<
+              _$AppDatabase,
+              $ExtraAttributesTable,
+              ExtraAttributeRow
+            >,
+          ),
+          ExtraAttributeRow,
+          PrefetchHooks Function()
+        > {
+  $$ExtraAttributesTableTableManager(
+    _$AppDatabase db,
+    $ExtraAttributesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ExtraAttributesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ExtraAttributesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ExtraAttributesTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> ownerType = const Value.absent(),
+                Value<int> ownerId = const Value.absent(),
+                Value<String> key = const Value.absent(),
+                Value<Object?> value = const Value.absent(),
+                Value<String> valueType = const Value.absent(),
+                Value<String?> label = const Value.absent(),
+                Value<bool> isBuiltin = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ExtraAttributesCompanion(
+                ownerType: ownerType,
+                ownerId: ownerId,
+                key: key,
+                value: value,
+                valueType: valueType,
+                label: label,
+                isBuiltin: isBuiltin,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String ownerType,
+                required int ownerId,
+                required String key,
+                Value<Object?> value = const Value.absent(),
+                required String valueType,
+                Value<String?> label = const Value.absent(),
+                Value<bool> isBuiltin = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+                Value<DateTime> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ExtraAttributesCompanion.insert(
+                ownerType: ownerType,
+                ownerId: ownerId,
+                key: key,
+                value: value,
+                valueType: valueType,
+                label: label,
+                isBuiltin: isBuiltin,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+                updatedAt: updatedAt,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$ExtraAttributesTable, ExtraAttributeRow>(table),
+                  BaseReferences<
+                    _$AppDatabase,
+                    $ExtraAttributesTable,
+                    ExtraAttributeRow
+                  >(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$ExtraAttributesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ExtraAttributesTable,
+      ExtraAttributeRow,
+      $$ExtraAttributesTableFilterComposer,
+      $$ExtraAttributesTableOrderingComposer,
+      $$ExtraAttributesTableAnnotationComposer,
+      $$ExtraAttributesTableCreateCompanionBuilder,
+      $$ExtraAttributesTableUpdateCompanionBuilder,
+      (
+        ExtraAttributeRow,
+        BaseReferences<_$AppDatabase, $ExtraAttributesTable, ExtraAttributeRow>,
+      ),
+      ExtraAttributeRow,
+      PrefetchHooks Function()
+    >;
 
 class $AppDatabaseManager {
   final _$AppDatabase _db;
   $AppDatabaseManager(this._db);
   $$CoffeeBeansTableTableManager get coffeeBeans =>
       $$CoffeeBeansTableTableManager(_db, _db.coffeeBeans);
+  $$BeanBatchesTableTableManager get beanBatches =>
+      $$BeanBatchesTableTableManager(_db, _db.beanBatches);
   $$GrindersTableTableManager get grinders =>
       $$GrindersTableTableManager(_db, _db.grinders);
   $$RecipesTableTableManager get recipes =>
       $$RecipesTableTableManager(_db, _db.recipes);
   $$BrewLogsTableTableManager get brewLogs =>
       $$BrewLogsTableTableManager(_db, _db.brewLogs);
+  $$BrewLogBeansTableTableManager get brewLogBeans =>
+      $$BrewLogBeansTableTableManager(_db, _db.brewLogBeans);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
+  $$ExtraAttributesTableTableManager get extraAttributes =>
+      $$ExtraAttributesTableTableManager(_db, _db.extraAttributes);
 }
