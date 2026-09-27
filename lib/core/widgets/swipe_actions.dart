@@ -20,13 +20,18 @@ class SwipeAction {
   final Color? color;
 }
 
-/// 右滑露出操作按钮的卡片容器。
+/// 卡片**左滑**露出操作按钮的容器（记录页的「收藏 / 删除」）。
 ///
 /// ## 为什么不用 `Dismissible`
 ///
 /// `Dismissible` 一个方向只能挂一个动作，而且松手就「消失」（是删除语义）。
 /// 这里要的是**滑开停住、露出两个按钮、点哪个执行哪个**，
 /// 所以自己用 `Stack` + 位移实现。
+///
+/// ## 方向
+///
+/// 只支持**左滑**（手指从右往左），按钮出现在**右侧**（用户选定的交互）。
+/// 内部统一用「已滑开多少」这个正数 [_offset] 表达，位移取负号。
 ///
 /// ## 手势
 ///
@@ -45,7 +50,7 @@ class SwipeActions extends StatefulWidget {
   /// 卡片本体（要盖住操作按钮的那一层）。
   final Widget child;
 
-  /// 从左到右排列的操作，滑开后依次露出。
+  /// 从左到右排列的操作，滑开后依次露出在右侧。
   final List<SwipeAction> actions;
 
   /// 无障碍朗读用，例如「花魁 的快捷操作」。
@@ -59,6 +64,7 @@ class _SwipeActionsState extends State<SwipeActions> {
   /// 单个操作按钮的宽度。
   static const double _actionWidth = 78;
 
+  /// 已滑开的距离（0 = 关闭，正数 = 露出右侧按钮的宽度）。
   double _offset = 0;
   bool _dragging = false;
 
@@ -66,7 +72,8 @@ class _SwipeActionsState extends State<SwipeActions> {
 
   void _onDragUpdate(DragUpdateDetails details) {
     setState(() {
-      _offset = (_offset + details.delta.dx).clamp(0.0, _maxOffset);
+      // 左滑 dx 为负，所以取负号累加。
+      _offset = (_offset - details.delta.dx).clamp(0.0, _maxOffset);
     });
   }
 
@@ -75,9 +82,9 @@ class _SwipeActionsState extends State<SwipeActions> {
       _dragging = false;
       // 过半就吸附到全开，否则收回去；顺带照顾一下快速轻扫。
       final double velocity = details.velocity.pixelsPerSecond.dx;
-      final bool shouldOpen = velocity > 250
+      final bool shouldOpen = velocity < -250
           ? true
-          : velocity < -250
+          : velocity > 250
           ? false
           : _offset > _maxOffset / 2;
       _offset = shouldOpen ? _maxOffset : 0;
@@ -110,7 +117,8 @@ class _SwipeActionsState extends State<SwipeActions> {
             children: <Widget>[
               Positioned.fill(
                 child: Align(
-                  alignment: Alignment.centerLeft,
+                  // 按钮在右侧（左滑露出）。
+                  alignment: Alignment.centerRight,
                   child: SizedBox(
                     width: _maxOffset,
                     height: double.infinity,
@@ -125,14 +133,15 @@ class _SwipeActionsState extends State<SwipeActions> {
               ),
               // ⚠️ 位移必须包在 AbsorbPointer **外面**：
               // AbsorbPointer 的吸收区域是它自己的 size，不会跟着子树的
-              // Transform 走。反过来的话，卡片虽然画到了右边，它那块「吸收区」
-              // 还留在左边盖着操作按钮，点「收藏」会被当成点卡片（只会收起）。
+              // Transform 走。反过来的话，卡片虽然画到了左边，它那块「吸收区」
+              // 还留在原地盖着操作按钮，点「收藏」会被当成点卡片（只会收起）。
               AnimatedContainer(
                 duration: _dragging
                     ? Duration.zero
                     : const Duration(milliseconds: 180),
                 curve: Curves.easeOut,
-                transform: Matrix4.translationValues(_offset, 0, 0),
+                // 左滑：卡片整体向左移。
+                transform: Matrix4.translationValues(-_offset, 0, 0),
                 child: AbsorbPointer(absorbing: isOpen, child: widget.child),
               ),
             ],

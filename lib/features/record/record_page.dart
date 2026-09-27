@@ -284,7 +284,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                         : Icons.search_off_outlined,
                     title: _favoritesOnly ? '还没有收藏的参数' : '没有匹配的记录',
                     message: _favoritesOnly
-                        ? '在记录上向右滑动，点「收藏」就能存下这套参数'
+                        ? '在记录上向左滑动，点「收藏」就能存下这套参数'
                         : '换个豆子名、方法或评分试试',
                   ),
           ),
@@ -368,15 +368,26 @@ class _BrewLogCard extends StatelessWidget {
                     Icon(favoriteFilledIcon, size: 18, color: colors.primary),
                     const SizedBox(width: 4),
                   ],
+                  // 第一行 = 所有豆名 + 方法 chip + 评分星。
+                  // chip 用 `Flexible` 紧跟在豆名之后（豆名太长就省略），
+                  // 多余空白留在 chip 之后，星标因此仍在最右。
                   Expanded(
-                    child: Text(
-                      // 拼配时用「A + B」，没有用量行才退回主豆名。
-                      log.beanLabel ?? beanName ?? '未指定豆子',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    child: Row(
+                      children: <Widget>[
+                        Flexible(
+                          child: Text(
+                            // 拼配时用「A + B」，没有用量行才退回主豆名。
+                            log.beanLabel ?? beanName ?? '未指定豆子',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        _MethodChip(label: log.method.label),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -384,15 +395,9 @@ class _BrewLogCard extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: <Widget>[
-                  _MethodChip(label: log.method.label),
-                  Text(_grindLabel(log, grinder), style: mutedStyle),
-                ],
-              ),
+              _grindLabel(log, grinder).isEmpty
+                  ? const SizedBox.shrink()
+                  : Text(_grindLabel(log, grinder), style: mutedStyle),
               if (log.isBlend) ...<Widget>[
                 const SizedBox(height: 8),
                 Text(

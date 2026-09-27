@@ -588,3 +588,12 @@ kotlin.incremental=false
 而 `dart analyze` 可能还是干净的，很容易误判。要改源码就用编辑器/补丁工具，
 或者在 Dart 侧改。已经写坏了就 `git checkout -- <file>` 重来。
 
+> 确实要用脚本批量改时，**不要**用 `Get-Content` / `Set-Content`，
+> 改用 .NET 的显式编码读写（它不看控制台代码页）：
+>
+> ```powershell
+> $c = [System.IO.File]::ReadAllText($f)
+> $c = $c.Replace('旧', '新')
+> [System.IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding($false)))
+> ```
+
