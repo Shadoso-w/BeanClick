@@ -72,6 +72,9 @@
 
 ### 变更
 
+- **流程：UI 改动先出设计稿**。以后任何界面改动都先给一版设计稿（目标 / 布局示意 /
+  尺寸与状态 / 与现状的差异 / 待确认项）讨论定稿，再动代码。
+  已写进 `docs/DEVELOPMENT.md` §13.1 与 `CONTRIBUTING.md`
 - **测试**：`test/` 下 256 个用例全部通过；
   `test/data/schema_v3_test.dart` 改名为 `test/data/design_decisions_test.dart`
   （表结构已到 v4，旧名字与内容不符）

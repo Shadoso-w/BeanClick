@@ -513,4 +513,54 @@ kotlin.incremental=false
 | `Keystore file ... not found for signing config 'release'` | 见 §9，`storeFile` 要用 `rootProject.file(...)` 解析 |
 | 构建突然变得极慢（小时级） | 见 §11「构建相关的两个坑」，清残留 java 进程 |
 | `Could not close incremental caches ... compileReleaseKotlin` | 已在 `android/gradle.properties` 关掉 Kotlin 增量编译，见 §11 |
+| 用 PowerShell 改源码后 `flutter test` 报 `Failed to decode data using encoding 'utf-8'` | 见 §13，**别用 PowerShell 的文本 cmdlet 碰源码** |
+
+---
+
+## 13. 协作约定
+
+### 13.1 UI 改动：先出设计稿，确认后再写代码
+
+**规则（用户明确要求）：任何 UI 改动，先给设计稿讨论定稿，再动代码。**
+
+不要看到「把 A 挪到 B」「加个按钮」就直接改，因为：
+
+- 布局是牵一发动全身的（比如把悬浮 FAB 并进 dock，会连带改列表底部内边距、
+  空状态文案、以及所有断言 FAB 的测试）
+- 同一个词常常有两种理解（「收藏」是收藏豆子还是收藏这套参数？
+  「右滑」是滑开后停住，还是滑走即删除？），实现完再改成本高得多
+- 用户改主意的成本远低于你改代码的成本
+
+设计稿至少包含这五项：
+
+| 项 | 说明 |
+|---|---|
+| **目标** | 这次要解决什么、用户原话是什么 |
+| **布局示意** | 线框图（ASCII 即可）或渲染图，标出各元素位置与相对关系 |
+| **尺寸与状态** | 关键尺寸（高度 / 圆角 / 图标大小）、空态 / 有数据 / 滑开 / 长按等状态 |
+| **与现状的差异** | 删了什么、加了什么、哪些地方会连带变化（含受影响的测试） |
+| **待确认项** | 我拿不准的 2~3 个点，列成选项让用户挑，而不是自己拍板 |
+
+两种呈现形式，按改动大小选：
+
+1. **聊天里的线框图 + 标注**（默认，最快）—— 适合布局、层级、文案这类讨论
+2. **用 Flutter 真实渲染出的 PNG** —— 拿真实的主题、字体、控件渲染成图，
+   能直接看到配色与间距。放进 `tool/design_preview/` 单独跑，
+   **不要**放进 `test/`（否则会被 CI 当 golden 比对，跨平台字体差异会导致假红）
+
+确认之后再进入实现：改代码 → 补测试 → `dart analyze` / `dart format` /
+`flutter test` 全绿 → 文档同步 → 提交推送 → CI 绿。
+
+### 13.2 别用 PowerShell 的文本 cmdlet 改源码
+
+踩过两次，都是真损坏（不是显示问题）：
+
+```powershell
+# ❌ 这样会把 UTF-8 中文按 GBK 解码再写回，文件直接坏掉
+(Get-Content foo.dart -Raw) -replace 'a', 'b' | Set-Content -NoNewline foo.dart
+```
+
+报错是 `Failed to decode data using encoding 'utf-8'`（`flutter test` 直接跑不起来），
+而 `dart analyze` 可能还是干净的，很容易误判。要改源码就用编辑器/补丁工具，
+或者在 Dart 侧改。已经写坏了就 `git checkout -- <file>` 重来。
 

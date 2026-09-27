@@ -66,9 +66,22 @@ CI 会在 PR 上自动跑分析与测试，未通过不予合并。
 改动 Drift 表结构时：
 
 1. 递增数据库 `schemaVersion`
-2. 提供 `MigrationStrategy`
+2. 在 `onUpgrade` 里写**逐列迁移**（**不要**删表重建，用户数据只有一份）
 3. 重跑 `dart run build_runner build --delete-conflicting-outputs`
-4. 在 PR 中说明迁移策略与回滚方式
+4. 重新 dump schema 快照：
+   `dart run drift_dev schema dump lib/data/database.dart test/drift/schemas`
+   + `dart run drift_dev schema generate test/drift/schemas test/drift/generated`
+   （忘了跑，`test/data/schema_snapshot_test.dart` 会红并点名差异）
+5. 在 PR 中说明迁移策略与回滚方式
+
+细节见 [docs/DEVELOPMENT.md](DEVELOPMENT.md) §7.4。
+
+## UI 变更：先出设计稿
+
+**任何 UI 改动都要先给设计稿讨论定稿，再写代码。** 设计稿至少包含：
+目标、布局示意（线框图或真实渲染图）、关键尺寸与各种状态、
+与现状的差异（含受影响的测试）、以及 2~3 个待确认选项。
+细节与两种呈现形式见 [docs/DEVELOPMENT.md](DEVELOPMENT.md) §13.1。
 
 ## Issue
 
