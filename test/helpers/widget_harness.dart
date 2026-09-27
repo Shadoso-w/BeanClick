@@ -29,6 +29,8 @@ library;
 
 import 'package:beanclick/data/database.dart';
 import 'package:beanclick/data/providers.dart';
+import 'package:beanclick/domain/entities.dart';
+import 'package:beanclick/domain/enums.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // Riverpod 3 把 `Override` 放在 misc.dart 里，主库不再导出。
@@ -50,6 +52,86 @@ class WidgetTestHarness {
 
   AppDatabase get db => _db;
   ProviderContainer get container => _container;
+
+  /// 建一支豆子 + 一个批次，返回两者的 id。
+  ///
+  /// 批次模型下这是最常见的准备动作（余量、烘焙日期都在批次上），
+  /// 放在脚手架里避免每个 widget 测试重复拼装实体。
+  Future<({int beanId, int batchId})> addBeanWithBatch({
+    String name = '耶加雪菲',
+    String? origin = '埃塞俄比亚',
+    double remainingGrams = 200,
+    double? initialGrams = 200,
+    DateTime? roastDate,
+    List<String> flavorTags = const <String>['柑橘', '花香'],
+    bool isFavorite = false,
+    DateTime? createdAt,
+  }) async {
+    final DateTime now = createdAt ?? DateTime(2026, 1, 1, 9);
+    final int beanId = await _container
+        .read(beanRepositoryProvider)
+        .save(
+          CoffeeBean(
+            name: name,
+            origin: origin,
+            flavorTags: flavorTags,
+            isFavorite: isFavorite,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    final int batchId = await _container
+        .read(beanRepositoryProvider)
+        .saveBatch(
+          BeanBatch(
+            beanId: beanId,
+            roastDate: roastDate,
+            remainingGrams: remainingGrams,
+            initialGrams: initialGrams,
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    return (beanId: beanId, batchId: batchId);
+  }
+
+  /// 建一条冲煮记录（可带单支豆子用量）。
+  Future<int> addBrewLog({
+    int? beanId,
+    int? batchId,
+    int? grinderId,
+    double? doseGrams = 15,
+    int? rating,
+    String? notes,
+    DateTime? brewedAt,
+  }) async {
+    final DateTime now = brewedAt ?? DateTime(2026, 1, 1, 8);
+    final result = await _container
+        .read(brewLogRepositoryProvider)
+        .save(
+          BrewLog(
+            beanId: beanId,
+            grinderId: grinderId,
+            method: BrewMethod.pourOver,
+            doseGrams: doseGrams,
+            rating: rating,
+            notes: notes,
+            brewedAt: now,
+            beanUsages: beanId == null
+                ? const <BeanUsage>[]
+                : <BeanUsage>[
+                    BeanUsage(
+                      beanId: beanId,
+                      batchId: batchId,
+                      doseGrams: doseGrams ?? 0,
+                    ),
+                  ],
+            createdAt: now,
+            updatedAt: now,
+          ),
+        );
+    return result.brewLogId;
+  }
 
   /// 设置额外覆盖（例如把导出目录指向临时目录）。
   ///

@@ -80,9 +80,7 @@ void main() {
       ]);
 
       final all = await repo.getAll(ExtraOwnerType.bean, bean.beanId);
-      final byKey = <String, ExtraAttribute>{
-        for (final a in all) a.key: a,
-      };
+      final byKey = <String, ExtraAttribute>{for (final a in all) a.key: a};
 
       expect(byKey['roaster']!.value, 'M2M');
       expect(byKey['altitude']!.value, 1950);
@@ -307,10 +305,7 @@ void main() {
         ),
       ]);
 
-      final grinderAttrs = await repo.getAll(
-        ExtraOwnerType.grinder,
-        grinderId,
-      );
+      final grinderAttrs = await repo.getAll(ExtraOwnerType.grinder, grinderId);
       expect(
         grinderAttrs.every((a) => a.value == null),
         isTrue,
@@ -434,7 +429,9 @@ void main() {
 
     test('同一 owner 内 key 不重复', () {
       for (final owner in ExtraOwnerType.values) {
-        final keys = ExtraAttributeRegistry.of(owner).map((d) => d.key).toList();
+        final keys = ExtraAttributeRegistry.of(owner)
+            .map((d) => d.key)
+            .toList();
         expect(keys.toSet(), hasLength(keys.length), reason: '$owner 有重复 key');
       }
     });

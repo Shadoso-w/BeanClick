@@ -1,6 +1,4 @@
 import 'package:beanclick/app.dart';
-import 'package:beanclick/data/providers.dart';
-import 'package:beanclick/domain/entities.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -42,16 +40,7 @@ void main() {
 
   testWidgets('列表非空时依然能新增咖啡豆', (tester) async {
     // 先放一支豆子，让列表非空（原来的 bug 就是这时没有入口）
-    await harness.container
-        .read(beanRepositoryProvider)
-        .save(
-          CoffeeBean(
-            name: '花魁',
-            remainingGrams: 200,
-            createdAt: DateTime(2026, 1, 1),
-            updatedAt: DateTime(2026, 1, 1),
-          ),
-        );
+    await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
 
     await gotoBeans(tester);
     expect(find.text('花魁'), findsOneWidget);
