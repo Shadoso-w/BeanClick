@@ -56,6 +56,31 @@ enum BrewMethod {
   }
 }
 
+/// 辅料单位（牛奶、糖浆这类「加了什么」的计量）。
+///
+/// 与冲煮参数无关，所以不并进其他枚举；存枚举 name、显示中文标签。
+enum AddInUnit {
+  ml('ml'),
+  gram('g'),
+  pump('泵'),
+  serving('份');
+
+  const AddInUnit(this.label);
+
+  /// 显示名。
+  final String label;
+
+  static const List<AddInUnit> selectable = [ml, gram, pump, serving];
+
+  static AddInUnit? fromName(String? name) {
+    if (name == null) return null;
+    for (final value in values) {
+      if (value.name == name) return value;
+    }
+    return null;
+  }
+}
+
 /// 烘焙度。
 enum RoastLevel {
   light('浅烘'),

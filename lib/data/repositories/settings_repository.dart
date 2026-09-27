@@ -4,6 +4,8 @@
 /// 支持的 key 与默认值见 `lib/domain/settings_keys.dart`（对应手册 §6.3）。
 library;
 
+import 'dart:convert';
+
 import 'package:beanclick/data/database.dart';
 import 'package:beanclick/domain/settings_keys.dart';
 import 'package:drift/drift.dart';
@@ -95,4 +97,44 @@ class SettingsRepository {
   /// 默认冲煮方法。
   Future<String> getDefaultMethod() async =>
       await get(SettingsKeys.defaultMethod) ?? 'pourOver';
+
+  /// 自定义冲煮方法库（有序）。
+  ///
+  /// 存成 JSON 字符串数组；内容坏掉（手工改过库）时当作空列表，
+  /// 不让设置页把整个 App 拖崩。
+  Future<List<String>> getCustomBrewMethods() async {
+    final String? raw = await get(SettingsKeys.customBrewMethods);
+    if (raw == null || raw.isEmpty) return const <String>[];
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is! List) return const <String>[];
+      return decoded
+          .map((Object? e) => e.toString().trim())
+          .where((String value) => value.isNotEmpty)
+          .toList(growable: false);
+    } on FormatException {
+      return const <String>[];
+    }
+  }
+
+  Future<void> setCustomBrewMethods(List<String> methods) =>
+      set(SettingsKeys.customBrewMethods, jsonEncode(methods));
+
+  /// 监听自定义方法库（表单的方法 chip 行跟着变）。
+  Stream<List<String>> watchCustomBrewMethods() =>
+      watch(SettingsKeys.customBrewMethods).map(_decodeMethods);
+
+  static List<String> _decodeMethods(String? raw) {
+    if (raw == null || raw.isEmpty) return const <String>[];
+    try {
+      final Object? decoded = jsonDecode(raw);
+      if (decoded is! List) return const <String>[];
+      return decoded
+          .map((Object? e) => e.toString().trim())
+          .where((String value) => value.isNotEmpty)
+          .toList(growable: false);
+    } on FormatException {
+      return const <String>[];
+    }
+  }
 }

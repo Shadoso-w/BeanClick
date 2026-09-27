@@ -153,6 +153,7 @@ class BrewLogRepository {
               log.copyWith(beanId: primaryBeanId, updatedAt: now).toCompanion(),
             );
         await _replaceUsages(id, usages);
+        await _replaceAddIns(id, log.addIns);
         if (autoDeductStock) {
           for (final usage in usages) {
             final beanId = usage.beanId;
@@ -176,6 +177,7 @@ class BrewLogRepository {
         log.copyWith(beanId: primaryBeanId, updatedAt: now).toCompanion(),
       );
       await _replaceUsages(existingId, usages);
+      await _replaceAddIns(existingId, log.addIns);
 
       if (autoDeductStock) {
         // 按 beanId 聚合；被删除的豆子（beanId 为空）不参与扣减。
@@ -334,13 +336,57 @@ class BrewLogRepository {
     return rows.map((row) => row.toEntity()).toList(growable: false);
   }
 
-  /// 给一批记录补上各自的豆子用量（含豆子名），避免逐条查询。
+  /// 覆写某条记录的辅料。
+  ///
+  /// 与豆子用量一样是「先删后插」：辅料行没有别的表引用它，
+  /// 全量替换比逐行 diff 简单且不会漏。
+  Future<void> _replaceAddIns(int brewLogId, List<BrewLogAddIn> addIns) async {
+    await (_db.delete(
+      _db.brewLogAddins,
+    )..where((t) => t.brewLogId.equals(brewLogId))).go();
+    if (addIns.isEmpty) return;
+
+    for (int i = 0; i < addIns.length; i++) {
+      await _db
+          .into(_db.brewLogAddins)
+          .insert(
+            addIns[i].copyWith(position: i).toCompanion(brewLogId),
+            mode: InsertMode.insertOrReplace,
+          );
+    }
+  }
+
+  /// 「选择辅料」面板里的「最近用过」：从本机记录里聚合，按最近使用倒序。
+  ///
+  /// 名字不单独建表，所以这里直接从历史记录里取（去重靠 GROUP BY）。
+  /// 取不到就返回空列表，面板只显示内置的「常用」。
+  Future<List<String>> getRecentAddInNames({int limit = 8}) async {
+    final name = _db.brewLogAddins.name;
+    final id = _db.brewLogAddins.id;
+    final query = _db.selectOnly(_db.brewLogAddins)
+      ..addColumns(<Expression<Object>>[name, id.max()])
+      ..groupBy(<Expression<Object>>[name])
+      ..orderBy(<OrderingTerm>[OrderingTerm.desc(id.max())])
+      ..limit(limit);
+    final rows = await query.get();
+    return rows
+        .map((row) => row.read(name)!)
+        .where((String value) => value.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  /// 给一批记录补上各自的豆子用量与辅料，避免逐条查询。
   Future<List<BrewLog>> _attachBeans(List<BrewLogRow> rows) async {
     if (rows.isEmpty) return const <BrewLog>[];
 
     final ids = rows.map((row) => row.id).toList(growable: false);
     final usageRows =
         await (_db.select(_db.brewLogBeans)
+              ..where((t) => t.brewLogId.isIn(ids))
+              ..orderBy([(t) => OrderingTerm(expression: t.position)]))
+            .get();
+    final addInRows =
+        await (_db.select(_db.brewLogAddins)
               ..where((t) => t.brewLogId.isIn(ids))
               ..orderBy([(t) => OrderingTerm(expression: t.position)]))
             .get();
@@ -368,10 +414,18 @@ class BrewLogRepository {
           .add(row.toEntity(beanName: nameById[row.beanId]));
     }
 
+    final addInsByLog = <int, List<BrewLogAddIn>>{};
+    for (final row in addInRows) {
+      addInsByLog
+          .putIfAbsent(row.brewLogId, () => <BrewLogAddIn>[])
+          .add(row.toEntity());
+    }
+
     return rows
         .map(
           (row) => row.toEntity(
             beanUsages: usagesByLog[row.id] ?? const <BeanUsage>[],
+            addIns: addInsByLog[row.id] ?? const <BrewLogAddIn>[],
           ),
         )
         .toList(growable: false);

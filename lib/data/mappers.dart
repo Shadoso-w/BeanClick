@@ -64,14 +64,18 @@ extension GrinderRowMapper on GrinderRow {
 }
 
 extension BrewLogRowMapper on BrewLogRow {
-  /// [beanUsages] 由调用方联表填充；不传则视为未关联豆子。
-  BrewLog toEntity({List<BeanUsage> beanUsages = const []}) => BrewLog(
+  /// [beanUsages] / [addIns] 由调用方联表填充；不传则视为未关联。
+  BrewLog toEntity({
+    List<BeanUsage> beanUsages = const [],
+    List<BrewLogAddIn> addIns = const [],
+  }) => BrewLog(
     id: id,
     beanId: beanId,
     grinderId: grinderId,
     recipeId: recipeId,
     // 认不出的方法回落到手冲（枚举是宽容解码，不会崩）。
     method: method ?? BrewMethod.pourOver,
+    methodLabel: methodLabel,
     grindSetting: grindSetting,
     grindClicks: grindClicks,
     doseGrams: doseGrams,
@@ -101,9 +105,34 @@ extension BrewLogRowMapper on BrewLogRow {
     yieldGrams: yieldGrams,
     preheatUpperChamber: preheatUpperChamber,
     beanUsages: beanUsages,
+    addIns: addIns,
     createdAt: createdAt,
     updatedAt: updatedAt,
   );
+}
+
+extension BrewLogAddInRowMapper on BrewLogAddInRow {
+  BrewLogAddIn toEntity() => BrewLogAddIn(
+    id: id,
+    name: name,
+    amount: amount,
+    // 认不出的单位回落到 ml（宽容解码，不会崩）。
+    unit: unit ?? AddInUnit.ml,
+    position: position,
+  );
+}
+
+extension BrewLogAddInCompanionMapper on BrewLogAddIn {
+  /// [newId] 为空时由调用方给出（新建记录时列表才知道 brewLogId）。
+  BrewLogAddinsCompanion toCompanion(int brewLogId, {int? newId}) =>
+      BrewLogAddinsCompanion(
+        id: newId == null ? const Value.absent() : Value(newId),
+        brewLogId: Value(brewLogId),
+        name: Value(name),
+        amount: Value(amount),
+        unit: Value(unit),
+        position: Value(position),
+      );
 }
 
 extension BeanUsageRowMapper on BeanUsageRow {
@@ -221,6 +250,7 @@ extension BrewLogCompanionMapper on BrewLog {
     grinderId: Value(grinderId),
     recipeId: Value(recipeId),
     method: Value(method),
+    methodLabel: Value(methodLabel),
     grindSetting: Value(grindSetting),
     grindClicks: Value(grindClicks),
     doseGrams: Value(doseGrams),

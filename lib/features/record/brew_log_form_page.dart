@@ -114,6 +114,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   BrewMethod _method = BrewMethod.pourOver;
 
+  /// 自定义方法的原文；为空表示用内置的 [_method]。
+  String? _methodLabel;
+
   /// 这一杯用到的豆子（拼配时多于一支）。顺序就是 [BeanUsage.position]。
   late final List<_BeanPick> _picks;
 
@@ -125,6 +128,12 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   int? _rating;
   bool _isBest = false;
   bool _isFavorite = false;
+
+  /// 这条记录加的辅料（牛奶、糖浆…）。
+  late final List<_AddIn> _addIns;
+
+  /// 弹一次「选择辅料」面板用的历史项（最近用过）。
+  List<String> _recentAddInNames = const <String>[];
 
   /// 时分是否已被确认过（编辑旧记录算已确认）。
   ///
@@ -177,6 +186,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     _yieldGrams = TextEditingController(text: numberToText(source?.yieldGrams));
 
     _method = source?.method ?? BrewMethod.pourOver;
+    _methodLabel = source?.methodLabel;
+    _addIns = <_AddIn>[
+      for (final BrewLogAddIn addIn in source?.addIns ?? const <BrewLogAddIn>[])
+        _AddIn(name: addIn.name, amount: addIn.amount, unit: addIn.unit),
+    ];
     _picks = _initialPicks(source);
     _grinderId = source?.grinderId;
     // 复制上次时不继承评分与备注（见 copyFrom 的说明）。
@@ -195,6 +209,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   @override
   void dispose() {
+    for (final _AddIn addIn in _addIns) {
+      addIn.dispose();
+    }
     for (final _BeanPick pick in _picks) {
       pick.dispose();
     }
@@ -242,6 +259,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       beanId: primaryBeanId,
       grinderId: _grinderId,
       method: _method,
+      methodLabel: _methodLabel,
       grindSetting: parseNumber(_grindSetting.text),
       grindClicks: int.tryParse(_grindClicks.text.trim()),
       doseGrams: parseNumber(_dose.text),
@@ -290,6 +308,10 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       clearYieldGrams: parseNumber(_yieldGrams.text) == null,
       clearPreheatUpperChamber: _preheatUpperChamber == null,
       beanUsages: _usagesFromPicks(),
+      addIns: <BrewLogAddIn>[
+        for (int i = 0; i < _addIns.length; i++) _addIns[i].toEntity(i),
+      ],
+      clearMethodLabel: _methodLabel == null,
     );
 
     try {
@@ -599,6 +621,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       _heatLevel.text = copied.heatLevel ?? '';
       _yieldGrams.text = numberToText(copied.yieldGrams);
       _method = copied.method;
+      _methodLabel = copied.methodLabel;
       _resetPicks(copied);
       _grinderId = copied.grinderId;
       _preheatUpperChamber = copied.preheatUpperChamber;
@@ -676,6 +699,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                   label: '冲煮方法',
                   isRequired: true,
                   child: _buildMethodSelector(),
+                ),
+                LabeledField(
+                  label: '辅料',
+                  helper: _addIns.isEmpty ? '牛奶、糖浆这类额外加的，可以只记名字不记量' : null,
+                  child: _buildAddIns(),
                 ),
                 LabeledField(
                   label: '豆子',
@@ -961,6 +989,10 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
               )
               .toList();
 
+    // 自定义方法库（全局，见 SettingsKeys.customBrewMethods）。
+    final List<String> customs =
+        ref.watch(customBrewMethodsProvider).value ?? const <String>[];
+
     return Wrap(
       spacing: 8,
       runSpacing: 8,
@@ -968,19 +1000,292 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
         for (final BrewMethod method in visible)
           ChoiceChip(
             label: Text(method.label),
-            selected: method == _method,
+            selected: _methodLabel == null && method == _method,
             onSelected: (bool selected) {
-              if (selected) setState(() => _method = method);
+              if (selected) {
+                setState(() {
+                  _method = method;
+                  _methodLabel = null;
+                });
+              }
             },
           ),
+        // 自定义方法：浅色区分，长按可重命名 / 删除。
+        for (final String custom in customs)
+          ChoiceChip(
+            label: Text(custom),
+            selected: _methodLabel == custom,
+            selectedColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest,
+            backgroundColor: Theme.of(context)
+                .colorScheme
+                .surfaceContainerHighest,
+            onSelected: (bool selected) {
+              if (selected) setState(() => _methodLabel = custom);
+            },
+            // ChoiceChip 没有 onLongPress，用 GestureDetector 包一层。
+            // 用 InkWell 之外的包装不影响短按：短按由 chip 自己处理。
+          ).withLongPress(() => _manageCustomMethod(custom)),
+        ActionChip(
+          key: const Key('brew.addMethod'),
+          avatar: const Icon(Icons.add, size: 16),
+          label: const Text('＋'),
+          tooltip: '新建冲煮方法',
+          onPressed: _saving ? null : _createCustomMethod,
+        ),
         if (!showAll && visible.length < BrewMethod.values.length)
           ActionChip(
-            avatar: const Icon(Icons.add, size: 16),
             label: const Text('更多方法'),
             onPressed: () => setState(() => _showAllMethods = true),
           ),
       ],
     );
+  }
+
+  /// 新建自定义方法：弹输入框 → 存进全局库 → 直接选中。
+  Future<void> _createCustomMethod() async {
+    final String? name = await _promptMethodName(title: '新的冲煮方法');
+    if (name == null || !mounted) return;
+
+    final List<String> current =
+        ref.read(customBrewMethodsProvider).value ?? const <String>[];
+    if (!current.contains(name)) {
+      await ref.read(settingsRepositoryProvider).setCustomBrewMethods(<String>[
+        ...current,
+        name,
+      ]);
+    }
+    if (!mounted) return;
+    setState(() => _methodLabel = name);
+  }
+
+  /// 长按自定义方法：重命名 / 删除。
+  ///
+  /// 两者都只动**方法库**，历史记录里存的原文不变 —— 和豆名快照一个语义：
+  /// 记录要能反映「当时是怎么冲的」。
+  Future<void> _manageCustomMethod(String name) async {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    final String? action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: Text('重命名「$name」'),
+              subtitle: const Text('只改列表里的名字，历史记录保留原来的写法'),
+              onTap: () => Navigator.of(context).pop('rename'),
+            ),
+            ListTile(
+              leading: Icon(Icons.delete_outline, color: colors.error),
+              title: Text(
+                '从列表删除「$name」',
+                style: TextStyle(color: colors.error),
+              ),
+              subtitle: const Text('已有的记录仍显示这个名字'),
+              onTap: () => Navigator.of(context).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+
+    final List<String> current = List<String>.of(
+      ref.read(customBrewMethodsProvider).value ?? const <String>[],
+    );
+
+    if (action == 'delete') {
+      current.remove(name);
+      await ref.read(settingsRepositoryProvider).setCustomBrewMethods(current);
+      if (!mounted) return;
+      setState(() {
+        // 正在用被删掉的方法：退回内置的手冲。
+        if (_methodLabel == name) _methodLabel = null;
+      });
+      _showMessage('已从列表删除「$name」');
+      return;
+    }
+
+    final String? renamed = await _promptMethodName(
+      title: '重命名「$name」',
+      initial: name,
+    );
+    if (renamed == null || !mounted || renamed == name) return;
+    final int index = current.indexOf(name);
+    if (index >= 0) current[index] = renamed;
+    await ref.read(settingsRepositoryProvider).setCustomBrewMethods(current);
+    if (!mounted) return;
+    setState(() {
+      if (_methodLabel == name) _methodLabel = renamed;
+    });
+  }
+
+  /// 方法名的输入对话框（新建与重命名共用）。取消返回 null。
+  ///
+  /// 输入框由 [_MethodNameDialog] 自己持有并释放：在这里 `await showDialog`
+  /// 之后立刻 dispose 会踩到「退场动画期间还在用同一个 controller」的断言
+  /// （A TextEditingController was used after being disposed）。
+  Future<String?> _promptMethodName({
+    required String title,
+    String initial = '',
+  }) {
+    return showDialog<String>(
+      context: context,
+      builder: (BuildContext context) =>
+          _MethodNameDialog(title: title, initial: initial),
+    );
+  }
+
+  /// 辅料：一行一个（名字 + 数量 + 单位 + 删除），名字从「常用 / 最近用过 / 新建」里选。
+  Widget _buildAddIns() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        for (int i = 0; i < _addIns.length; i++) _buildAddInRow(i),
+        if (_addIns.isEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              '还没有加辅料',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('brew.addAddIn'),
+            onPressed: _saving ? null : _pickAddIn,
+            icon: const Icon(addCircleIcon, size: 18),
+            label: const Text('添加辅料'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAddInRow(int index) {
+    final _AddIn addIn = _addIns[index];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Expanded(
+            flex: 4,
+            child: InkWell(
+              key: Key('brew.addInName.$index'),
+              onTap: _saving ? null : () => _renameAddIn(index),
+              child: InputDecorator(
+                decoration: const InputDecoration(
+                  isDense: true,
+                  border: OutlineInputBorder(),
+                ),
+                child: Text(addIn.name, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: NumberField(
+              key: Key('brew.addInAmount.$index'),
+              controller: addIn.amount,
+              hintText: '数量',
+            ),
+          ),
+          const SizedBox(width: 4),
+          // 单位：ml / g / 泵 / 份
+          DropdownButton<AddInUnit>(
+            key: Key('brew.addInUnit.$index'),
+            value: addIn.unit,
+            underline: const SizedBox.shrink(),
+            items: <DropdownMenuItem<AddInUnit>>[
+              for (final AddInUnit unit in AddInUnit.selectable)
+                DropdownMenuItem<AddInUnit>(
+                  value: unit,
+                  child: Text(unit.label),
+                ),
+            ],
+            onChanged: _saving
+                ? null
+                : (AddInUnit? value) {
+                    if (value == null) return;
+                    setState(() => addIn.unit = value);
+                  },
+          ),
+          IconButton(
+            tooltip: '删掉这一项',
+            onPressed: _saving
+                ? null
+                : () => setState(() => _addIns.removeAt(index).dispose()),
+            icon: const Icon(Icons.close, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 打开「选择辅料」面板：常用 / 最近用过 / 新建。
+  Future<void> _pickAddIn() async {
+    const List<String> common = <String>[
+      '牛奶',
+      '燕麦奶',
+      '豆奶',
+      '水',
+      '冰块',
+      '榛果糖浆',
+      '焦糖酱',
+      '糖',
+    ];
+    final List<String> recent = await ref
+        .read(brewLogRepositoryProvider)
+        .getRecentAddInNames();
+    if (!mounted) return;
+    _recentAddInNames = recent
+        .where((String name) => !common.contains(name))
+        .toList(growable: false);
+
+    final String? name = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (BuildContext context) =>
+          _AddInPickerSheet(common: common, recent: _recentAddInNames),
+    );
+    if (name == null || !mounted) return;
+    setState(() => _addIns.add(_AddIn(name: name)));
+  }
+
+  /// 改这一行的名字（复用选择面板）。
+  Future<void> _renameAddIn(int index) async {
+    final String? name = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (BuildContext context) => _AddInPickerSheet(
+        common: const <String>[
+          '牛奶',
+          '燕麦奶',
+          '豆奶',
+          '水',
+          '冰块',
+          '榛果糖浆',
+          '焦糖酱',
+          '糖',
+        ],
+        recent: _recentAddInNames,
+        title: '换一种辅料',
+      ),
+    );
+    if (name == null || !mounted) return;
+    setState(() => _addIns[index].name = name);
   }
 
   /// 豆子选择（含拼配）。
@@ -1386,7 +1691,197 @@ class _NoFavoriteSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            const Text('在「记录」里向右滑动一条记录，点「收藏」就能存下这套参数；以后长按这里就能挑出来复制。'),
+            const Text('在「记录」里向左滑动一条记录，点「收藏」就能存下这套参数；以后长按这里就能挑出来复制。'),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 表单里的一条辅料。
+///
+/// 名字在写入记录时成为**文本快照**（见 `BrewLogAddIn`），
+/// 所以这里不需要引用任何「辅料表」——辅料库是从历史记录聚合出来的。
+class _AddIn {
+  _AddIn({required this.name, double? amount, this.unit = AddInUnit.ml})
+    : amount = TextEditingController(text: numberToText(amount));
+
+  String name;
+  final TextEditingController amount;
+  AddInUnit unit;
+
+  BrewLogAddIn toEntity(int position) => BrewLogAddIn(
+    name: name,
+    amount: parseNumber(amount.text),
+    unit: unit,
+    position: position,
+  );
+
+  void dispose() => amount.dispose();
+}
+
+/// 给任意 widget 套一个长按（`ChoiceChip` 自己没有 `onLongPress`）。
+extension _LongPressable on Widget {
+  Widget withLongPress(VoidCallback onLongPress) =>
+      GestureDetector(onLongPress: onLongPress, child: this);
+}
+
+/// 输入冲煮方法名的对话框。
+///
+/// 自己持有 [TextEditingController] 并在 `dispose` 里释放 ——
+/// 由调用方 `await showDialog` 之后释放会踩到「退场动画还在用 controller」的断言。
+class _MethodNameDialog extends StatefulWidget {
+  const _MethodNameDialog({required this.title, required this.initial});
+
+  final String title;
+  final String initial;
+
+  @override
+  State<_MethodNameDialog> createState() => _MethodNameDialogState();
+}
+
+class _MethodNameDialogState extends State<_MethodNameDialog> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initial,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final String name = _controller.text.trim();
+    if (name.isEmpty) return;
+    Navigator.of(context).pop(name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: TextField(
+        key: const Key('brew.methodName'),
+        controller: _controller,
+        autofocus: true,
+        maxLength: 20,
+        decoration: const InputDecoration(hintText: '例如：拿铁、摩卡、燕麦拿铁'),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('取消'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('保存')),
+      ],
+    );
+  }
+}
+
+/// 「选择辅料」面板：常用 / 最近用过 / 新建。
+class _AddInPickerSheet extends StatefulWidget {
+  const _AddInPickerSheet({
+    required this.common,
+    required this.recent,
+    this.title = '选择辅料',
+  });
+
+  final List<String> common;
+  final List<String> recent;
+  final String title;
+
+  @override
+  State<_AddInPickerSheet> createState() => _AddInPickerSheetState();
+}
+
+class _AddInPickerSheetState extends State<_AddInPickerSheet> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final String name = _controller.text.trim();
+    if (name.isEmpty) return;
+    Navigator.of(context).pop(name);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    Widget group(String title, List<String> items) {
+      if (items.isEmpty) return const SizedBox.shrink();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(title, style: theme.textTheme.labelMedium),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              for (final String item in items)
+                ActionChip(
+                  key: Key('brew.addInOption.$item'),
+                  label: Text(item),
+                  onPressed: () => Navigator.of(context).pop(item),
+                ),
+            ],
+          ),
+          const SizedBox(height: 14),
+        ],
+      );
+    }
+
+    return SafeArea(
+      child: Padding(
+        // 键盘弹起时把面板顶上去。
+        padding: EdgeInsets.only(
+          left: 20,
+          right: 20,
+          top: 4,
+          bottom: 20 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              widget.title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            group('常用', widget.common),
+            group('最近用过', widget.recent),
+            Text('新建', style: theme.textTheme.labelMedium),
+            const SizedBox(height: 6),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: TextField(
+                    key: const Key('brew.addInName'),
+                    controller: _controller,
+                    maxLength: 20,
+                    decoration: const InputDecoration(
+                      hintText: '输入辅料名…',
+                      counterText: '',
+                    ),
+                    onSubmitted: (_) => _submit(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton(onPressed: _submit, child: const Text('添加')),
+              ],
+            ),
           ],
         ),
       ),

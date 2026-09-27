@@ -183,7 +183,7 @@ void main() {
     final int version = (await first.customSelect('PRAGMA user_version').get())
         .first
         .read<int>('user_version');
-    expect(version, 5, reason: '一次升到当前版本，不会停在中间某个版本');
+    expect(version, 6, reason: '一次升到当前版本，不会停在中间某个版本');
     await first.close();
 
     final AppDatabase second = await openUpgraded();

@@ -162,6 +162,8 @@ BrewLog makeLog({
   String? notes,
   bool isBest = false,
   bool isFavorite = false,
+  String? methodLabel,
+  List<BrewLogAddIn> addIns = const <BrewLogAddIn>[],
   DateTime? brewedAt,
 }) {
   final now = brewedAt ?? DateTime(2026, 1, 1, 8);
@@ -190,6 +192,8 @@ BrewLog makeLog({
     notes: notes,
     isBest: isBest,
     isFavorite: isFavorite,
+    methodLabel: methodLabel,
+    addIns: addIns,
     brewedAt: now,
     beanUsages: usages,
     createdAt: now,

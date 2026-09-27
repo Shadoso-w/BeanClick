@@ -262,6 +262,12 @@ class BrewLogs extends Table {
       .map(const TolerantEnumConverter<BrewMethod>(BrewMethod.values))
       .withDefault(const Constant('pourOver'))();
 
+  /// 自定义冲煮方法的原文（如「拿铁」）；为空表示用内置的 [method]。
+  ///
+  /// 单独一列而不是把自定义名字塞进 [method]：[method] 挂着容忍枚举转换器，
+  /// 认不出的字符串会被回退掉，等于**丢掉方法**。
+  TextColumn get methodLabel => text().nullable()();
+
   // --- 核心参数 ---
   RealColumn get grindSetting => real().nullable()();
 
@@ -388,6 +394,43 @@ class BrewLogBeans extends Table {
   IntColumn get position => integer().withDefault(const Constant(0))();
 }
 
+/// 一条记录里加的一种辅料（牛奶、榛果糖浆…）。多行 = 加了多种。
+///
+/// 与 [BrewLogBeans] 同构：记录删了跟着删（级联），
+/// 名字**直接存文本**不建名字表 —— 历史项靠聚合已有记录得到，
+/// 用户不需要维护一份辅料清单；名字写进记录后也不会被改名影响。
+///
+/// 类名刻意写成 `Addins`（不是 `AddIns`）：drift 按驼峰拆词，
+/// `BrewLogAddIns` 会变成 `brew_log_add_ins`，而 `BrewLogAddins` 才是
+/// 干净的 `brew_log_addins`。
+@DataClassName('BrewLogAddInRow')
+@TableIndex(name: 'idx_brew_log_addins_brew_log_id', columns: {#brewLogId})
+class BrewLogAddins extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get brewLogId =>
+      integer().references(BrewLogs, #id, onDelete: KeyAction.cascade)();
+
+  /// 辅料名快照，如「牛奶」。
+  TextColumn get name => text().withLength(min: 1, max: 60)();
+
+  /// 数量；可空 = 只记「加了什么」没量。
+  RealColumn get amount => real().nullable()();
+
+  /// 单位，存枚举 name（`ml` / `gram` / `pump` / `serving`）。
+  TextColumn get unit => text()
+      .map(
+        const TolerantEnumConverter<AddInUnit>(
+          AddInUnit.values,
+          fallback: AddInUnit.ml,
+        ),
+      )
+      .withDefault(const Constant('ml'))();
+
+  /// 顺序。
+  IntColumn get position => integer().withDefault(const Constant(0))();
+}
+
 /// 配方（设计稿 §4）。
 @DataClassName('RecipeRow')
 class Recipes extends Table {
@@ -507,6 +550,7 @@ class ExtraAttributes extends Table {
     Grinders,
     BrewLogs,
     BrewLogBeans,
+    BrewLogAddins,
     Recipes,
     AppSettings,
     ExtraAttributes,
@@ -521,18 +565,17 @@ class AppDatabase extends _$AppDatabase {
   /// 打开指定文件的数据库。
   AppDatabase.file(File file) : super(NativeDatabase(file));
 
-  /// v5：`brew_logs.is_favorite`（收藏一套参数，方便复制）。
+  /// v6：`brew_logs.methodLabel`（自定义冲煮方法）+ `brew_log_addins`（辅料）。
   ///
   /// 版本历史（**真实情况**，代码里出现过的版本号）：
   /// - v1：M1 的 5 张表，烘焙日期/烘焙度/余量/购入总重/价格都在 `coffee_beans` 上
-  /// - v4：批次（`bean_batches`）+ 多豆（`brew_log_beans`）+ 扩展属性
-  ///   （`extra_attributes`），烘焙信息与余量下移到批次
+  /// - v4：批次 + 多豆 + 扩展属性，烘焙信息与余量下移到批次
   /// - v5：`brew_logs.is_favorite`
+  /// - v6：`brew_logs.methodLabel`、`brew_log_addins`
   ///
-  /// ⚠️ v2 / v3 从未在任何提交或安装包里出现过（`git log -L` 里 schemaVersion
-  /// 只有 `1` → `4` → `5` 这几次变化），所以迁移只需要 v1 → v4 → v5 这条路。
+  /// ⚠️ v2 / v3 从未出现过（`git log -L` 里 schemaVersion 是 1 → 4 → 5 → 6）。
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -548,6 +591,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 5) {
         await _upgradeToV5(m);
       }
+      if (from < 6) {
+        await _upgradeToV6(m);
+      }
       // 索引与默认设置都是幂等的，迁移后统一兜一次：
       // 旧库没有索引（v1 一个都没建），而少了索引会让查批次、拉时间线全表扫描。
       await _createIndexes();
@@ -558,6 +604,15 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('PRAGMA foreign_keys = ON');
     },
   );
+
+  /// v5 → v6：加「自定义方法原文」列，并建辅料表。
+  ///
+  /// 两句都是**纯新增**：新列可空（旧记录自动为 NULL = 用内置方法），
+  /// 新表建出来就是空的，都不需要搬数据。
+  Future<void> _upgradeToV6(Migrator m) async {
+    await m.addColumn(brewLogs, brewLogs.methodLabel);
+    await m.createTable(brewLogAddins);
+  }
 
   /// v4 → v5：给冲煮记录加「收藏」。
   ///
@@ -673,6 +728,10 @@ class AppDatabase extends _$AppDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_extra_owner '
       'ON extra_attributes (owner_type, owner_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_brew_log_addins_brew_log_id '
+      'ON brew_log_addins (brew_log_id)',
     );
   }
 

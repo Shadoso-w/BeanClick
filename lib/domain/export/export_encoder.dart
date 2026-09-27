@@ -281,6 +281,7 @@ abstract final class ExportEncoder {
         '风味',
         '最佳',
         '收藏',
+        '辅料',
         'TDS%',
         '萃取率%',
         '水质ppm',
@@ -298,7 +299,7 @@ abstract final class ExportEncoder {
         <String>[
           '${log.id ?? ''}',
           log.brewedAt.toLocal().toIso8601String(),
-          log.method.label,
+          log.methodDisplay,
           // 拼配时列出全部豆子与各自粉量；单支时就是豆子名。
           _beanLabel(log, beansById),
           log.isBlend ? '是' : '',
@@ -315,6 +316,7 @@ abstract final class ExportEncoder {
           log.flavorTags.join('、'),
           log.isBest ? '是' : '',
           log.isFavorite ? '是' : '',
+          _addInsLabel(log.addIns),
           number(log.tds),
           number(log.extractionYield),
           log.waterPpm?.toString() ?? '',
@@ -407,6 +409,17 @@ abstract final class ExportEncoder {
           return '$label $percent%';
         })
         .join(' + ');
+  }
+
+  /// 辅料列：`牛奶 150ml、榛果糖浆 1泵`；没填数量的只写名字。
+  static String _addInsLabel(List<BrewLogAddIn> addIns) {
+    if (addIns.isEmpty) return '';
+    return addIns
+        .map((BrewLogAddIn addIn) {
+          if (addIn.amount == null) return addIn.name;
+          return '${addIn.name} ${number(addIn.amount)}${addIn.unit.label}';
+        })
+        .join('、');
   }
 
   static String _pourStages(List<PourStage>? stages) {
