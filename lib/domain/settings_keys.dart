@@ -13,6 +13,12 @@ abstract final class SettingsKeys {
   static const String exportFormat = 'exportFormat';
   static const String firstLaunchDone = 'firstLaunchDone';
 
+  /// 自定义冲煮方法库：JSON 字符串数组（有序）。
+  ///
+  /// 「一串有序的名字」不参与 SQL 查询，所以放设置表而不是单开一张表
+  /// （判断标准见 `docs/添加新属性指南.md`）。
+  static const String customBrewMethods = 'customBrewMethods';
+
   /// 全部 key，用于「首次启动写入默认值」。
   static const List<String> all = [
     themeMode,
@@ -22,6 +28,7 @@ abstract final class SettingsKeys {
     unitTemp,
     exportFormat,
     firstLaunchDone,
+    customBrewMethods,
   ];
 }
 
@@ -37,6 +44,9 @@ abstract final class SettingsDefaults {
   static const String exportFormat = 'json';
   static const String firstLaunchDone = 'false';
 
+  /// 还没有自定义方法：空数组。
+  static const String customBrewMethods = '[]';
+
   static const Map<String, String> byKey = {
     SettingsKeys.themeMode: themeMode,
     SettingsKeys.autoDeductStock: autoDeductStock,
@@ -45,5 +55,6 @@ abstract final class SettingsDefaults {
     SettingsKeys.unitTemp: unitTemp,
     SettingsKeys.exportFormat: exportFormat,
     SettingsKeys.firstLaunchDone: firstLaunchDone,
+    SettingsKeys.customBrewMethods: customBrewMethods,
   };
 }

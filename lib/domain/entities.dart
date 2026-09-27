@@ -514,6 +514,78 @@ class Grinder {
   String toString() => 'Grinder(id: $id, ${displayName()})';
 }
 
+/// 一条记录里加的一种辅料（牛奶、榛果糖浆、冰块…）。
+///
+/// 与 [BeanUsage] 同构：**每条记录多行**，名字存文本快照（不建名字表），
+/// 所以删掉或改名都不影响历史记录的可读性。
+class BrewLogAddIn {
+  const BrewLogAddIn({
+    this.id,
+    required this.name,
+    this.amount,
+    this.unit = AddInUnit.ml,
+    this.position = 0,
+  });
+
+  final int? id;
+
+  /// 辅料名，如「牛奶」。
+  final String name;
+
+  /// 数量；**可以为空**，表示「只记加了什么、没量」。
+  final double? amount;
+
+  final AddInUnit unit;
+  final int position;
+
+  BrewLogAddIn copyWith({
+    int? id,
+    String? name,
+    double? amount,
+    AddInUnit? unit,
+    int? position,
+    bool clearAmount = false,
+  }) => BrewLogAddIn(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    amount: clearAmount ? null : (amount ?? this.amount),
+    unit: unit ?? this.unit,
+    position: position ?? this.position,
+  );
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'amount': amount,
+    'unit': unit.name,
+    'position': position,
+  };
+
+  factory BrewLogAddIn.fromJson(Map<String, Object?> json) => BrewLogAddIn(
+    id: (json['id'] as num?)?.toInt(),
+    name: (json['name'] as String?) ?? '',
+    amount: (json['amount'] as num?)?.toDouble(),
+    unit: AddInUnit.fromName(json['unit'] as String?) ?? AddInUnit.ml,
+    position: (json['position'] as num?)?.toInt() ?? 0,
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BrewLogAddIn &&
+          other.id == id &&
+          other.name == name &&
+          other.amount == amount &&
+          other.unit == unit &&
+          other.position == position;
+
+  @override
+  int get hashCode => Object.hash(id, name, amount, unit, position);
+
+  @override
+  String toString() => 'BrewLogAddIn($name, $amount ${unit.name})';
+}
+
 /// 一条冲煮记录用到的其中一支豆子。
 ///
 /// [beanId] 在豆子被删除后会变成 null，但 [beanName] 是**写入时的快照**，
@@ -645,6 +717,8 @@ class BrewLog {
     this.yieldGrams,
     this.preheatUpperChamber,
     this.beanUsages = const [],
+    this.addIns = const [],
+    this.methodLabel,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -709,6 +783,20 @@ class BrewLog {
 
   /// 这条记录用到的豆子（多支 = 拼配）。由 Repository 联表填充。
   final List<BeanUsage> beanUsages;
+
+  /// 这条记录加的辅料（牛奶、糖浆…）。可以没有。
+  final List<BrewLogAddIn> addIns;
+
+  /// 自定义冲煮方法的原文（如「拿铁」）。为空表示用内置的 [method]。
+  ///
+  /// 单独一列而不是塞进 [method]：`method` 存的是枚举 name，
+  /// 认不出的值会被容忍转换器回退掉，直接写自定义名字会**丢方法**。
+  final String? methodLabel;
+
+  /// 方法显示名：自定义的用原文，否则用内置枚举的中文标签。
+  ///
+  /// 卡片、统计、导出都用它，保证三处一致。
+  String get methodDisplay => methodLabel ?? method.label;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -776,6 +864,8 @@ class BrewLog {
     'yieldGrams': yieldGrams,
     'preheatUpperChamber': preheatUpperChamber,
     'beanUsages': beanUsages.map((e) => e.toJson()).toList(growable: false),
+    'addIns': addIns.map((e) => e.toJson()).toList(growable: false),
+    'methodLabel': methodLabel,
     'createdAt': createdAt.toIso8601String(),
     'updatedAt': updatedAt.toIso8601String(),
   };
@@ -822,6 +912,10 @@ class BrewLog {
     beanUsages: (json['beanUsages'] as List<Object?>? ?? const [])
         .map((e) => BeanUsage.fromJson((e as Map).cast<String, Object?>()))
         .toList(growable: false),
+    addIns: (json['addIns'] as List<Object?>? ?? const [])
+        .map((e) => BrewLogAddIn.fromJson((e as Map).cast<String, Object?>()))
+        .toList(growable: false),
+    methodLabel: json['methodLabel'] as String?,
     createdAt: _date(json['createdAt']) ?? DateTime.now(),
     updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
   );
@@ -861,6 +955,8 @@ class BrewLog {
     double? yieldGrams,
     bool? preheatUpperChamber,
     List<BeanUsage>? beanUsages,
+    List<BrewLogAddIn>? addIns,
+    String? methodLabel,
     DateTime? createdAt,
     DateTime? updatedAt,
     bool clearBeanId = false,
@@ -890,6 +986,7 @@ class BrewLog {
     bool clearHeatLevel = false,
     bool clearYieldGrams = false,
     bool clearPreheatUpperChamber = false,
+    bool clearMethodLabel = false,
   }) => BrewLog(
     id: id ?? this.id,
     beanId: clearBeanId ? null : (beanId ?? this.beanId),
@@ -939,6 +1036,8 @@ class BrewLog {
         ? null
         : (preheatUpperChamber ?? this.preheatUpperChamber),
     beanUsages: beanUsages ?? this.beanUsages,
+    addIns: addIns ?? this.addIns,
+    methodLabel: clearMethodLabel ? null : (methodLabel ?? this.methodLabel),
     createdAt: createdAt ?? this.createdAt,
     updatedAt: updatedAt ?? this.updatedAt,
   );
@@ -981,6 +1080,8 @@ class BrewLog {
           other.yieldGrams == yieldGrams &&
           other.preheatUpperChamber == preheatUpperChamber &&
           _listEquals(other.beanUsages, beanUsages) &&
+          _listEquals(other.addIns, addIns) &&
+          other.methodLabel == methodLabel &&
           other.createdAt == createdAt &&
           other.updatedAt == updatedAt;
 
@@ -1020,6 +1121,8 @@ class BrewLog {
     yieldGrams,
     preheatUpperChamber,
     Object.hashAll(beanUsages),
+    Object.hashAll(addIns),
+    methodLabel,
     createdAt,
     updatedAt,
   ]);

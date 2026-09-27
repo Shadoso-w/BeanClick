@@ -2777,6 +2777,17 @@ class $BrewLogsTable extends BrewLogs
         requiredDuringInsert: false,
         defaultValue: const Constant('pourOver'),
       ).withConverter<BrewMethod?>($BrewLogsTable.$convertermethod);
+  static const VerificationMeta _methodLabelMeta = const VerificationMeta(
+    'methodLabel',
+  );
+  @override
+  late final GeneratedColumn<String> methodLabel = GeneratedColumn<String>(
+    'method_label',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _grindSettingMeta = const VerificationMeta(
     'grindSetting',
   );
@@ -3113,6 +3124,7 @@ class $BrewLogsTable extends BrewLogs
     grinderId,
     recipeId,
     method,
+    methodLabel,
     grindSetting,
     grindClicks,
     doseGrams,
@@ -3175,6 +3187,15 @@ class $BrewLogsTable extends BrewLogs
       context.handle(
         _recipeIdMeta,
         recipeId.isAcceptableOrUnknown(data['recipe_id']!, _recipeIdMeta),
+      );
+    }
+    if (data.containsKey('method_label')) {
+      context.handle(
+        _methodLabelMeta,
+        methodLabel.isAcceptableOrUnknown(
+          data['method_label']!,
+          _methodLabelMeta,
+        ),
       );
     }
     if (data.containsKey('grind_setting')) {
@@ -3394,6 +3415,10 @@ class $BrewLogsTable extends BrewLogs
           data['${effectivePrefix}method'],
         )!,
       ),
+      methodLabel: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}method_label'],
+      ),
       grindSetting: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}grind_setting'],
@@ -3546,6 +3571,12 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
   final int? grinderId;
   final int? recipeId;
   final BrewMethod? method;
+
+  /// 自定义冲煮方法的原文（如「拿铁」）；为空表示用内置的 [method]。
+  ///
+  /// 单独一列而不是把自定义名字塞进 [method]：[method] 挂着容忍枚举转换器，
+  /// 认不出的字符串会被回退掉，等于**丢掉方法**。
+  final String? methodLabel;
   final double? grindSetting;
   final int? grindClicks;
 
@@ -3602,6 +3633,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     this.grinderId,
     this.recipeId,
     this.method,
+    this.methodLabel,
     this.grindSetting,
     this.grindClicks,
     this.doseGrams,
@@ -3650,6 +3682,9 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       map['method'] = Variable<String>(
         $BrewLogsTable.$convertermethod.toSql(method),
       );
+    }
+    if (!nullToAbsent || methodLabel != null) {
+      map['method_label'] = Variable<String>(methodLabel);
     }
     if (!nullToAbsent || grindSetting != null) {
       map['grind_setting'] = Variable<double>(grindSetting);
@@ -3755,6 +3790,9 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       method: method == null && nullToAbsent
           ? const Value.absent()
           : Value(method),
+      methodLabel: methodLabel == null && nullToAbsent
+          ? const Value.absent()
+          : Value(methodLabel),
       grindSetting: grindSetting == null && nullToAbsent
           ? const Value.absent()
           : Value(grindSetting),
@@ -3845,6 +3883,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       grinderId: serializer.fromJson<int?>(json['grinderId']),
       recipeId: serializer.fromJson<int?>(json['recipeId']),
       method: serializer.fromJson<BrewMethod?>(json['method']),
+      methodLabel: serializer.fromJson<String?>(json['methodLabel']),
       grindSetting: serializer.fromJson<double?>(json['grindSetting']),
       grindClicks: serializer.fromJson<int?>(json['grindClicks']),
       doseGrams: serializer.fromJson<double?>(json['doseGrams']),
@@ -3888,6 +3927,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       'grinderId': serializer.toJson<int?>(grinderId),
       'recipeId': serializer.toJson<int?>(recipeId),
       'method': serializer.toJson<BrewMethod?>(method),
+      'methodLabel': serializer.toJson<String?>(methodLabel),
       'grindSetting': serializer.toJson<double?>(grindSetting),
       'grindClicks': serializer.toJson<int?>(grindClicks),
       'doseGrams': serializer.toJson<double?>(doseGrams),
@@ -3927,6 +3967,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     Value<int?> grinderId = const Value.absent(),
     Value<int?> recipeId = const Value.absent(),
     Value<BrewMethod?> method = const Value.absent(),
+    Value<String?> methodLabel = const Value.absent(),
     Value<double?> grindSetting = const Value.absent(),
     Value<int?> grindClicks = const Value.absent(),
     Value<double?> doseGrams = const Value.absent(),
@@ -3963,6 +4004,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     grinderId: grinderId.present ? grinderId.value : this.grinderId,
     recipeId: recipeId.present ? recipeId.value : this.recipeId,
     method: method.present ? method.value : this.method,
+    methodLabel: methodLabel.present ? methodLabel.value : this.methodLabel,
     grindSetting: grindSetting.present ? grindSetting.value : this.grindSetting,
     grindClicks: grindClicks.present ? grindClicks.value : this.grindClicks,
     doseGrams: doseGrams.present ? doseGrams.value : this.doseGrams,
@@ -4013,6 +4055,9 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       grinderId: data.grinderId.present ? data.grinderId.value : this.grinderId,
       recipeId: data.recipeId.present ? data.recipeId.value : this.recipeId,
       method: data.method.present ? data.method.value : this.method,
+      methodLabel: data.methodLabel.present
+          ? data.methodLabel.value
+          : this.methodLabel,
       grindSetting: data.grindSetting.present
           ? data.grindSetting.value
           : this.grindSetting,
@@ -4082,6 +4127,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           ..write('grinderId: $grinderId, ')
           ..write('recipeId: $recipeId, ')
           ..write('method: $method, ')
+          ..write('methodLabel: $methodLabel, ')
           ..write('grindSetting: $grindSetting, ')
           ..write('grindClicks: $grindClicks, ')
           ..write('doseGrams: $doseGrams, ')
@@ -4123,6 +4169,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     grinderId,
     recipeId,
     method,
+    methodLabel,
     grindSetting,
     grindClicks,
     doseGrams,
@@ -4163,6 +4210,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           other.grinderId == this.grinderId &&
           other.recipeId == this.recipeId &&
           other.method == this.method &&
+          other.methodLabel == this.methodLabel &&
           other.grindSetting == this.grindSetting &&
           other.grindClicks == this.grindClicks &&
           other.doseGrams == this.doseGrams &&
@@ -4201,6 +4249,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
   final Value<int?> grinderId;
   final Value<int?> recipeId;
   final Value<BrewMethod?> method;
+  final Value<String?> methodLabel;
   final Value<double?> grindSetting;
   final Value<int?> grindClicks;
   final Value<double?> doseGrams;
@@ -4237,6 +4286,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     this.grinderId = const Value.absent(),
     this.recipeId = const Value.absent(),
     this.method = const Value.absent(),
+    this.methodLabel = const Value.absent(),
     this.grindSetting = const Value.absent(),
     this.grindClicks = const Value.absent(),
     this.doseGrams = const Value.absent(),
@@ -4274,6 +4324,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     this.grinderId = const Value.absent(),
     this.recipeId = const Value.absent(),
     this.method = const Value.absent(),
+    this.methodLabel = const Value.absent(),
     this.grindSetting = const Value.absent(),
     this.grindClicks = const Value.absent(),
     this.doseGrams = const Value.absent(),
@@ -4311,6 +4362,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Expression<int>? grinderId,
     Expression<int>? recipeId,
     Expression<String>? method,
+    Expression<String>? methodLabel,
     Expression<double>? grindSetting,
     Expression<int>? grindClicks,
     Expression<double>? doseGrams,
@@ -4348,6 +4400,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       if (grinderId != null) 'grinder_id': grinderId,
       if (recipeId != null) 'recipe_id': recipeId,
       if (method != null) 'method': method,
+      if (methodLabel != null) 'method_label': methodLabel,
       if (grindSetting != null) 'grind_setting': grindSetting,
       if (grindClicks != null) 'grind_clicks': grindClicks,
       if (doseGrams != null) 'dose_grams': doseGrams,
@@ -4388,6 +4441,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Value<int?>? grinderId,
     Value<int?>? recipeId,
     Value<BrewMethod?>? method,
+    Value<String?>? methodLabel,
     Value<double?>? grindSetting,
     Value<int?>? grindClicks,
     Value<double?>? doseGrams,
@@ -4425,6 +4479,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       grinderId: grinderId ?? this.grinderId,
       recipeId: recipeId ?? this.recipeId,
       method: method ?? this.method,
+      methodLabel: methodLabel ?? this.methodLabel,
       grindSetting: grindSetting ?? this.grindSetting,
       grindClicks: grindClicks ?? this.grindClicks,
       doseGrams: doseGrams ?? this.doseGrams,
@@ -4477,6 +4532,9 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       map['method'] = Variable<String>(
         $BrewLogsTable.$convertermethod.toSql(method.value),
       );
+    }
+    if (methodLabel.present) {
+      map['method_label'] = Variable<String>(methodLabel.value);
     }
     if (grindSetting.present) {
       map['grind_setting'] = Variable<double>(grindSetting.value);
@@ -4585,6 +4643,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
           ..write('grinderId: $grinderId, ')
           ..write('recipeId: $recipeId, ')
           ..write('method: $method, ')
+          ..write('methodLabel: $methodLabel, ')
           ..write('grindSetting: $grindSetting, ')
           ..write('grindClicks: $grindClicks, ')
           ..write('doseGrams: $doseGrams, ')
@@ -5152,6 +5211,419 @@ class BrewLogBeansCompanion extends UpdateCompanion<BeanUsageRow> {
           ..write('beanNameSnapshot: $beanNameSnapshot, ')
           ..write('roastDateSnapshot: $roastDateSnapshot, ')
           ..write('doseGrams: $doseGrams, ')
+          ..write('position: $position')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BrewLogAddinsTable extends BrewLogAddins
+    with TableInfo<$BrewLogAddinsTable, BrewLogAddInRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BrewLogAddinsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _brewLogIdMeta = const VerificationMeta(
+    'brewLogId',
+  );
+  @override
+  late final GeneratedColumn<int> brewLogId = GeneratedColumn<int>(
+    'brew_log_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES brew_logs (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 60,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _amountMeta = const VerificationMeta('amount');
+  @override
+  late final GeneratedColumn<double> amount = GeneratedColumn<double>(
+    'amount',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  @override
+  late final GeneratedColumnWithTypeConverter<AddInUnit?, String> unit =
+      GeneratedColumn<String>(
+        'unit',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('ml'),
+      ).withConverter<AddInUnit?>($BrewLogAddinsTable.$converterunit);
+  static const VerificationMeta _positionMeta = const VerificationMeta(
+    'position',
+  );
+  @override
+  late final GeneratedColumn<int> position = GeneratedColumn<int>(
+    'position',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    brewLogId,
+    name,
+    amount,
+    unit,
+    position,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'brew_log_addins';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BrewLogAddInRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('brew_log_id')) {
+      context.handle(
+        _brewLogIdMeta,
+        brewLogId.isAcceptableOrUnknown(data['brew_log_id']!, _brewLogIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_brewLogIdMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('amount')) {
+      context.handle(
+        _amountMeta,
+        amount.isAcceptableOrUnknown(data['amount']!, _amountMeta),
+      );
+    }
+    if (data.containsKey('position')) {
+      context.handle(
+        _positionMeta,
+        position.isAcceptableOrUnknown(data['position']!, _positionMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BrewLogAddInRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BrewLogAddInRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      brewLogId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}brew_log_id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      amount: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}amount'],
+      ),
+      unit: $BrewLogAddinsTable.$converterunit.fromSql(
+        attachedDatabase.typeMapping.read(
+          DriftSqlType.string,
+          data['${effectivePrefix}unit'],
+        )!,
+      ),
+      position: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}position'],
+      )!,
+    );
+  }
+
+  @override
+  $BrewLogAddinsTable createAlias(String alias) {
+    return $BrewLogAddinsTable(attachedDatabase, alias);
+  }
+
+  static TypeConverter<AddInUnit?, String?> $converterunit =
+      const TolerantEnumConverter<AddInUnit>(
+        AddInUnit.values,
+        fallback: AddInUnit.ml,
+      );
+}
+
+class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
+  final int id;
+  final int brewLogId;
+
+  /// 辅料名快照，如「牛奶」。
+  final String name;
+
+  /// 数量；可空 = 只记「加了什么」没量。
+  final double? amount;
+
+  /// 单位，存枚举 name（`ml` / `gram` / `pump` / `serving`）。
+  final AddInUnit? unit;
+
+  /// 顺序。
+  final int position;
+  const BrewLogAddInRow({
+    required this.id,
+    required this.brewLogId,
+    required this.name,
+    this.amount,
+    this.unit,
+    required this.position,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['brew_log_id'] = Variable<int>(brewLogId);
+    map['name'] = Variable<String>(name);
+    if (!nullToAbsent || amount != null) {
+      map['amount'] = Variable<double>(amount);
+    }
+    if (!nullToAbsent || unit != null) {
+      map['unit'] = Variable<String>(
+        $BrewLogAddinsTable.$converterunit.toSql(unit),
+      );
+    }
+    map['position'] = Variable<int>(position);
+    return map;
+  }
+
+  BrewLogAddinsCompanion toCompanion(bool nullToAbsent) {
+    return BrewLogAddinsCompanion(
+      id: Value(id),
+      brewLogId: Value(brewLogId),
+      name: Value(name),
+      amount: amount == null && nullToAbsent
+          ? const Value.absent()
+          : Value(amount),
+      unit: unit == null && nullToAbsent ? const Value.absent() : Value(unit),
+      position: Value(position),
+    );
+  }
+
+  factory BrewLogAddInRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BrewLogAddInRow(
+      id: serializer.fromJson<int>(json['id']),
+      brewLogId: serializer.fromJson<int>(json['brewLogId']),
+      name: serializer.fromJson<String>(json['name']),
+      amount: serializer.fromJson<double?>(json['amount']),
+      unit: serializer.fromJson<AddInUnit?>(json['unit']),
+      position: serializer.fromJson<int>(json['position']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'brewLogId': serializer.toJson<int>(brewLogId),
+      'name': serializer.toJson<String>(name),
+      'amount': serializer.toJson<double?>(amount),
+      'unit': serializer.toJson<AddInUnit?>(unit),
+      'position': serializer.toJson<int>(position),
+    };
+  }
+
+  BrewLogAddInRow copyWith({
+    int? id,
+    int? brewLogId,
+    String? name,
+    Value<double?> amount = const Value.absent(),
+    Value<AddInUnit?> unit = const Value.absent(),
+    int? position,
+  }) => BrewLogAddInRow(
+    id: id ?? this.id,
+    brewLogId: brewLogId ?? this.brewLogId,
+    name: name ?? this.name,
+    amount: amount.present ? amount.value : this.amount,
+    unit: unit.present ? unit.value : this.unit,
+    position: position ?? this.position,
+  );
+  BrewLogAddInRow copyWithCompanion(BrewLogAddinsCompanion data) {
+    return BrewLogAddInRow(
+      id: data.id.present ? data.id.value : this.id,
+      brewLogId: data.brewLogId.present ? data.brewLogId.value : this.brewLogId,
+      name: data.name.present ? data.name.value : this.name,
+      amount: data.amount.present ? data.amount.value : this.amount,
+      unit: data.unit.present ? data.unit.value : this.unit,
+      position: data.position.present ? data.position.value : this.position,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BrewLogAddInRow(')
+          ..write('id: $id, ')
+          ..write('brewLogId: $brewLogId, ')
+          ..write('name: $name, ')
+          ..write('amount: $amount, ')
+          ..write('unit: $unit, ')
+          ..write('position: $position')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, brewLogId, name, amount, unit, position);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BrewLogAddInRow &&
+          other.id == this.id &&
+          other.brewLogId == this.brewLogId &&
+          other.name == this.name &&
+          other.amount == this.amount &&
+          other.unit == this.unit &&
+          other.position == this.position);
+}
+
+class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
+  final Value<int> id;
+  final Value<int> brewLogId;
+  final Value<String> name;
+  final Value<double?> amount;
+  final Value<AddInUnit?> unit;
+  final Value<int> position;
+  const BrewLogAddinsCompanion({
+    this.id = const Value.absent(),
+    this.brewLogId = const Value.absent(),
+    this.name = const Value.absent(),
+    this.amount = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.position = const Value.absent(),
+  });
+  BrewLogAddinsCompanion.insert({
+    this.id = const Value.absent(),
+    required int brewLogId,
+    required String name,
+    this.amount = const Value.absent(),
+    this.unit = const Value.absent(),
+    this.position = const Value.absent(),
+  }) : brewLogId = Value(brewLogId),
+       name = Value(name);
+  static Insertable<BrewLogAddInRow> custom({
+    Expression<int>? id,
+    Expression<int>? brewLogId,
+    Expression<String>? name,
+    Expression<double>? amount,
+    Expression<String>? unit,
+    Expression<int>? position,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (brewLogId != null) 'brew_log_id': brewLogId,
+      if (name != null) 'name': name,
+      if (amount != null) 'amount': amount,
+      if (unit != null) 'unit': unit,
+      if (position != null) 'position': position,
+    });
+  }
+
+  BrewLogAddinsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? brewLogId,
+    Value<String>? name,
+    Value<double?>? amount,
+    Value<AddInUnit?>? unit,
+    Value<int>? position,
+  }) {
+    return BrewLogAddinsCompanion(
+      id: id ?? this.id,
+      brewLogId: brewLogId ?? this.brewLogId,
+      name: name ?? this.name,
+      amount: amount ?? this.amount,
+      unit: unit ?? this.unit,
+      position: position ?? this.position,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (brewLogId.present) {
+      map['brew_log_id'] = Variable<int>(brewLogId.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (amount.present) {
+      map['amount'] = Variable<double>(amount.value);
+    }
+    if (unit.present) {
+      map['unit'] = Variable<String>(
+        $BrewLogAddinsTable.$converterunit.toSql(unit.value),
+      );
+    }
+    if (position.present) {
+      map['position'] = Variable<int>(position.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BrewLogAddinsCompanion(')
+          ..write('id: $id, ')
+          ..write('brewLogId: $brewLogId, ')
+          ..write('name: $name, ')
+          ..write('amount: $amount, ')
+          ..write('unit: $unit, ')
           ..write('position: $position')
           ..write(')'))
         .toString();
@@ -6066,6 +6538,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $RecipesTable recipes = $RecipesTable(this);
   late final $BrewLogsTable brewLogs = $BrewLogsTable(this);
   late final $BrewLogBeansTable brewLogBeans = $BrewLogBeansTable(this);
+  late final $BrewLogAddinsTable brewLogAddins = $BrewLogAddinsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final $ExtraAttributesTable extraAttributes = $ExtraAttributesTable(
     this,
@@ -6086,6 +6559,10 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_brew_log_beans_bean_id',
     'CREATE INDEX idx_brew_log_beans_bean_id ON brew_log_beans (bean_id)',
   );
+  late final Index idxBrewLogAddinsBrewLogId = Index(
+    'idx_brew_log_addins_brew_log_id',
+    'CREATE INDEX idx_brew_log_addins_brew_log_id ON brew_log_addins (brew_log_id)',
+  );
   late final Index idxExtraOwner = Index(
     'idx_extra_owner',
     'CREATE INDEX idx_extra_owner ON extra_attributes (owner_type, owner_id)',
@@ -6101,12 +6578,14 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     recipes,
     brewLogs,
     brewLogBeans,
+    brewLogAddins,
     appSettings,
     extraAttributes,
     idxBeanBatchesBeanId,
     idxBrewLogsBrewedAt,
     idxBrewLogBeansBrewLogId,
     idxBrewLogBeansBeanId,
+    idxBrewLogAddinsBrewLogId,
     idxExtraOwner,
   ];
   @override
@@ -6159,6 +6638,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('brew_log_beans', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'brew_logs',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('brew_log_addins', kind: UpdateKind.delete)],
     ),
   ]);
 }
@@ -8142,6 +8628,7 @@ typedef $$BrewLogsTableCreateCompanionBuilder = BrewLogsCompanion Function({
   Value<int?> grinderId,
   Value<int?> recipeId,
   Value<BrewMethod?> method,
+  Value<String?> methodLabel,
   Value<double?> grindSetting,
   Value<int?> grindClicks,
   Value<double?> doseGrams,
@@ -8179,6 +8666,7 @@ typedef $$BrewLogsTableUpdateCompanionBuilder = BrewLogsCompanion Function({
   Value<int?> grinderId,
   Value<int?> recipeId,
   Value<BrewMethod?> method,
+  Value<String?> methodLabel,
   Value<double?> grindSetting,
   Value<int?> grindClicks,
   Value<double?> doseGrams,
@@ -8283,6 +8771,24 @@ final class $$BrewLogsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$BrewLogAddinsTable, List<BrewLogAddInRow>>
+  _brewLogAddinsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.brewLogAddins,
+    aliasName: 'brew_logs__id__brew_log_addins__brew_log_id',
+  );
+
+  $$BrewLogAddinsTableProcessedTableManager get brewLogAddinsRefs {
+    final manager = $$BrewLogAddinsTableTableManager(
+      $_db,
+      $_db.brewLogAddins,
+    ).filter((f) => f.brewLogId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_brewLogAddinsRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$BrewLogsTableFilterComposer
@@ -8304,6 +8810,11 @@ class $$BrewLogsTableFilterComposer
         column: $table.method,
         builder: (column) => ColumnWithTypeConverterFilters(column),
       );
+
+  ColumnFilters<String> get methodLabel => $composableBuilder(
+    column: $table.methodLabel,
+    builder: (column) => ColumnFilters(column),
+  );
 
   ColumnFilters<double> get grindSetting => $composableBuilder(
     column: $table.grindSetting,
@@ -8551,6 +9062,31 @@ class $$BrewLogsTableFilterComposer
     );
     return f(composer);
   }
+
+  Expression<bool> brewLogAddinsRefs(
+    Expression<bool> Function($$BrewLogAddinsTableFilterComposer f) f,
+  ) {
+    final $$BrewLogAddinsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.brewLogAddins,
+      getReferencedColumn: (t) => t.brewLogId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogAddinsTableFilterComposer(
+            $db: $db,
+            $table: $db.brewLogAddins,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$BrewLogsTableOrderingComposer
@@ -8569,6 +9105,11 @@ class $$BrewLogsTableOrderingComposer
 
   ColumnOrderings<String> get method => $composableBuilder(
     column: $table.method,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get methodLabel => $composableBuilder(
+    column: $table.methodLabel,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -8807,6 +9348,11 @@ class $$BrewLogsTableAnnotationComposer
   GeneratedColumnWithTypeConverter<BrewMethod?, String> get method =>
       $composableBuilder(column: $table.method, builder: (column) => column);
 
+  GeneratedColumn<String> get methodLabel => $composableBuilder(
+    column: $table.methodLabel,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<double> get grindSetting => $composableBuilder(
     column: $table.grindSetting,
     builder: (column) => column,
@@ -9021,6 +9567,31 @@ class $$BrewLogsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> brewLogAddinsRefs<T extends Object>(
+    Expression<T> Function($$BrewLogAddinsTableAnnotationComposer a) f,
+  ) {
+    final $$BrewLogAddinsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.brewLogAddins,
+      getReferencedColumn: (t) => t.brewLogId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogAddinsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.brewLogAddins,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$BrewLogsTableTableManager
@@ -9041,6 +9612,7 @@ class $$BrewLogsTableTableManager
             bool grinderId,
             bool recipeId,
             bool brewLogBeansRefs,
+            bool brewLogAddinsRefs,
           })
         > {
   $$BrewLogsTableTableManager(_$AppDatabase db, $BrewLogsTable table)
@@ -9061,6 +9633,7 @@ class $$BrewLogsTableTableManager
                 Value<int?> grinderId = const Value.absent(),
                 Value<int?> recipeId = const Value.absent(),
                 Value<BrewMethod?> method = const Value.absent(),
+                Value<String?> methodLabel = const Value.absent(),
                 Value<double?> grindSetting = const Value.absent(),
                 Value<int?> grindClicks = const Value.absent(),
                 Value<double?> doseGrams = const Value.absent(),
@@ -9097,6 +9670,7 @@ class $$BrewLogsTableTableManager
                 grinderId: grinderId,
                 recipeId: recipeId,
                 method: method,
+                methodLabel: methodLabel,
                 grindSetting: grindSetting,
                 grindClicks: grindClicks,
                 doseGrams: doseGrams,
@@ -9135,6 +9709,7 @@ class $$BrewLogsTableTableManager
                 Value<int?> grinderId = const Value.absent(),
                 Value<int?> recipeId = const Value.absent(),
                 Value<BrewMethod?> method = const Value.absent(),
+                Value<String?> methodLabel = const Value.absent(),
                 Value<double?> grindSetting = const Value.absent(),
                 Value<int?> grindClicks = const Value.absent(),
                 Value<double?> doseGrams = const Value.absent(),
@@ -9171,6 +9746,7 @@ class $$BrewLogsTableTableManager
                 grinderId: grinderId,
                 recipeId: recipeId,
                 method: method,
+                methodLabel: methodLabel,
                 grindSetting: grindSetting,
                 grindClicks: grindClicks,
                 doseGrams: doseGrams,
@@ -9216,11 +9792,13 @@ class $$BrewLogsTableTableManager
                 grinderId = false,
                 recipeId = false,
                 brewLogBeansRefs = false,
+                brewLogAddinsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (brewLogBeansRefs) db.brewLogBeans,
+                    if (brewLogAddinsRefs) db.brewLogAddins,
                   ],
                   addJoins:
                       <
@@ -9297,6 +9875,27 @@ class $$BrewLogsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (brewLogAddinsRefs)
+                        await $_getPrefetchedData<
+                          BrewLogRow,
+                          $BrewLogsTable,
+                          BrewLogAddInRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BrewLogsTableReferences
+                              ._brewLogAddinsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BrewLogsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).brewLogAddinsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.brewLogId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -9322,6 +9921,7 @@ typedef $$BrewLogsTableProcessedTableManager =
         bool grinderId,
         bool recipeId,
         bool brewLogBeansRefs,
+        bool brewLogAddinsRefs,
       })
     >;
 typedef $$BrewLogBeansTableCreateCompanionBuilder =
@@ -9863,6 +10463,340 @@ typedef $$BrewLogBeansTableProcessedTableManager =
       BeanUsageRow,
       PrefetchHooks Function({bool brewLogId, bool beanId, bool batchId})
     >;
+typedef $$BrewLogAddinsTableCreateCompanionBuilder =
+    BrewLogAddinsCompanion Function({
+      Value<int> id,
+      required int brewLogId,
+      required String name,
+      Value<double?> amount,
+      Value<AddInUnit?> unit,
+      Value<int> position,
+    });
+typedef $$BrewLogAddinsTableUpdateCompanionBuilder =
+    BrewLogAddinsCompanion Function({
+      Value<int> id,
+      Value<int> brewLogId,
+      Value<String> name,
+      Value<double?> amount,
+      Value<AddInUnit?> unit,
+      Value<int> position,
+    });
+
+final class $$BrewLogAddinsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $BrewLogAddinsTable, BrewLogAddInRow> {
+  $$BrewLogAddinsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $BrewLogsTable _brewLogIdTable(_$AppDatabase db) =>
+      db.brewLogs.createAlias('brew_log_addins__brew_log_id__brew_logs__id');
+
+  $$BrewLogsTableProcessedTableManager get brewLogId {
+    final $_column = $_itemColumn<int>('brew_log_id')!;
+
+    final manager = $$BrewLogsTableTableManager(
+      $_db,
+      $_db.brewLogs,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_brewLogIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$BrewLogAddinsTableFilterComposer
+    extends Composer<_$AppDatabase, $BrewLogAddinsTable> {
+  $$BrewLogAddinsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnWithTypeConverterFilters<AddInUnit?, AddInUnit, String> get unit =>
+      $composableBuilder(
+        column: $table.unit,
+        builder: (column) => ColumnWithTypeConverterFilters(column),
+      );
+
+  ColumnFilters<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$BrewLogsTableFilterComposer get brewLogId {
+    final $$BrewLogsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableFilterComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogAddinsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BrewLogAddinsTable> {
+  $$BrewLogAddinsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get amount => $composableBuilder(
+    column: $table.amount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get unit => $composableBuilder(
+    column: $table.unit,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get position => $composableBuilder(
+    column: $table.position,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$BrewLogsTableOrderingComposer get brewLogId {
+    final $$BrewLogsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableOrderingComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogAddinsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BrewLogAddinsTable> {
+  $$BrewLogAddinsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<double> get amount =>
+      $composableBuilder(column: $table.amount, builder: (column) => column);
+
+  GeneratedColumnWithTypeConverter<AddInUnit?, String> get unit =>
+      $composableBuilder(column: $table.unit, builder: (column) => column);
+
+  GeneratedColumn<int> get position =>
+      $composableBuilder(column: $table.position, builder: (column) => column);
+
+  $$BrewLogsTableAnnotationComposer get brewLogId {
+    final $$BrewLogsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogAddinsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BrewLogAddinsTable,
+          BrewLogAddInRow,
+          $$BrewLogAddinsTableFilterComposer,
+          $$BrewLogAddinsTableOrderingComposer,
+          $$BrewLogAddinsTableAnnotationComposer,
+          $$BrewLogAddinsTableCreateCompanionBuilder,
+          $$BrewLogAddinsTableUpdateCompanionBuilder,
+          (BrewLogAddInRow, $$BrewLogAddinsTableReferences),
+          BrewLogAddInRow,
+          PrefetchHooks Function({bool brewLogId})
+        > {
+  $$BrewLogAddinsTableTableManager(_$AppDatabase db, $BrewLogAddinsTable table)
+    : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BrewLogAddinsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$BrewLogAddinsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$BrewLogAddinsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> brewLogId = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<double?> amount = const Value.absent(),
+                Value<AddInUnit?> unit = const Value.absent(),
+                Value<int> position = const Value.absent(),
+              }) => BrewLogAddinsCompanion(
+                id: id,
+                brewLogId: brewLogId,
+                name: name,
+                amount: amount,
+                unit: unit,
+                position: position,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int brewLogId,
+                required String name,
+                Value<double?> amount = const Value.absent(),
+                Value<AddInUnit?> unit = const Value.absent(),
+                Value<int> position = const Value.absent(),
+              }) => BrewLogAddinsCompanion.insert(
+                id: id,
+                brewLogId: brewLogId,
+                name: name,
+                amount: amount,
+                unit: unit,
+                position: position,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$BrewLogAddinsTable, BrewLogAddInRow>(table),
+                  $$BrewLogAddinsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({brewLogId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (brewLogId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.brewLogId,
+                        referencedTable: $$BrewLogAddinsTableReferences
+                            ._brewLogIdTable(db),
+                        referencedColumn: $$BrewLogAddinsTableReferences
+                            ._brewLogIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$BrewLogAddinsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BrewLogAddinsTable,
+      BrewLogAddInRow,
+      $$BrewLogAddinsTableFilterComposer,
+      $$BrewLogAddinsTableOrderingComposer,
+      $$BrewLogAddinsTableAnnotationComposer,
+      $$BrewLogAddinsTableCreateCompanionBuilder,
+      $$BrewLogAddinsTableUpdateCompanionBuilder,
+      (BrewLogAddInRow, $$BrewLogAddinsTableReferences),
+      BrewLogAddInRow,
+      PrefetchHooks Function({bool brewLogId})
+    >;
 typedef $$AppSettingsTableCreateCompanionBuilder =
     AppSettingsCompanion Function({
       required String key,
@@ -10361,6 +11295,8 @@ class $AppDatabaseManager {
       $$BrewLogsTableTableManager(_db, _db.brewLogs);
   $$BrewLogBeansTableTableManager get brewLogBeans =>
       $$BrewLogBeansTableTableManager(_db, _db.brewLogBeans);
+  $$BrewLogAddinsTableTableManager get brewLogAddins =>
+      $$BrewLogAddinsTableTableManager(_db, _db.brewLogAddins);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
   $$ExtraAttributesTableTableManager get extraAttributes =>

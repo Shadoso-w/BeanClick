@@ -68,6 +68,14 @@ final beanListProvider = StreamProvider<List<CoffeeBean>>(
   (ref) => ref.watch(beanRepositoryProvider).watchAll(),
 );
 
+/// 自定义冲煮方法库（有序）。
+///
+/// 存在设置表里，表单的方法 chip 行跟着它变；改完立刻生效，
+/// 不需要重进表单。
+final customBrewMethodsProvider = StreamProvider<List<String>>(
+  (ref) => ref.watch(settingsRepositoryProvider).watchCustomBrewMethods(),
+);
+
 /// 全部批次，按豆子分组。
 ///
 /// 豆库列表需要「总余量 / 批次数 / 最近烘焙日」，这些都在批次上。

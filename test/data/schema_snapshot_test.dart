@@ -1,5 +1,6 @@
 import 'package:beanclick/data/database.dart';
 import 'package:beanclick/data/repositories/bean_repository.dart';
+import 'package:beanclick/domain/enums.dart';
 import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
@@ -95,7 +96,32 @@ final Map<int, _VersionFixture> _fixtures = <int, _VersionFixture>{
     insert: _insertV5Fixture,
     validate: _validateV5Fixture,
   ),
+  6: const _VersionFixture(
+    insert: _insertV6Fixture,
+    validate: _validateV6Fixture,
+  ),
 };
+
+/// v6 的写入 = v5 那份数据 + 自定义方法 + 两条辅料。
+///
+/// 每次升版本都照这个办法复用上一版的写入函数，只补这次新增的东西，
+/// 免得每版都把整套 INSERT 抄一遍（抄错了就是假绿）。
+void _insertV6Fixture(Batch batch, GeneratedDatabase db) {
+  _insertV5Fixture(batch, db);
+  // v6 新增：自定义方法原文（内置方法仍走 method 列）。
+  batch.customStatement(
+    "UPDATE brew_logs SET method_label = '拿铁' WHERE id = 1",
+  );
+  // v6 新增：辅料两行（一行有量、一行只有名字）。
+  batch.customStatement(
+    'INSERT INTO brew_log_addins (id, brew_log_id, name, amount, unit, '
+    "position) VALUES (1, 1, '牛奶', 150, 'ml', 0)",
+  );
+  batch.customStatement(
+    'INSERT INTO brew_log_addins (id, brew_log_id, name, amount, unit, '
+    "position) VALUES (2, 1, '榛果糖浆', 1, 'pump', 1)",
+  );
+}
 
 /// v5 的写入 = v4 那份数据 + 把那条记录标成收藏。
 ///
@@ -190,10 +216,15 @@ Future<void> _validateV4Fixture(AppDatabase db) =>
 Future<void> _validateV5Fixture(AppDatabase db) =>
     _validateFixture(db, expectFavorite: true);
 
+/// v6 升上来后：收藏 + 自定义方法 + 辅料都要在。
+Future<void> _validateV6Fixture(AppDatabase db) =>
+    _validateFixture(db, expectFavorite: true, expectAddIns: true);
+
 /// 升到当前版本后逐项校验上面的数据。
 Future<void> _validateFixture(
   AppDatabase db, {
   required bool expectFavorite,
+  bool expectAddIns = false,
 }) async {
   // --- 豆子与批次 ---
   final List<CoffeeBeanRow> beans = await (db.select(
@@ -221,6 +252,23 @@ Future<void> _validateFixture(
   expect(logs.single.rating, 5);
   // v5 加的收藏标记：v4 的库升上来默认 false，v5 的库要保住写进去的 true。
   expect(logs.single.isFavorite, expectFavorite);
+  // v6 加的自定义方法：v5 及更早升上来时为空（用内置方法）。
+  expect(logs.single.methodLabel, expectAddIns ? '拿铁' : isNull);
+
+  // v6 加的辅料行。
+  final List<BrewLogAddInRow> addInRows = await (db.select(
+    db.brewLogAddins,
+  )..orderBy([(t) => OrderingTerm(expression: t.position)])).get();
+  if (expectAddIns) {
+    expect(addInRows, hasLength(2));
+    expect(addInRows[0].name, '牛奶');
+    expect(addInRows[0].amount, 150);
+    expect(addInRows[0].unit, AddInUnit.ml);
+    expect(addInRows[1].name, '榛果糖浆');
+    expect(addInRows[1].unit, AddInUnit.pump);
+  } else {
+    expect(addInRows, isEmpty);
+  }
 
   final List<BeanUsageRow> usages = await (db.select(
     db.brewLogBeans,

@@ -386,7 +386,7 @@ class _BrewLogCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        _MethodChip(label: log.method.label),
+                        _MethodChip(label: log.methodDisplay),
                       ],
                     ),
                   ),
@@ -403,6 +403,28 @@ class _BrewLogCard extends StatelessWidget {
                 Text(
                   '拼配 ${log.beanUsages.map((BeanUsage u) => '${_formatNumber(u.doseGrams)} g').join(' + ')}',
                   style: mutedStyle,
+                ),
+              ],
+              if (log.addIns.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 8),
+                Row(
+                  children: <Widget>[
+                    // 用 Material 图标而不是 emoji：emoji 在中文字体里画不出来。
+                    Icon(
+                      Icons.local_drink_outlined,
+                      size: 14,
+                      color: colors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        _addInsLabel(log.addIns),
+                        style: mutedStyle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ),
               ],
               const SizedBox(height: 10),
@@ -623,4 +645,18 @@ String _formatBrewTime(DateTime value) {
 String _formatNumber(double value) {
   if (value == value.roundToDouble()) return value.toStringAsFixed(0);
   return value.toStringAsFixed(1);
+}
+
+/// 辅料那一行的文字：最多两项，其余折叠成 `+N`。
+///
+/// 卡片上只给一眼的印象，详细清单在详情/编辑页里。
+String _addInsLabel(List<BrewLogAddIn> addIns, {int max = 2}) {
+  String one(BrewLogAddIn addIn) {
+    if (addIn.amount == null) return addIn.name;
+    return '${addIn.name} ${_formatNumber(addIn.amount!)} ${addIn.unit.label}';
+  }
+
+  final List<String> shown = addIns.take(max).map(one).toList(growable: true);
+  if (addIns.length > max) shown.add('+${addIns.length - max}');
+  return shown.join(' · ');
 }

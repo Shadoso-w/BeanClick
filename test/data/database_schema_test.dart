@@ -36,7 +36,7 @@ void main() {
   }
 
   group('表结构', () {
-    test('包含全部 8 张表', () async {
+    test('包含全部 9 张表', () async {
       final tables = await tableNames();
 
       expect(
@@ -47,6 +47,7 @@ void main() {
           'grinders',
           'brew_logs',
           'brew_log_beans',
+          'brew_log_addins',
           'recipes',
           'app_settings',
           'extra_attributes',
@@ -54,8 +55,8 @@ void main() {
       );
     });
 
-    test('schemaVersion 为 5', () {
-      expect(db.schemaVersion, 5);
+    test('schemaVersion 为 6', () {
+      expect(db.schemaVersion, 6);
     });
 
     test('外键约束已开启（SQLite 默认关闭）', () async {
@@ -64,10 +65,10 @@ void main() {
       expect(row.data.values.first, 1);
     });
 
-    test('建库时种入 7 项默认设置（手册 §6.3）', () async {
+    test('建库时种入 8 项默认设置（手册 §6.3 + 自定义方法库）', () async {
       final rows = await db.customSelect('SELECT key FROM app_settings').get();
 
-      expect(rows.length, 7);
+      expect(rows.length, 8);
     });
 
     test('clearAll 清空数据但保留表结构', () async {
@@ -76,7 +77,7 @@ void main() {
       );
       expect(
         (await db.customSelect('SELECT * FROM app_settings').get()).length,
-        8,
+        9,
       );
 
       await db.clearAll();
