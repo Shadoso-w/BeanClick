@@ -7,12 +7,17 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# 同一分支上连续推送时，取消上一次还没跑完的运行，避免排队浪费额度。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze-and-test:
     name: Analyze & Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: subosito/flutter-action@v2
         with:
@@ -40,9 +45,9 @@ jobs:
     needs: analyze-and-test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '17'
@@ -63,7 +68,7 @@ jobs:
         run: flutter build apk --release --split-per-abi
 
       - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: beanclick-apk
           path: build/app/outputs/flutter-apk/*.apk
