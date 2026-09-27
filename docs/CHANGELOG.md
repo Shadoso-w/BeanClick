@@ -31,6 +31,10 @@
 - **索引**：补 4 个索引（外键与时间线），此前全是全表扫描
 - **导出**：JSON 升到 `schemaVersion 2`，新增 `beanBatches` 段；
   CSV 新增「咖啡豆批次」表，拼配记录的豆子列输出 `A 70% + B 30%`
+- **数据库迁移改成逐列搬迁**：`onUpgrade` 从「删表重建」换成 `_upgradeToV4`——
+  建新表 → 把烘焙日期/烘焙度/余量/购入总重/价格搬成每支豆子的第一个批次 →
+  用 `brew_logs.beanId` 回填用量行与烘焙快照 → 最后才删掉 `coffee_beans` 上搬走的列。
+  **v1 用户的豆子、记录、设置项全部保留**，不再丢数据
 - **豆库界面**：卡片展示批次聚合（总余量、批次数、最近烘焙距今天数、收藏）；
   新增批次编辑页，「再来一袋」与编辑批次共用
 
@@ -38,15 +42,15 @@
 
 - **冲煮记录表单不扣余量**：表单只写 `brew_logs.doseGrams`，没有同步
   `brew_log_beans` 的用量行，导致从界面保存/编辑记录时**批次余量一分没动**。
-  现在 `_save` 会用 `_syncUsages()` 把豆子选择与粉量对齐成用量行
+  现在 `_save` 会用 `_usagesFromPicks()` 把豆子选择与粉量对齐成用量行
 
 ### 变更
 
-- **测试全量迁移到批次模型**：`test/` 下 226 个用例全部通过；
+- **测试全量迁移到批次模型**：`test/` 下 240 个用例全部通过；
   `test/data/schema_v3_test.dart` 改名为 `test/data/design_decisions_test.dart`
   （表结构已到 v4，旧名字与内容不符）
-- 测试脚手架新增 `addBeanWithBatch` / `addBrewLog` 组合夹具；
-  按文字点击的辅助函数改为先滚动再点（视口外的控件根本不存在）
+- 测试脚手架新增 `addBeanWithBatch` / `addBrewLog` 组合夹具，以及
+  `fillField` / `readField` / `tapKey` / `tapSaveButton` 等表单操作扩展
 
 ### 计划中
 
