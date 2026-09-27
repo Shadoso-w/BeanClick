@@ -348,10 +348,15 @@ keytool -genkeypair -v `
 |---|---|
 | `flutter doctor` | Flutter / Android toolchain / 设备全部通过（Chrome 与 VS 缺失，与安卓无关） |
 | `flutter analyze` | `No issues found!`，退出码 0 |
-| `flutter test` | 117 个测试全部通过，退出码 0 |
-| `flutter build apk --release --split-per-abi` | 成功，约 2.3 分钟 |
+| `dart format --output=none --set-exit-if-changed .` | 0 处改动，退出码 0（CI 同款检查） |
+| `dart run build_runner build --delete-conflicting-outputs` | 成功；生成物与仓库里的 `database.g.dart` 完全一致（无 diff） |
+| `flutter test` | 226 个测试全部通过，退出码 0 |
+| `flutter build apk --release --split-per-abi` | 成功，约 2.3 分钟（**M2.5 时**的基线；批次模型后还没重新量） |
 
-包体（验收清单要求 < 30MB）：
+> 表中 `flutter test` / `flutter build` 的耗时与用例数是**实测值**，
+> 批次模型（M2.6）之后还没重新出包，包体数字仍是 M2.5 的。
+
+包体（验收清单要求 < 30MB，数字截至 M2.5）：
 
 | ABI | M1 | M2 | M2.5 |
 |---|---|---|---|
