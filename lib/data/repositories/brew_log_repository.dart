@@ -224,6 +224,31 @@ class BrewLogRepository {
     await (_db.delete(_db.brewLogs)..where((t) => t.id.equals(id))).go();
   }
 
+  /// 收藏 / 取消收藏一套参数。
+  ///
+  /// 只改标记，不碰余量，也不影响「最佳参数」标记。
+  Future<void> setFavorite(int id, bool value) async {
+    await (_db.update(_db.brewLogs)..where((t) => t.id.equals(id))).write(
+      BrewLogsCompanion(
+        isFavorite: Value(value),
+        updatedAt: Value(DateTime.now()),
+      ),
+    );
+  }
+
+  /// 收藏过的参数，按冲煮时间倒序。
+  ///
+  /// 「新增一杯」右上角复制按钮长按后列出的就是这一份。
+  Future<List<BrewLog>> getFavorites() async {
+    final query = _db.select(_db.brewLogs)
+      ..where((t) => t.isFavorite.equals(true))
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.brewedAt, mode: OrderingMode.desc),
+        (t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc),
+      ]);
+    return _attachBeans(await query.get());
+  }
+
   // -------------------------------------------------------------------------
   // 内部
   // -------------------------------------------------------------------------

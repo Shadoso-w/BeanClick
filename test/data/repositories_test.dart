@@ -389,6 +389,48 @@ void main() {
       expect(result.stockAdjustments, isEmpty);
       expect(result.brewLogId, greaterThan(0));
     });
+
+    test('收藏与取消收藏：只改标记，不碰余量也不动最佳', () async {
+      final a = await harness.addBeanWithBatch(remainingGrams: 200);
+      final int logId = (await harness.logs.save(
+        makeLog(
+          beanId: a.beanId,
+          batchId: a.batchId,
+          doseGrams: 15,
+          isBest: true,
+        ),
+      )).brewLogId;
+
+      expect((await harness.logs.getById(logId))!.isFavorite, isFalse);
+
+      await harness.logs.setFavorite(logId, true);
+      final BrewLog favorited = (await harness.logs.getById(logId))!;
+      expect(favorited.isFavorite, isTrue);
+      expect(favorited.isBest, isTrue, reason: '收藏不该动「最佳参数」');
+      expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 185);
+
+      await harness.logs.setFavorite(logId, false);
+      expect((await harness.logs.getById(logId))!.isFavorite, isFalse);
+    });
+
+    test('getFavorites 只返回收藏的，按冲煮时间倒序', () async {
+      final int old = (await harness.logs.save(
+        makeLog(brewedAt: DateTime(2026, 1, 1, 8), isFavorite: true),
+      )).brewLogId;
+      await harness.logs.save(
+        makeLog(brewedAt: DateTime(2026, 1, 2, 8), isFavorite: false),
+      );
+      final int newest = (await harness.logs.save(
+        makeLog(brewedAt: DateTime(2026, 1, 3, 8), isFavorite: true),
+      )).brewLogId;
+
+      final List<BrewLog> favorites = await harness.logs.getFavorites();
+
+      expect(favorites.map((BrewLog log) => log.id).toList(), <int>[
+        newest,
+        old,
+      ]);
+    });
   });
 
   // -------------------------------------------------------------------------

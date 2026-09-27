@@ -1,4 +1,5 @@
 import 'package:beanclick/app.dart';
+import 'package:beanclick/core/icons.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -6,8 +7,9 @@ import '../helpers/widget_harness.dart';
 
 /// 豆库页的新增入口（用户反馈：列表非空时无法新增）。
 ///
-/// 中栏被「新加一杯」占用后，这里用右下角的浮动小 + 补回入口，
+/// 中栏被「新加一杯」占用后，这里用右下角的浮动按钮补回入口，
 /// 且动作跟随「咖啡豆 / 磨豆机」分段切换。
+/// 图标统一是**圆圈加号**（见 `lib/core/icons.dart`）。
 void main() {
   final WidgetTestHarness harness = setUpWidgetTest();
 
@@ -18,7 +20,6 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
   }
 
-  /// 豆库页的新增按钮；外壳那个大的「新加一杯」要排除掉。
   Finder addButton() => find.byWidgetPredicate(
     (Widget widget) =>
         widget is FloatingActionButton && widget.tooltip == '新增咖啡豆',
@@ -29,11 +30,14 @@ void main() {
         widget is FloatingActionButton && widget.tooltip == '新增磨豆机',
   );
 
-  testWidgets('豆库页始终有新增咖啡豆入口', (tester) async {
+  testWidgets('豆库页始终有新增咖啡豆入口，图标是圆圈加号', (tester) async {
     await gotoBeans(tester);
 
     expect(addButton(), findsOneWidget);
-    expect(find.byIcon(Icons.add), findsWidgets);
+    expect(
+      find.descendant(of: addButton(), matching: find.byIcon(addCircleIcon)),
+      findsOneWidget,
+    );
 
     await harness.finish(tester);
   });
@@ -61,6 +65,13 @@ void main() {
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(addGrinderButton(), findsOneWidget);
+    expect(
+      find.descendant(
+        of: addGrinderButton(),
+        matching: find.byIcon(addCircleIcon),
+      ),
+      findsOneWidget,
+    );
     expect(addButton(), findsNothing);
 
     await tester.tap(addGrinderButton());

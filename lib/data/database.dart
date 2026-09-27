@@ -297,6 +297,13 @@ class BrewLogs extends Table {
   /// 「标记最佳参数」。
   BoolColumn get isBest => boolean().withDefault(const Constant(false))();
 
+  /// 收藏这条参数（方便以后一键复制出来）。
+  ///
+  /// 与 [isBest] 的区别：`isBest` 是「这一杯是这套参数的最好结果」，
+  /// 收藏是「把这套参数存起来，以后还要照着冲」——
+  /// 「新增一杯」右上角复制按钮长按后列出的就是收藏过的这些。
+  BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
+
   // --- 专业字段（UI 折叠） ---
   RealColumn get tds => real().nullable()();
 
@@ -514,17 +521,18 @@ class AppDatabase extends _$AppDatabase {
   /// 打开指定文件的数据库。
   AppDatabase.file(File file) : super(NativeDatabase(file));
 
-  /// v4：批次模型 + 多豆冲煮 + 扩展属性。
+  /// v5：`brew_logs.is_favorite`（收藏一套参数，方便复制）。
   ///
-  /// 版本历史（**真实情况**，代码里只出现过这两个版本号）：
+  /// 版本历史（**真实情况**，代码里出现过的版本号）：
   /// - v1：M1 的 5 张表，烘焙日期/烘焙度/余量/购入总重/价格都在 `coffee_beans` 上
   /// - v4：批次（`bean_batches`）+ 多豆（`brew_log_beans`）+ 扩展属性
   ///   （`extra_attributes`），烘焙信息与余量下移到批次
+  /// - v5：`brew_logs.is_favorite`
   ///
   /// ⚠️ v2 / v3 从未在任何提交或安装包里出现过（`git log -L` 里 schemaVersion
-  /// 只有 `1` → `4` 这一次变化），所以迁移只需要处理 v1 → v4 这一条路。
+  /// 只有 `1` → `4` → `5` 这几次变化），所以迁移只需要 v1 → v4 → v5 这条路。
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -537,6 +545,9 @@ class AppDatabase extends _$AppDatabase {
       if (from < 4) {
         await _upgradeToV4(m);
       }
+      if (from < 5) {
+        await _upgradeToV5(m);
+      }
       // 索引与默认设置都是幂等的，迁移后统一兜一次：
       // 旧库没有索引（v1 一个都没建），而少了索引会让查批次、拉时间线全表扫描。
       await _createIndexes();
@@ -547,6 +558,14 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('PRAGMA foreign_keys = ON');
     },
   );
+
+  /// v4 → v5：给冲煮记录加「收藏」。
+  ///
+  /// 可空列之外的加列都是安全的（`withDefault` 让老记录自动得到 `false`），
+  /// 不需要搬迁数据，所以这里只有一句 `addColumn`。
+  Future<void> _upgradeToV5(Migrator m) async {
+    await m.addColumn(brewLogs, brewLogs.isFavorite);
+  }
 
   /// v1 → v4 的**逐列迁移**（保住用户已经记下的数据）。
   ///

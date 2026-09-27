@@ -1,3 +1,4 @@
+import 'package:beanclick/core/icons.dart';
 import 'package:beanclick/data/providers.dart';
 import 'package:beanclick/domain/entities.dart';
 import 'package:beanclick/domain/enums.dart';
@@ -266,6 +267,23 @@ void main() {
     await tester.pumpAndSettle();
     // 列表到位后显示的是真名。
     expect(find.text('花魁'), findsWidgets);
+
+    await harness.finish(tester);
+  });
+
+  testWidgets('表单里的「新增豆子 / 新增磨豆机」也是圆圈加号', (tester) async {
+    await harness.addBeanWithBatch(name: '花魁');
+
+    await pumpForm(tester);
+
+    // 新增豆子 / 新增磨豆机这两个内联入口与豆库页的新增按钮用同一个图标。
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('brew.addBean')),
+        matching: find.byIcon(addCircleIcon),
+      ),
+      findsOneWidget,
+    );
 
     await harness.finish(tester);
   });

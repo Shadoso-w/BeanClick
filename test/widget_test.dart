@@ -72,42 +72,42 @@ void main() {
     return editable.controller.text;
   }
 
-  group('外壳（三栏 dock）', () {
-    testWidgets('dock 是三栏：记录 / 新加一杯 / 豆库', (tester) async {
+  group('外壳（底部 dock）', () {
+    testWidgets('dock 是两栏 + 中间固定的圆形加号', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(NavigationBar), findsOneWidget);
-      final NavigationBar bar = tester.widget<NavigationBar>(
-        find.byType(NavigationBar),
-      );
-      expect(bar.destinations, hasLength(3));
-      for (final String label in <String>['记录', '新加一杯', '豆库']) {
+      // 记录 / 豆库 两栏，中间那颗 + 是按钮不是栏位。
+      for (final String label in <String>['记录', '豆库']) {
         expect(find.text(label), findsWidgets);
       }
+      expect(find.byKey(const Key('dock.addCup')), findsOneWidget);
+      expect(find.byTooltip('新加一杯'), findsOneWidget);
       // 统计与我的不再占栏位
       expect(find.text('我的'), findsNothing);
 
       await harness.finish(tester);
     });
 
-    testWidgets('「新加一杯」是常驻的大 + 号', (tester) async {
+    testWidgets('加号固定在 dock 里，不再是悬浮按钮', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(FloatingActionButton), findsOneWidget);
-      expect(
-        tester.widget<FloatingActionButton>(find.byType(FloatingActionButton)),
-        isA<FloatingActionButton>(),
-      );
-      // 常驻底部中间
+      // 悬浮 FAB 会盖住列表内容，用户要求把它并进 dock。
+      expect(find.byType(FloatingActionButton), findsNothing);
+
       final Scaffold scaffold = tester.widget<Scaffold>(
         find.byType(Scaffold).first,
       );
-      expect(
-        scaffold.floatingActionButtonLocation,
-        FloatingActionButtonLocation.centerFloat,
+      expect(scaffold.floatingActionButton, isNull);
+
+      // 加号横向居中、并且落在屏幕底部区域（即 dock 里）。
+      final Size screen = tester.getSize(find.byType(Scaffold).first);
+      final Offset addCenter = tester.getCenter(
+        find.byKey(const Key('dock.addCup')),
       );
+      expect((addCenter.dx - screen.width / 2).abs(), lessThan(1));
+      expect(addCenter.dy, greaterThan(screen.height * 0.85));
 
       await harness.finish(tester);
     });
@@ -134,11 +134,11 @@ void main() {
       await harness.finish(tester);
     });
 
-    testWidgets('点 dock 中间的「新加一杯」会打开表单，且不切走当前栏', (tester) async {
+    testWidgets('点 dock 中间的加号会打开表单，且不切走当前栏', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      await tester.tap(find.text('新加一杯').last);
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
 
       expect(find.text('记录一杯'), findsOneWidget);
@@ -188,7 +188,7 @@ void main() {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
 
       expect(find.text('记录一杯'), findsOneWidget);
@@ -208,7 +208,7 @@ void main() {
     testWidgets('无历史记录时也能保存第一杯，并落库', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
 
       await fill(tester, 'brew.dose', '15');
@@ -248,7 +248,7 @@ void main() {
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
 
       // 参数被复制过来（值在输入框里，不是 Text）。
@@ -281,7 +281,7 @@ void main() {
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
       await tapSave(tester);
 

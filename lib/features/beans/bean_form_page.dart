@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/icons.dart';
 import '../../core/widgets/extra_attribute_fields.dart';
 import '../../core/widgets/form_fields.dart';
 import '../../data/providers.dart';
@@ -518,7 +519,7 @@ class _BatchSection extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             onPressed: onAdd,
-            icon: const Icon(Icons.add, size: 18),
+            icon: const Icon(addCircleIcon, size: 18),
             label: const Text('再来一袋'),
           ),
         ),

@@ -89,9 +89,23 @@ class _VersionFixture {
 final Map<int, _VersionFixture> _fixtures = <int, _VersionFixture>{
   4: const _VersionFixture(
     insert: _insertV4Fixture,
-    validate: _validateFixture,
+    validate: _validateV4Fixture,
+  ),
+  5: const _VersionFixture(
+    insert: _insertV5Fixture,
+    validate: _validateV5Fixture,
   ),
 };
+
+/// v5 的写入 = v4 那份数据 + 把那条记录标成收藏。
+///
+/// 每次升版本都照这个办法复用上一版的写入函数，只补这次新增的字段，
+/// 免得每版都把整套 INSERT 抄一遍（抄错了就是假绿）。
+void _insertV5Fixture(Batch batch, GeneratedDatabase db) {
+  _insertV4Fixture(batch, db);
+  // v5 新增：收藏这套参数。
+  batch.customStatement('UPDATE brew_logs SET is_favorite = 1 WHERE id = 1');
+}
 
 /// 往 **v4 结构的库**里塞一份有代表性的数据。
 ///
@@ -168,8 +182,19 @@ void _insertV4Fixture(Batch batch, GeneratedDatabase db) {
   );
 }
 
+/// v4 升上来后：那条记录还没有收藏概念，默认必须是「未收藏」。
+Future<void> _validateV4Fixture(AppDatabase db) =>
+    _validateFixture(db, expectFavorite: false);
+
+/// v5 升上来后：收藏标记要原样保留。
+Future<void> _validateV5Fixture(AppDatabase db) =>
+    _validateFixture(db, expectFavorite: true);
+
 /// 升到当前版本后逐项校验上面的数据。
-Future<void> _validateFixture(AppDatabase db) async {
+Future<void> _validateFixture(
+  AppDatabase db, {
+  required bool expectFavorite,
+}) async {
   // --- 豆子与批次 ---
   final List<CoffeeBeanRow> beans = await (db.select(
     db.coffeeBeans,
@@ -194,6 +219,8 @@ Future<void> _validateFixture(AppDatabase db) async {
   expect(logs, hasLength(1));
   expect(logs.single.doseGrams, 20);
   expect(logs.single.rating, 5);
+  // v5 加的收藏标记：v4 的库升上来默认 false，v5 的库要保住写进去的 true。
+  expect(logs.single.isFavorite, expectFavorite);
 
   final List<BeanUsageRow> usages = await (db.select(
     db.brewLogBeans,

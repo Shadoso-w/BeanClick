@@ -10,10 +10,11 @@ import '../settings/settings_page.dart';
 
 /// 应用外壳。
 ///
-/// 导航为三栏（用户确认的 dock 方案）：
+/// 底部 dock 三格：
 ///
 /// 1. **记录** —— 时间线 + 统计两个页签（统计从原来的独立 tab 并进来）
-/// 2. **新加一杯** —— 底部正中常驻的大 + 号，点开直接进记录表单
+/// 2. **新加一杯** —— 正中的圆形大 + 号。**固定在 dock 里**，不是悬浮按钮，
+///    滚动列表也不会盖住内容。点开直接进记录表单
 /// 3. **豆库**
 ///
 /// 「我的」（设置与导出）整体移到右上角，不再占一栏。
@@ -28,25 +29,13 @@ class HomeShell extends ConsumerStatefulWidget {
 }
 
 class _HomeShellState extends ConsumerState<HomeShell> {
-  /// 中间那一栏是动作而不是页面，索引占位为 1。
-  static const int _addCupIndex = 1;
-
-  static const List<String> _titles = <String>['记录', '新加一杯', '豆库'];
+  static const List<String> _titles = <String>['记录', '豆库'];
 
   int _currentIndex = 0;
 
-  void _onDestinationSelected(int index) {
-    if (index == _addCupIndex) {
-      _onAddCupPressed();
-      return;
-    }
-    if (index == _currentIndex) return;
-    setState(() => _currentIndex = index);
-  }
-
   /// 快速记录（手册 §8）：默认复制上次参数，直接进表单。
   ///
-  /// 表单关闭后不切换 tab —— 中间栏只是动作入口。
+  /// 表单关闭后不切换 tab —— 中间那个 + 号只是动作入口。
   Future<void> _onAddCupPressed() async {
     final BrewLog? latest = await ref
         .read(brewLogRepositoryProvider)
@@ -83,36 +72,142 @@ class _HomeShellState extends ConsumerState<HomeShell> {
       ),
       body: IndexedStack(
         index: _currentIndex,
-        children: const <Widget>[
-          RecordPage(),
-          SizedBox.shrink(), // 中间栏是动作，不承载页面
-          BeansPage(),
-        ],
+        children: const <Widget>[RecordPage(), BeansPage()],
       ),
-      floatingActionButton: FloatingActionButton.large(
-        onPressed: _onAddCupPressed,
-        tooltip: '新加一杯',
-        child: const Icon(Icons.add, size: 36),
+      bottomNavigationBar: _BottomDock(
+        currentIndex: _currentIndex,
+        onSelect: (int index) {
+          if (index == _currentIndex) return;
+          setState(() => _currentIndex = index);
+        },
+        onAddCup: _onAddCupPressed,
       ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: _onDestinationSelected,
-        destinations: const <NavigationDestination>[
-          NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history),
-            label: '记录',
+    );
+  }
+}
+
+/// 底部 dock：左「记录」、中间固定的圆形大 +、右「豆库」。
+///
+/// 中间那颗刻意不用 `FloatingActionButton`：悬浮按钮会盖住列表最后一条，
+/// 而且滚动时位置会跟着动。放进 dock 里之后它永远是同一个位置，
+/// 列表也只需要留普通的内边距。
+class _BottomDock extends StatelessWidget {
+  const _BottomDock({
+    required this.currentIndex,
+    required this.onSelect,
+    required this.onAddCup,
+  });
+
+  final int currentIndex;
+  final ValueChanged<int> onSelect;
+  final VoidCallback onAddCup;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return Material(
+      color: theme.colorScheme.surfaceContainer,
+      elevation: 3,
+      child: SafeArea(
+        top: false,
+        child: SizedBox(
+          height: 68,
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: _DockItem(
+                  icon: Icons.history_outlined,
+                  selectedIcon: Icons.history,
+                  label: '记录',
+                  selected: currentIndex == 0,
+                  onTap: () => onSelect(0),
+                ),
+              ),
+              _AddCupButton(onPressed: onAddCup),
+              Expanded(
+                child: _DockItem(
+                  icon: Icons.coffee_outlined,
+                  selectedIcon: Icons.coffee,
+                  label: '豆库',
+                  selected: currentIndex == 1,
+                  onTap: () => onSelect(1),
+                ),
+              ),
+            ],
           ),
-          NavigationDestination(
-            icon: Icon(Icons.add_circle_outline),
-            selectedIcon: Icon(Icons.add_circle),
-            label: '新加一杯',
+        ),
+      ),
+    );
+  }
+}
+
+/// dock 正中那颗固定的圆形加号。
+class _AddCupButton extends StatelessWidget {
+  const _AddCupButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: '新加一杯',
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        child: Material(
+          color: colors.primary,
+          shape: const CircleBorder(),
+          elevation: 2,
+          child: InkWell(
+            key: const Key('dock.addCup'),
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: SizedBox(
+              width: 52,
+              height: 52,
+              child: Icon(Icons.add, size: 30, color: colors.onPrimary),
+            ),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.coffee_outlined),
-            selectedIcon: Icon(Icons.coffee),
-            label: '豆库',
+        ),
+      ),
+    );
+  }
+}
+
+/// dock 里的一格（图标 + 文字，选中时换成实心图标并染色）。
+class _DockItem extends StatelessWidget {
+  const _DockItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final ColorScheme colors = Theme.of(context).colorScheme;
+    final Color color = selected ? colors.primary : colors.onSurfaceVariant;
+
+    return InkWell(
+      onTap: onTap,
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: <Widget>[
+          Icon(selected ? selectedIcon : icon, color: color, size: 24),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium
+                ?.copyWith(color: color),
           ),
         ],
       ),
