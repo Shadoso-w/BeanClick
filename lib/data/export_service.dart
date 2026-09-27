@@ -9,6 +9,8 @@ import 'dart:io';
 import 'package:beanclick/data/database.dart';
 import 'package:beanclick/data/mappers.dart';
 import 'package:beanclick/data/providers.dart';
+import 'package:beanclick/data/repositories/bean_repository.dart';
+import 'package:beanclick/data/repositories/brew_log_repository.dart';
 import 'package:beanclick/domain/export/export_encoder.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as p;
@@ -124,17 +126,21 @@ class ExportService implements Exporter {
 
 /// 从数据库读取一份完整快照。
 Future<ExportDocument> loadExportDocument(AppDatabase db) async {
-  final beans = await db.select(db.coffeeBeans).get();
-  final grinders = await db.select(db.grinders).get();
-  final brewLogs = await db.select(db.brewLogs).get();
-  final recipes = await db.select(db.recipes).get();
+  final beanRows = await db.select(db.coffeeBeans).get();
+  final batchRows = await db.select(db.beanBatches).get();
+  final grinderRows = await db.select(db.grinders).get();
+  final recipeRows = await db.select(db.recipes).get();
+
+  // 冲煮记录要走仓储，才能联表带出豆子用量（可能多支）。
+  final logs = await BrewLogRepository(db, BeanRepository(db)).getAll();
 
   return ExportDocument(
     exportedAt: DateTime.now(),
-    beans: beans.map((row) => row.toEntity()).toList(growable: false),
-    grinders: grinders.map((row) => row.toEntity()).toList(growable: false),
-    brewLogs: brewLogs.map((row) => row.toEntity()).toList(growable: false),
-    recipes: recipes.map((row) => row.toEntity()).toList(growable: false),
+    beans: beanRows.map((row) => row.toEntity()).toList(growable: false),
+    batches: batchRows.map((row) => row.toEntity()).toList(growable: false),
+    grinders: grinderRows.map((row) => row.toEntity()).toList(growable: false),
+    brewLogs: logs,
+    recipes: recipeRows.map((row) => row.toEntity()).toList(growable: false),
   );
 }
 

@@ -29,6 +29,7 @@ class ExportDocument {
   const ExportDocument({
     required this.exportedAt,
     required this.beans,
+    this.batches = const <BeanBatch>[],
     required this.grinders,
     required this.brewLogs,
     required this.recipes,
@@ -38,12 +39,18 @@ class ExportDocument {
   final DateTime exportedAt;
   final String appVersion;
   final List<CoffeeBean> beans;
+
+  /// 豆子批次（复购产生的每一袋）。烘焙日期、烘焙度、余量、价格在这里。
+  final List<BeanBatch> batches;
+
   final List<Grinder> grinders;
   final List<BrewLog> brewLogs;
   final List<Recipe> recipes;
 
   /// 当前 JSON 结构版本。将来结构变了要递增，导入时据此判断兼容性。
-  static const int schemaVersion = 1;
+  ///
+  /// v2：豆子的烘焙日期/烘焙度/余量/价格下移到批次表；冲煮记录支持多支豆子。
+  static const int schemaVersion = 2;
 }
 
 /// 一次导出的产物：文件名 + 内容。
@@ -110,12 +117,16 @@ abstract final class ExportEncoder {
       'exportedAt': document.exportedAt.toIso8601String(),
       'counts': <String, int>{
         'beans': document.beans.length,
+        'batches': document.batches.length,
         'grinders': document.grinders.length,
         'brewLogs': document.brewLogs.length,
         'recipes': document.recipes.length,
       },
       'coffeeBeans': document.beans
           .map((CoffeeBean bean) => bean.toJson())
+          .toList(growable: false),
+      'beanBatches': document.batches
+          .map((BeanBatch batch) => batch.toJson())
           .toList(growable: false),
       'grinders': document.grinders
           .map((Grinder grinder) => grinder.toJson())
@@ -156,6 +167,7 @@ abstract final class ExportEncoder {
           DateTime.now(),
       appVersion: map['appVersion'] as String? ?? 'unknown',
       beans: _decodeList(map['coffeeBeans'], CoffeeBean.fromJson),
+      batches: _decodeList(map['beanBatches'], BeanBatch.fromJson),
       grinders: _decodeList(map['grinders'], Grinder.fromJson),
       brewLogs: _decodeList(map['brewLogs'], BrewLog.fromJson),
       recipes: _decodeList(map['recipes'], Recipe.fromJson),
@@ -198,23 +210,10 @@ abstract final class ExportEncoder {
       buffer.writeln();
     }
 
-    // --- 咖啡豆 ---
+    // --- 咖啡豆（身份信息，不含批次属性） ---
     section('# 导出于 ${document.exportedAt.toIso8601String()}', <List<String>>[]);
     section('咖啡豆', <List<String>>[
-      <String>[
-        'id',
-        '名称',
-        '产地',
-        '庄园',
-        '处理法',
-        '烘焙度',
-        '烘焙日期',
-        '风味标签',
-        '剩余克数',
-        '购入总重',
-        '价格',
-        '备注',
-      ],
+      <String>['id', '名称', '产地', '庄园', '处理法', '风味标签', '收藏', '备注'],
       for (final CoffeeBean bean in document.beans)
         <String>[
           '${bean.id ?? ''}',
@@ -222,13 +221,25 @@ abstract final class ExportEncoder {
           bean.origin ?? '',
           bean.farm ?? '',
           bean.process?.label ?? '',
-          bean.roastLevel?.label ?? '',
-          bean.roastDate == null ? '' : dateOnly(bean.roastDate!),
           bean.flavorTags.join('、'),
-          number(bean.remainingGrams),
-          number(bean.initialGrams),
-          number(bean.price),
+          bean.isFavorite ? '是' : '',
           bean.notes ?? '',
+        ],
+    ]);
+
+    // --- 咖啡豆批次（烘焙日期/余量/价格在这里） ---
+    section('咖啡豆批次', <List<String>>[
+      <String>['id', '所属豆子', '烘焙日期', '烘焙度', '剩余克数', '购入总重', '价格', '备注'],
+      for (final BeanBatch batch in document.batches)
+        <String>[
+          '${batch.id ?? ''}',
+          beansById[batch.beanId]?.name ?? '豆子#${batch.beanId}',
+          batch.roastDate == null ? '' : dateOnly(batch.roastDate!),
+          batch.roastLevel?.label ?? '',
+          number(batch.remainingGrams),
+          number(batch.initialGrams),
+          number(batch.price),
+          batch.notes ?? '',
         ],
     ]);
 
@@ -256,6 +267,7 @@ abstract final class ExportEncoder {
         '冲煮时间',
         '方法',
         '豆子',
+        '拼配',
         '磨豆机',
         '研磨刻度',
         'click',
@@ -286,7 +298,9 @@ abstract final class ExportEncoder {
           '${log.id ?? ''}',
           log.brewedAt.toLocal().toIso8601String(),
           log.method.label,
-          beansById[log.beanId]?.name ?? '',
+          // 拼配时列出全部豆子与各自粉量；单支时就是豆子名。
+          _beanLabel(log, beansById),
+          log.isBlend ? '是' : '',
           _grinderName(grindersById[log.grinderId]),
           number(log.grindSetting),
           log.grindClicks?.toString() ?? '',
@@ -368,6 +382,29 @@ abstract final class ExportEncoder {
   static String _grinderName(Grinder? grinder) {
     if (grinder == null) return '';
     return '${grinder.brand} ${grinder.model}';
+  }
+
+  /// 冲煮记录的豆子列。
+  ///
+  /// 拼配时写成 `A 70% + B 30%`（按各自粉量占比），单支时就是豆子名。
+  /// 记录里没存豆子用量（例如旧数据）时，回退到主豆字段。
+  static String _beanLabel(BrewLog log, Map<int?, CoffeeBean> beansById) {
+    final usages = log.beanUsages;
+    if (usages.isEmpty) {
+      return beansById[log.beanId]?.name ?? '';
+    }
+    final total = usages.fold<double>(0, (sum, u) => sum + u.doseGrams);
+    return usages
+        .map((BeanUsage usage) {
+          final name = usage.beanName ?? beansById[usage.beanId]?.name;
+          final label = name ?? '豆子#${usage.beanId}';
+          if (usages.length == 1 || total <= 0) {
+            return '$label ${number(usage.doseGrams)}g';
+          }
+          final percent = (usage.doseGrams / total * 100).round();
+          return '$label $percent%';
+        })
+        .join(' + ');
   }
 
   static String _pourStages(List<PourStage>? stages) {

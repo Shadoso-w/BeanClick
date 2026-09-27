@@ -7,6 +7,7 @@ library;
 import 'package:beanclick/data/database.dart';
 import 'package:beanclick/data/repositories/bean_repository.dart';
 import 'package:beanclick/data/repositories/brew_log_repository.dart';
+import 'package:beanclick/data/repositories/extra_attribute_repository.dart';
 import 'package:beanclick/data/repositories/grinder_repository.dart';
 import 'package:beanclick/data/repositories/settings_repository.dart';
 import 'package:beanclick/domain/entities.dart';
@@ -41,6 +42,11 @@ final settingsRepositoryProvider = Provider<SettingsRepository>(
   (ref) => SettingsRepository(ref.watch(databaseProvider)),
 );
 
+/// 扩展属性仓储（豆子 / 磨豆机的任意附加信息）。
+final extraAttributeRepositoryProvider = Provider<ExtraAttributeRepository>(
+  (ref) => ExtraAttributeRepository(ref.watch(databaseProvider)),
+);
+
 /// 主题模式：监听设置表，设置页改动后根 MaterialApp 会自动重建。
 final themeModeProvider = StreamProvider(
   (ref) => ref.watch(settingsRepositoryProvider).watchThemeMode(),
@@ -61,6 +67,24 @@ final autoDeductStockProvider = StreamProvider(
 final beanListProvider = StreamProvider<List<CoffeeBean>>(
   (ref) => ref.watch(beanRepositoryProvider).watchAll(),
 );
+
+/// 全部批次，按豆子分组。
+///
+/// 豆库列表需要「总余量 / 批次数 / 最近烘焙日」，这些都在批次上。
+/// 一次取回全部再在内存里分组，避免每支豆子各查一次（N+1）。
+final batchesByBeanProvider = FutureProvider<Map<int, List<BeanBatch>>>((
+  ref,
+) async {
+  // 依赖豆子列表，豆子变动时一起刷新。
+  final List<CoffeeBean> beans = await ref.watch(beanListProvider.future);
+  final Map<int, List<BeanBatch>> grouped = <int, List<BeanBatch>>{};
+  for (final CoffeeBean bean in beans) {
+    final int? id = bean.id;
+    if (id == null) continue;
+    grouped[id] = await ref.watch(beanRepositoryProvider).batchesOf(id);
+  }
+  return grouped;
+});
 
 /// 全部磨豆机（按添加时间正序）。
 final grinderListProvider = StreamProvider<List<Grinder>>(
