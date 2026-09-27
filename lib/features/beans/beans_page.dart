@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/icons.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../data/providers.dart';
 import '../../domain/entities.dart';
@@ -67,7 +68,9 @@ class _BeansPageState extends State<BeansPage> {
 ///
 /// 中栏已被「新加一杯」占用，所以豆库的新增入口单独放这里；
 /// 动作跟随当前分段：咖啡豆段新增豆子，磨豆机段新增磨豆机。
-/// 用 [Align] 定位而不是 Scaffold 的 FAB 槽位，避免和外壳那个大 + 号冲突。
+///
+/// 图标统一用**圆圈加号**：全 App 里「新增一支豆子 / 一台磨豆机」的入口
+/// 都长这样（见 `lib/core/icons.dart`）。
 class _AddFab extends StatelessWidget {
   const _AddFab({required this.label, required this.onPressed});
 
@@ -84,7 +87,7 @@ class _AddFab extends StatelessWidget {
           heroTag: 'beans.add',
           onPressed: onPressed,
           tooltip: '新增$label',
-          child: const Icon(Icons.add),
+          child: const Icon(addCircleIcon),
         ),
       ),
     );

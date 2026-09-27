@@ -22,9 +22,9 @@ void main() {
   // 决策 1：加外键索引
   // -------------------------------------------------------------------------
   group('决策 1：外键索引', () {
-    test('schemaVersion 为 4', () {
-      // v3 = 批次模型 + 多豆 + 索引；v4 = extra_attributes 扩展属性表。
-      expect(harness.db.schemaVersion, 4);
+    test('schemaVersion 为 5', () {
+      // v4 = 批次模型 + 多豆 + 扩展属性；v5 = 冲煮记录的收藏标记。
+      expect(harness.db.schemaVersion, 5);
     });
 
     test('4 个索引都建上了', () async {

@@ -2927,6 +2927,21 @@ class $BrewLogsTable extends BrewLogs
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _isFavoriteMeta = const VerificationMeta(
+    'isFavorite',
+  );
+  @override
+  late final GeneratedColumn<bool> isFavorite = GeneratedColumn<bool>(
+    'is_favorite',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_favorite" IN (0, 1))',
+    ),
+    defaultValue: const Constant(false),
+  );
   static const VerificationMeta _tdsMeta = const VerificationMeta('tds');
   @override
   late final GeneratedColumn<double> tds = GeneratedColumn<double>(
@@ -3112,6 +3127,7 @@ class $BrewLogsTable extends BrewLogs
     photoPath,
     brewedAt,
     isBest,
+    isFavorite,
     tds,
     extractionYield,
     waterPpm,
@@ -3246,6 +3262,12 @@ class $BrewLogsTable extends BrewLogs
       context.handle(
         _isBestMeta,
         isBest.isAcceptableOrUnknown(data['is_best']!, _isBestMeta),
+      );
+    }
+    if (data.containsKey('is_favorite')) {
+      context.handle(
+        _isFavoriteMeta,
+        isFavorite.isAcceptableOrUnknown(data['is_favorite']!, _isFavoriteMeta),
       );
     }
     if (data.containsKey('tds')) {
@@ -3430,6 +3452,10 @@ class $BrewLogsTable extends BrewLogs
         DriftSqlType.bool,
         data['${effectivePrefix}is_best'],
       )!,
+      isFavorite: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_favorite'],
+      )!,
       tds: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}tds'],
@@ -3542,6 +3568,13 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
 
   /// 「标记最佳参数」。
   final bool isBest;
+
+  /// 收藏这条参数（方便以后一键复制出来）。
+  ///
+  /// 与 [isBest] 的区别：`isBest` 是「这一杯是这套参数的最好结果」，
+  /// 收藏是「把这套参数存起来，以后还要照着冲」——
+  /// 「新增一杯」右上角复制按钮长按后列出的就是收藏过的这些。
+  final bool isFavorite;
   final double? tds;
   final double? extractionYield;
   final int? waterPpm;
@@ -3583,6 +3616,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     this.photoPath,
     required this.brewedAt,
     required this.isBest,
+    required this.isFavorite,
     this.tds,
     this.extractionYield,
     this.waterPpm,
@@ -3657,6 +3691,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     }
     map['brewed_at'] = Variable<DateTime>(brewedAt);
     map['is_best'] = Variable<bool>(isBest);
+    map['is_favorite'] = Variable<bool>(isFavorite);
     if (!nullToAbsent || tds != null) {
       map['tds'] = Variable<double>(tds);
     }
@@ -3756,6 +3791,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           : Value(photoPath),
       brewedAt: Value(brewedAt),
       isBest: Value(isBest),
+      isFavorite: Value(isFavorite),
       tds: tds == null && nullToAbsent ? const Value.absent() : Value(tds),
       extractionYield: extractionYield == null && nullToAbsent
           ? const Value.absent()
@@ -3823,6 +3859,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       photoPath: serializer.fromJson<String?>(json['photoPath']),
       brewedAt: serializer.fromJson<DateTime>(json['brewedAt']),
       isBest: serializer.fromJson<bool>(json['isBest']),
+      isFavorite: serializer.fromJson<bool>(json['isFavorite']),
       tds: serializer.fromJson<double?>(json['tds']),
       extractionYield: serializer.fromJson<double?>(json['extractionYield']),
       waterPpm: serializer.fromJson<int?>(json['waterPpm']),
@@ -3865,6 +3902,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       'photoPath': serializer.toJson<String?>(photoPath),
       'brewedAt': serializer.toJson<DateTime>(brewedAt),
       'isBest': serializer.toJson<bool>(isBest),
+      'isFavorite': serializer.toJson<bool>(isFavorite),
       'tds': serializer.toJson<double?>(tds),
       'extractionYield': serializer.toJson<double?>(extractionYield),
       'waterPpm': serializer.toJson<int?>(waterPpm),
@@ -3903,6 +3941,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     Value<String?> photoPath = const Value.absent(),
     DateTime? brewedAt,
     bool? isBest,
+    bool? isFavorite,
     Value<double?> tds = const Value.absent(),
     Value<double?> extractionYield = const Value.absent(),
     Value<int?> waterPpm = const Value.absent(),
@@ -3940,6 +3979,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     photoPath: photoPath.present ? photoPath.value : this.photoPath,
     brewedAt: brewedAt ?? this.brewedAt,
     isBest: isBest ?? this.isBest,
+    isFavorite: isFavorite ?? this.isFavorite,
     tds: tds.present ? tds.value : this.tds,
     extractionYield: extractionYield.present
         ? extractionYield.value
@@ -3997,6 +4037,9 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       photoPath: data.photoPath.present ? data.photoPath.value : this.photoPath,
       brewedAt: data.brewedAt.present ? data.brewedAt.value : this.brewedAt,
       isBest: data.isBest.present ? data.isBest.value : this.isBest,
+      isFavorite: data.isFavorite.present
+          ? data.isFavorite.value
+          : this.isFavorite,
       tds: data.tds.present ? data.tds.value : this.tds,
       extractionYield: data.extractionYield.present
           ? data.extractionYield.value
@@ -4053,6 +4096,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           ..write('photoPath: $photoPath, ')
           ..write('brewedAt: $brewedAt, ')
           ..write('isBest: $isBest, ')
+          ..write('isFavorite: $isFavorite, ')
           ..write('tds: $tds, ')
           ..write('extractionYield: $extractionYield, ')
           ..write('waterPpm: $waterPpm, ')
@@ -4093,6 +4137,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     photoPath,
     brewedAt,
     isBest,
+    isFavorite,
     tds,
     extractionYield,
     waterPpm,
@@ -4132,6 +4177,7 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           other.photoPath == this.photoPath &&
           other.brewedAt == this.brewedAt &&
           other.isBest == this.isBest &&
+          other.isFavorite == this.isFavorite &&
           other.tds == this.tds &&
           other.extractionYield == this.extractionYield &&
           other.waterPpm == this.waterPpm &&
@@ -4169,6 +4215,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
   final Value<String?> photoPath;
   final Value<DateTime> brewedAt;
   final Value<bool> isBest;
+  final Value<bool> isFavorite;
   final Value<double?> tds;
   final Value<double?> extractionYield;
   final Value<int?> waterPpm;
@@ -4204,6 +4251,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     this.photoPath = const Value.absent(),
     this.brewedAt = const Value.absent(),
     this.isBest = const Value.absent(),
+    this.isFavorite = const Value.absent(),
     this.tds = const Value.absent(),
     this.extractionYield = const Value.absent(),
     this.waterPpm = const Value.absent(),
@@ -4240,6 +4288,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     this.photoPath = const Value.absent(),
     this.brewedAt = const Value.absent(),
     this.isBest = const Value.absent(),
+    this.isFavorite = const Value.absent(),
     this.tds = const Value.absent(),
     this.extractionYield = const Value.absent(),
     this.waterPpm = const Value.absent(),
@@ -4276,6 +4325,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Expression<String>? photoPath,
     Expression<DateTime>? brewedAt,
     Expression<bool>? isBest,
+    Expression<bool>? isFavorite,
     Expression<double>? tds,
     Expression<double>? extractionYield,
     Expression<int>? waterPpm,
@@ -4312,6 +4362,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       if (photoPath != null) 'photo_path': photoPath,
       if (brewedAt != null) 'brewed_at': brewedAt,
       if (isBest != null) 'is_best': isBest,
+      if (isFavorite != null) 'is_favorite': isFavorite,
       if (tds != null) 'tds': tds,
       if (extractionYield != null) 'extraction_yield': extractionYield,
       if (waterPpm != null) 'water_ppm': waterPpm,
@@ -4351,6 +4402,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Value<String?>? photoPath,
     Value<DateTime>? brewedAt,
     Value<bool>? isBest,
+    Value<bool>? isFavorite,
     Value<double?>? tds,
     Value<double?>? extractionYield,
     Value<int?>? waterPpm,
@@ -4387,6 +4439,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       photoPath: photoPath ?? this.photoPath,
       brewedAt: brewedAt ?? this.brewedAt,
       isBest: isBest ?? this.isBest,
+      isFavorite: isFavorite ?? this.isFavorite,
       tds: tds ?? this.tds,
       extractionYield: extractionYield ?? this.extractionYield,
       waterPpm: waterPpm ?? this.waterPpm,
@@ -4469,6 +4522,9 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     if (isBest.present) {
       map['is_best'] = Variable<bool>(isBest.value);
     }
+    if (isFavorite.present) {
+      map['is_favorite'] = Variable<bool>(isFavorite.value);
+    }
     if (tds.present) {
       map['tds'] = Variable<double>(tds.value);
     }
@@ -4543,6 +4599,7 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
           ..write('photoPath: $photoPath, ')
           ..write('brewedAt: $brewedAt, ')
           ..write('isBest: $isBest, ')
+          ..write('isFavorite: $isFavorite, ')
           ..write('tds: $tds, ')
           ..write('extractionYield: $extractionYield, ')
           ..write('waterPpm: $waterPpm, ')
@@ -8099,6 +8156,7 @@ typedef $$BrewLogsTableCreateCompanionBuilder = BrewLogsCompanion Function({
   Value<String?> photoPath,
   Value<DateTime> brewedAt,
   Value<bool> isBest,
+  Value<bool> isFavorite,
   Value<double?> tds,
   Value<double?> extractionYield,
   Value<int?> waterPpm,
@@ -8135,6 +8193,7 @@ typedef $$BrewLogsTableUpdateCompanionBuilder = BrewLogsCompanion Function({
   Value<String?> photoPath,
   Value<DateTime> brewedAt,
   Value<bool> isBest,
+  Value<bool> isFavorite,
   Value<double?> tds,
   Value<double?> extractionYield,
   Value<int?> waterPpm,
@@ -8314,6 +8373,11 @@ class $$BrewLogsTableFilterComposer
 
   ColumnFilters<bool> get isBest => $composableBuilder(
     column: $table.isBest,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8578,6 +8642,11 @@ class $$BrewLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get tds => $composableBuilder(
     column: $table.tds,
     builder: (column) => ColumnOrderings(column),
@@ -8791,6 +8860,11 @@ class $$BrewLogsTableAnnotationComposer
   GeneratedColumn<bool> get isBest =>
       $composableBuilder(column: $table.isBest, builder: (column) => column);
 
+  GeneratedColumn<bool> get isFavorite => $composableBuilder(
+    column: $table.isFavorite,
+    builder: (column) => column,
+  );
+
   GeneratedColumn<double> get tds =>
       $composableBuilder(column: $table.tds, builder: (column) => column);
 
@@ -9001,6 +9075,7 @@ class $$BrewLogsTableTableManager
                 Value<String?> photoPath = const Value.absent(),
                 Value<DateTime> brewedAt = const Value.absent(),
                 Value<bool> isBest = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
                 Value<double?> tds = const Value.absent(),
                 Value<double?> extractionYield = const Value.absent(),
                 Value<int?> waterPpm = const Value.absent(),
@@ -9036,6 +9111,7 @@ class $$BrewLogsTableTableManager
                 photoPath: photoPath,
                 brewedAt: brewedAt,
                 isBest: isBest,
+                isFavorite: isFavorite,
                 tds: tds,
                 extractionYield: extractionYield,
                 waterPpm: waterPpm,
@@ -9073,6 +9149,7 @@ class $$BrewLogsTableTableManager
                 Value<String?> photoPath = const Value.absent(),
                 Value<DateTime> brewedAt = const Value.absent(),
                 Value<bool> isBest = const Value.absent(),
+                Value<bool> isFavorite = const Value.absent(),
                 Value<double?> tds = const Value.absent(),
                 Value<double?> extractionYield = const Value.absent(),
                 Value<int?> waterPpm = const Value.absent(),
@@ -9108,6 +9185,7 @@ class $$BrewLogsTableTableManager
                 photoPath: photoPath,
                 brewedAt: brewedAt,
                 isBest: isBest,
+                isFavorite: isFavorite,
                 tds: tds,
                 extractionYield: extractionYield,
                 waterPpm: waterPpm,

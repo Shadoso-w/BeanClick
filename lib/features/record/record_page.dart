@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/icons.dart';
 import '../../core/widgets/empty_state.dart';
+import '../../core/widgets/swipe_actions.dart';
 import '../../data/providers.dart';
 import '../../domain/entities.dart';
 import '../stats/stats_page.dart';
@@ -22,6 +24,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
 
   /// 0 = 时间线，1 = 统计（统计已并入本页，用户确认的 dock 方案）。
   int _tab = 0;
+
+  /// 只看收藏（记录页的「收藏」入口）。
+  bool _favoritesOnly = false;
 
   @override
   void dispose() {
@@ -44,6 +49,59 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     setState(() => _query = '');
   }
 
+  /// 收藏 / 取消收藏一条记录的参数。
+  Future<void> _toggleFavorite(BrewLog log) async {
+    final int? id = log.id;
+    if (id == null) return;
+    final bool next = !log.isFavorite;
+    await ref.read(brewLogRepositoryProvider).setFavorite(id, next);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(next ? '已收藏这套参数' : '已取消收藏'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+  }
+
+  /// 右滑删除：先确认（与表单里的删除文案保持一致），删完不回补余量。
+  Future<void> _confirmDelete(BrewLog log) async {
+    final int? id = log.id;
+    if (id == null) return;
+
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('删除这条记录？'),
+        content: const Text('删除后无法恢复。已扣减的豆子余量不会自动回补。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('删除'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    await ref.read(brewLogRepositoryProvider).delete(id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        const SnackBar(
+          content: Text('已删除这条记录'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+  }
+
   /// 内存过滤：豆子名 / 磨豆机 / 方法 / 备注 / 评分。
   List<BrewLog> _applyFilter(
     List<BrewLog> logs,
@@ -51,11 +109,15 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     Map<int?, Grinder> grinders,
   ) {
     final String query = _query.trim().toLowerCase();
-    if (query.isEmpty) return logs;
     final int? ratingQuery = int.tryParse(query);
 
     return logs
         .where((BrewLog log) {
+          // 收藏筛选要排在「搜索为空就全返回」的短路**前面**，
+          // 否则切到「收藏」而搜索框是空的时候等于没过滤。
+          if (_favoritesOnly && !log.isFavorite) return false;
+          if (query.isEmpty) return true;
+
           final Grinder? grinder = grinders[log.grinderId];
           final String haystack = <String>[
             // 拼配时 `beanLabel` 是「A + B」，只按主豆搜会漏掉第二支。
@@ -92,6 +154,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         _buildTabSelector(),
         if (_tab == 0) ...<Widget>[
           _buildSearchField(context),
+          _buildFilterChips(),
           Expanded(
             child: RefreshIndicator(
               onRefresh: _handleRefresh,
@@ -165,6 +228,36 @@ class _RecordPageState extends ConsumerState<RecordPage> {
     );
   }
 
+  /// 记录页的「收藏」入口：切到只看收藏。
+  Widget _buildFilterChips() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        children: <Widget>[
+          FilterChip(
+            key: const Key('record.filter.all'),
+            label: const Text('全部'),
+            selected: !_favoritesOnly,
+            showCheckmark: false,
+            onSelected: (_) => setState(() => _favoritesOnly = false),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            key: const Key('record.filter.favorite'),
+            avatar: Icon(
+              _favoritesOnly ? favoriteFilledIcon : favoriteIcon,
+              size: 18,
+            ),
+            label: const Text('收藏'),
+            selected: _favoritesOnly,
+            showCheckmark: false,
+            onSelected: (bool value) => setState(() => _favoritesOnly = value),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildTimeline(
     List<BrewLog> logs,
     Map<int?, String> beanNames,
@@ -183,12 +276,16 @@ class _RecordPageState extends ConsumerState<RecordPage> {
                 ? const EmptyState(
                     icon: Icons.local_cafe_outlined,
                     title: '还没有冲煮记录',
-                    message: '点击右下角 + 记录第一杯',
+                    message: '点击底部中间的 + 记录第一杯',
                   )
-                : const EmptyState(
-                    icon: Icons.search_off_outlined,
-                    title: '没有匹配的记录',
-                    message: '换个豆子名、方法或评分试试',
+                : EmptyState(
+                    icon: _favoritesOnly
+                        ? favoriteIcon
+                        : Icons.search_off_outlined,
+                    title: _favoritesOnly ? '还没有收藏的参数' : '没有匹配的记录',
+                    message: _favoritesOnly
+                        ? '在记录上向右滑动，点「收藏」就能存下这套参数'
+                        : '换个豆子名、方法或评分试试',
                   ),
           ),
         ],
@@ -197,17 +294,34 @@ class _RecordPageState extends ConsumerState<RecordPage> {
 
     return ListView.separated(
       physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       itemCount: visible.length,
       separatorBuilder: (BuildContext context, int index) =>
           const SizedBox(height: 12),
       itemBuilder: (BuildContext context, int index) {
         final BrewLog log = visible[index];
-        return _BrewLogCard(
-          log: log,
-          beanName: beanNames[log.beanId],
-          grinder: grinders[log.grinderId],
-          onTap: () => BrewLogFormPage.show(context, existing: log),
+        return SwipeActions(
+          key: ValueKey<int?>(log.id),
+          semanticLabel: '${log.beanLabel ?? '未指定豆子'} 的快捷操作',
+          actions: <SwipeAction>[
+            SwipeAction(
+              icon: log.isFavorite ? favoriteFilledIcon : favoriteIcon,
+              label: log.isFavorite ? '取消收藏' : '收藏',
+              onPressed: () => _toggleFavorite(log),
+            ),
+            SwipeAction(
+              icon: Icons.delete_outline,
+              label: '删除',
+              color: Theme.of(context).colorScheme.error,
+              onPressed: () => _confirmDelete(log),
+            ),
+          ],
+          child: _BrewLogCard(
+            log: log,
+            beanName: beanNames[log.beanId],
+            grinder: grinders[log.grinderId],
+            onTap: () => BrewLogFormPage.show(context, existing: log),
+          ),
         );
       },
     );
@@ -250,6 +364,10 @@ class _BrewLogCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  if (log.isFavorite) ...<Widget>[
+                    Icon(favoriteFilledIcon, size: 18, color: colors.primary),
+                    const SizedBox(width: 4),
+                  ],
                   Expanded(
                     child: Text(
                       // 拼配时用「A + B」，没有用量行才退回主豆名。

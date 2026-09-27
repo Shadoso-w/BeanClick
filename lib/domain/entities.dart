@@ -630,6 +630,7 @@ class BrewLog {
     this.photoPath,
     required this.brewedAt,
     this.isBest = false,
+    this.isFavorite = false,
     this.tds,
     this.extractionYield,
     this.waterPpm,
@@ -681,6 +682,11 @@ class BrewLog {
 
   /// 「标记最佳参数」。
   final bool isBest;
+
+  /// 收藏这套参数：记录页右滑可切换，方便以后复制出来照冲。
+  ///
+  /// 与 [isBest] 不同——最佳是「这杯最好喝」，收藏是「这套参数我要留着再用」。
+  final bool isFavorite;
 
   // --- 专业字段（UI 折叠） ---
   final double? tds;
@@ -755,6 +761,7 @@ class BrewLog {
     'photoPath': photoPath,
     'brewedAt': brewedAt.toIso8601String(),
     'isBest': isBest,
+    'isFavorite': isFavorite,
     'tds': tds,
     'extractionYield': extractionYield,
     'waterPpm': waterPpm,
@@ -796,6 +803,7 @@ class BrewLog {
     photoPath: json['photoPath'] as String?,
     brewedAt: _date(json['brewedAt']) ?? DateTime.now(),
     isBest: json['isBest'] as bool? ?? false,
+    isFavorite: json['isFavorite'] as bool? ?? false,
     tds: (json['tds'] as num?)?.toDouble(),
     extractionYield: (json['extractionYield'] as num?)?.toDouble(),
     waterPpm: (json['waterPpm'] as num?)?.toInt(),
@@ -838,6 +846,7 @@ class BrewLog {
     String? photoPath,
     DateTime? brewedAt,
     bool? isBest,
+    bool? isFavorite,
     double? tds,
     double? extractionYield,
     int? waterPpm,
@@ -905,6 +914,7 @@ class BrewLog {
     photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
     brewedAt: brewedAt ?? this.brewedAt,
     isBest: isBest ?? this.isBest,
+    isFavorite: isFavorite ?? this.isFavorite,
     tds: clearTds ? null : (tds ?? this.tds),
     extractionYield: clearExtractionYield
         ? null
@@ -956,6 +966,7 @@ class BrewLog {
           other.photoPath == photoPath &&
           other.brewedAt == brewedAt &&
           other.isBest == isBest &&
+          other.isFavorite == isFavorite &&
           other.tds == tds &&
           other.extractionYield == extractionYield &&
           other.waterPpm == waterPpm &&
@@ -994,6 +1005,7 @@ class BrewLog {
     photoPath,
     brewedAt,
     isBest,
+    isFavorite,
     tds,
     extractionYield,
     waterPpm,

@@ -160,6 +160,8 @@ BrewLog makeLog({
   int? rating = 4,
   String? dripper,
   String? notes,
+  bool isBest = false,
+  bool isFavorite = false,
   DateTime? brewedAt,
 }) {
   final now = brewedAt ?? DateTime(2026, 1, 1, 8);
@@ -186,6 +188,8 @@ BrewLog makeLog({
     rating: rating,
     dripper: dripper,
     notes: notes,
+    isBest: isBest,
+    isFavorite: isFavorite,
     brewedAt: now,
     beanUsages: usages,
     createdAt: now,

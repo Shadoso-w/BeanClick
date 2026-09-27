@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/icons.dart';
 import '../../core/widgets/form_fields.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/brew_log_repository.dart';
@@ -123,6 +124,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   int? _grinderId;
   int? _rating;
   bool _isBest = false;
+  bool _isFavorite = false;
   bool? _preheatUpperChamber;
   DateTime _brewedAt = DateTime.now();
   bool _advancedExpanded = false;
@@ -175,6 +177,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     // 复制上次时不继承评分与备注（见 copyFrom 的说明）。
     _rating = widget.existing?.rating;
     _isBest = widget.existing?.isBest ?? false;
+    _isFavorite = widget.existing?.isFavorite ?? false;
     _preheatUpperChamber = source?.preheatUpperChamber;
     _brewedAt = widget.existing?.brewedAt ?? DateTime.now();
 
@@ -244,6 +247,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
       brewedAt: _brewedAt,
       isBest: _isBest,
+      isFavorite: _isFavorite,
       tds: parseNumber(_tds.text),
       extractionYield: parseNumber(_extractionYield.text),
       waterPpm: int.tryParse(_waterPpm.text.trim()),
@@ -503,7 +507,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     }
   }
 
-  /// 手动再复制一次「上次」。仅新增时有意义。
+  /// 单击复制按钮：直接复制**上次**那杯的参数。
   Future<void> _applyCopyFromLast() async {
     final BrewLog? latest = await ref
         .read(brewLogRepositoryProvider)
@@ -513,7 +517,43 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       _showMessage('还没有可复制的记录');
       return;
     }
-    final BrewLog copied = BrewLogFormPage.copyFrom(latest);
+    _applyCopyFrom(latest, message: '已复制上次参数');
+  }
+
+  /// 长按复制按钮：从**收藏过的参数**里挑一条复制。
+  ///
+  /// 收藏是「这套参数我要留着再用」，所以这里的列表按冲煮时间倒序，
+  /// 每条显示豆子 / 方法 / 刻度 / 粉水 / 评分，够判断选哪条。
+  Future<void> _pickFavoriteToCopy() async {
+    final List<BrewLog> favorites = await ref
+        .read(brewLogRepositoryProvider)
+        .getFavorites();
+    if (!mounted) return;
+
+    if (favorites.isEmpty) {
+      await showModalBottomSheet<void>(
+        context: context,
+        builder: (BuildContext context) => const _NoFavoriteSheet(),
+      );
+      return;
+    }
+
+    final BrewLog? chosen = await showModalBottomSheet<BrewLog>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) =>
+          _FavoritePickerSheet(favorites: favorites),
+    );
+    if (chosen == null || !mounted) return;
+    _applyCopyFrom(chosen, message: '已复制收藏的参数');
+  }
+
+  /// 把一条记录的参数填进表单（复制上次 / 复制收藏共用）。
+  ///
+  /// 刻意不继承：评分、备注、最佳标记、收藏标记 —— 这是一杯新的咖啡，
+  /// 要重新评价（见 [BrewLogFormPage.copyFrom] 的说明）。
+  void _applyCopyFrom(BrewLog source, {required String message}) {
+    final BrewLog copied = BrewLogFormPage.copyFrom(source);
     setState(() {
       _grindSetting.text = numberToText(copied.grindSetting);
       _grindClicks.text = copied.grindClicks?.toString() ?? '';
@@ -538,8 +578,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       _preheatUpperChamber = copied.preheatUpperChamber;
       _rating = null;
       _isBest = false;
+      _isFavorite = false;
     });
-    _showMessage('已复制上次参数');
+    _showMessage(message);
   }
 
   void _showMessage(String message) {
@@ -574,10 +615,20 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
         title: Text(_isEditing ? '编辑记录' : '记录一杯'),
         actions: <Widget>[
           if (!_isEditing)
-            IconButton(
-              onPressed: _saving ? null : _applyCopyFromLast,
-              tooltip: '复制上次',
-              icon: const Icon(Icons.content_copy_outlined),
+            // 单击 = 复制上次；长按 = 从收藏过的参数里挑一条复制。
+            // `IconButton` 没有 onLongPress，所以用 Tooltip + InkWell 自己拼。
+            Tooltip(
+              message: '单击复制上次参数\n长按选择收藏过的参数',
+              child: InkWell(
+                key: const Key('brew.copyLast'),
+                customBorder: const CircleBorder(),
+                onTap: _saving ? null : _applyCopyFromLast,
+                onLongPress: _saving ? null : _pickFavoriteToCopy,
+                child: const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Icon(Icons.content_copy_outlined),
+                ),
+              ),
             ),
           if (_isEditing)
             IconButton(
@@ -776,6 +827,15 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                   value: _isBest,
                   onChanged: (bool value) => setState(() => _isBest = value),
                 ),
+                SwitchListTile(
+                  key: const Key('brew.isFavorite'),
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('收藏这套参数'),
+                  subtitle: const Text('记录页右滑也能收藏；复制按钮长按可从收藏里挑'),
+                  value: _isFavorite,
+                  onChanged: (bool value) =>
+                      setState(() => _isFavorite = value),
+                ),
               ],
             ),
             FormSection(
@@ -923,7 +983,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
             TextButton.icon(
               key: const Key('brew.addBean'),
               onPressed: _saving ? null : _addBean,
-              icon: const Icon(Icons.add, size: 18),
+              icon: const Icon(addCircleIcon, size: 18),
               label: const Text('新增豆子'),
             ),
             if (beans.isNotEmpty)
@@ -1106,7 +1166,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
           alignment: Alignment.centerLeft,
           child: TextButton.icon(
             onPressed: _saving ? null : _addGrinder,
-            icon: const Icon(Icons.add, size: 18),
+            icon: const Icon(addCircleIcon, size: 18),
             label: const Text('新增磨豆机'),
           ),
         ),
@@ -1201,4 +1261,106 @@ class _BeanPick {
   final TextEditingController share;
 
   void dispose() => share.dispose();
+}
+
+/// 「复制收藏的参数」选择面板：列出收藏过的记录，点一条就复制。
+class _FavoritePickerSheet extends StatelessWidget {
+  const _FavoritePickerSheet({required this.favorites});
+
+  final List<BrewLog> favorites;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
+    return SafeArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: Text(
+              '复制收藏的参数',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Flexible(
+            child: ListView.separated(
+              shrinkWrap: true,
+              padding: const EdgeInsets.only(bottom: 12),
+              itemCount: favorites.length,
+              separatorBuilder: (BuildContext context, int index) =>
+                  const Divider(height: 1),
+              itemBuilder: (BuildContext context, int index) {
+                final BrewLog log = favorites[index];
+                return ListTile(
+                  key: Key('brew.favorite.${log.id}'),
+                  leading: Icon(
+                    favoriteFilledIcon,
+                    color: theme.colorScheme.primary,
+                  ),
+                  title: Text(log.beanLabel ?? '未指定豆子'),
+                  subtitle: Text(_favoriteSubtitle(log)),
+                  trailing: const Icon(Icons.content_copy_outlined, size: 20),
+                  onTap: () => Navigator.of(context).pop(log),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// `手冲 · C40 22 · 15g / 240g · ★4 · 1月3日`。
+  static String _favoriteSubtitle(BrewLog log) {
+    final List<String> parts = <String>[
+      log.method.label,
+      if (log.grindSetting != null) '刻度 ${numberToText(log.grindSetting)}',
+      if (log.doseGrams != null || log.waterGrams != null)
+        '${numberToText(log.doseGrams)}g / ${numberToText(log.waterGrams)}g',
+      if (log.rating != null) '★${log.rating}',
+      formatDate(log.brewedAt.toLocal()),
+    ];
+    return parts.join(' · ');
+  }
+}
+
+/// 一条收藏都没有时的提示。
+class _NoFavoriteSheet extends StatelessWidget {
+  const _NoFavoriteSheet();
+
+  @override
+  Widget build(BuildContext context) {
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 28),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(
+                  favoriteIcon,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '还没有收藏的参数',
+                  style: Theme.of(context).textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text('在「记录」里向右滑动一条记录，点「收藏」就能存下这套参数；以后长按这里就能挑出来复制。'),
+          ],
+        ),
+      ),
+    );
+  }
 }
