@@ -60,8 +60,9 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
     _clicksPerRevolution = TextEditingController(
       text: grinder?.clicksPerRevolution?.toString() ?? '',
     );
-    _calibrationNote =
-        TextEditingController(text: grinder?.calibrationNote ?? '');
+    _calibrationNote = TextEditingController(
+      text: grinder?.calibrationNote ?? '',
+    );
     _notes = TextEditingController(text: grinder?.notes ?? '');
     _scaleUnit = grinder?.scaleUnit ?? GrindScaleUnit.click;
   }
@@ -83,7 +84,8 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
     setState(() => _saving = true);
 
     final DateTime now = DateTime.now();
-    final Grinder base = widget.grinder ??
+    final Grinder base =
+        widget.grinder ??
         Grinder(brand: '', model: '', createdAt: now, updatedAt: now);
     final Grinder grinder = base.copyWith(
       brand: _brand.text.trim(),
@@ -189,8 +191,8 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
                     hintText: '例如：Comandante',
                     validator: (String? value) =>
                         (value == null || value.trim().isEmpty)
-                            ? '请填写品牌'
-                            : null,
+                        ? '请填写品牌'
+                        : null,
                   ),
                 ),
                 LabeledField(
@@ -202,8 +204,8 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
                     hintText: '例如：C40 MK4',
                     validator: (String? value) =>
                         (value == null || value.trim().isEmpty)
-                            ? '请填写型号'
-                            : null,
+                        ? '请填写型号'
+                        : null,
                   ),
                 ),
                 LabeledField(
@@ -274,10 +276,7 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
               title: '展示预览',
               subtitle: '手册 §7 的展示格式',
               children: <Widget>[
-                FormHint(
-                  icon: Icons.visibility_outlined,
-                  message: preview,
-                ),
+                FormHint(icon: Icons.visibility_outlined, message: preview),
               ],
             ),
             FormSection(

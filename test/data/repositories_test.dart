@@ -23,21 +23,25 @@ void main() {
     });
 
     test('watchAll 按创建时间倒序', () async {
-      await harness.beans.save(makeBean(name: '早', createdAt: DateTime(2026, 1, 1)));
-      await harness.beans.save(makeBean(name: '晚', createdAt: DateTime(2026, 2, 1)));
+      await harness.beans.save(
+        makeBean(name: '早', createdAt: DateTime(2026, 1, 1)),
+      );
+      await harness.beans.save(
+        makeBean(name: '晚', createdAt: DateTime(2026, 2, 1)),
+      );
 
       final list = await harness.beans.watchAll().first;
       expect(list.map((bean) => bean.name), ['晚', '早']);
     });
 
     test('编辑后字段更新且 id 不变', () async {
-      final id = await harness.beans.save(makeBean(name: '花魁', remainingGrams: 100));
+      final id = await harness.beans.save(
+        makeBean(name: '花魁', remainingGrams: 100),
+      );
 
       await harness.beans.save(
-        (await harness.beans.getById(id))!.copyWith(
-          name: '花魁 1.0',
-          remainingGrams: 80,
-        ),
+        (await harness.beans.getById(id))!
+            .copyWith(name: '花魁 1.0', remainingGrams: 80),
       );
 
       final loaded = await harness.beans.getById(id);
@@ -165,8 +169,12 @@ void main() {
     });
 
     test('search 命中品牌与型号', () async {
-      await harness.grinders.save(makeGrinder(brand: 'Comandante', model: 'C40'));
-      await harness.grinders.save(makeGrinder(brand: '1Zpresso', model: 'JX-Pro'));
+      await harness.grinders.save(
+        makeGrinder(brand: 'Comandante', model: 'C40'),
+      );
+      await harness.grinders.save(
+        makeGrinder(brand: '1Zpresso', model: 'JX-Pro'),
+      );
 
       expect((await harness.grinders.search('1Z')).single.brand, '1Zpresso');
       expect((await harness.grinders.search('C40')).single.model, 'C40');
@@ -204,8 +212,7 @@ void main() {
       final beanId = await harness.beans.save(makeBean(remainingGrams: 200));
       final logId = (await harness.logs.save(
         makeLog(beanId: beanId, doseGrams: 15),
-      ))
-          .brewLogId;
+      )).brewLogId;
       expect((await harness.beans.getById(beanId))!.remainingGrams, 185);
 
       final saved = await harness.logs.getById(logId);
@@ -219,8 +226,7 @@ void main() {
       final beanId = await harness.beans.save(makeBean(remainingGrams: 200));
       final logId = (await harness.logs.save(
         makeLog(beanId: beanId, doseGrams: 15),
-      ))
-          .brewLogId;
+      )).brewLogId;
 
       final saved = await harness.logs.getById(logId);
       await harness.logs.save(saved!.copyWith(doseGrams: 10));
@@ -230,12 +236,15 @@ void main() {
     });
 
     test('编辑时更换豆子：旧豆回补、新豆扣减', () async {
-      final oldBean = await harness.beans.save(makeBean(name: '旧豆', remainingGrams: 200));
-      final newBean = await harness.beans.save(makeBean(name: '新豆', remainingGrams: 100));
+      final oldBean = await harness.beans.save(
+        makeBean(name: '旧豆', remainingGrams: 200),
+      );
+      final newBean = await harness.beans.save(
+        makeBean(name: '新豆', remainingGrams: 100),
+      );
       final logId = (await harness.logs.save(
         makeLog(beanId: oldBean, doseGrams: 15),
-      ))
-          .brewLogId;
+      )).brewLogId;
       expect((await harness.beans.getById(oldBean))!.remainingGrams, 185);
 
       final saved = await harness.logs.getById(logId);
@@ -249,11 +258,13 @@ void main() {
       final beanId = await harness.beans.save(makeBean(remainingGrams: 200));
       final logId = (await harness.logs.save(
         makeLog(beanId: beanId, doseGrams: 15),
-      ))
-          .brewLogId;
+      )).brewLogId;
 
       final saved = await harness.logs.getById(logId);
-      await harness.logs.save(saved!.copyWith(doseGrams: 25), autoDeductStock: false);
+      await harness.logs.save(
+        saved!.copyWith(doseGrams: 25),
+        autoDeductStock: false,
+      );
 
       expect((await harness.beans.getById(beanId))!.remainingGrams, 185);
     });
@@ -261,7 +272,9 @@ void main() {
     test('余量不足时扣到 0 并标记短缺', () async {
       final beanId = await harness.beans.save(makeBean(remainingGrams: 10));
 
-      final result = await harness.logs.save(makeLog(beanId: beanId, doseGrams: 15));
+      final result = await harness.logs.save(
+        makeLog(beanId: beanId, doseGrams: 15),
+      );
 
       expect(result.hasStockShortage, isTrue);
       expect((await harness.beans.getById(beanId))!.remainingGrams, 0);
@@ -271,8 +284,7 @@ void main() {
       final beanId = await harness.beans.save(makeBean(remainingGrams: 200));
       final logId = (await harness.logs.save(
         makeLog(beanId: beanId, doseGrams: 15),
-      ))
-          .brewLogId;
+      )).brewLogId;
 
       await harness.logs.delete(logId);
 
@@ -289,16 +301,24 @@ void main() {
 
   group('BrewLogRepository —— 查询', () {
     test('getLatest 返回最近一杯（复制上次的数据来源）', () async {
-      await harness.logs.save(makeLog(rating: 3, brewedAt: DateTime(2026, 1, 1)));
-      await harness.logs.save(makeLog(rating: 5, brewedAt: DateTime(2026, 3, 1)));
+      await harness.logs.save(
+        makeLog(rating: 3, brewedAt: DateTime(2026, 1, 1)),
+      );
+      await harness.logs.save(
+        makeLog(rating: 5, brewedAt: DateTime(2026, 3, 1)),
+      );
 
       final latest = await harness.logs.getLatest();
       expect(latest!.rating, 5);
     });
 
     test('watchAll 按冲煮时间倒序', () async {
-      await harness.logs.save(makeLog(rating: 3, brewedAt: DateTime(2026, 1, 1)));
-      await harness.logs.save(makeLog(rating: 5, brewedAt: DateTime(2026, 3, 1)));
+      await harness.logs.save(
+        makeLog(rating: 3, brewedAt: DateTime(2026, 1, 1)),
+      );
+      await harness.logs.save(
+        makeLog(rating: 5, brewedAt: DateTime(2026, 3, 1)),
+      );
 
       final list = await harness.logs.watchAll().first;
       expect(list.map((log) => log.rating), [5, 3]);
@@ -323,23 +343,41 @@ void main() {
       final beanId = await harness.beans.save(makeBean());
       final grinderId = await harness.grinders.save(makeGrinder());
       await harness.logs.save(
-        makeLog(beanId: beanId, grinderId: grinderId, grindSetting: 24, rating: 3),
+        makeLog(
+          beanId: beanId,
+          grinderId: grinderId,
+          grindSetting: 24,
+          rating: 3,
+        ),
       );
       await harness.logs.save(
-        makeLog(beanId: beanId, grinderId: grinderId, grindSetting: 20, rating: 5),
+        makeLog(
+          beanId: beanId,
+          grinderId: grinderId,
+          grindSetting: 20,
+          rating: 5,
+        ),
       );
       await harness.logs.save(
-        makeLog(beanId: beanId, grinderId: grinderId, grindSetting: 22, rating: 4),
+        makeLog(
+          beanId: beanId,
+          grinderId: grinderId,
+          grindSetting: 22,
+          rating: 4,
+        ),
       );
 
-      final list = await harness.logs.watchByBeanAndGrinder(beanId, grinderId).first;
+      final list = await harness.logs
+          .watchByBeanAndGrinder(beanId, grinderId)
+          .first;
       expect(list.map((log) => log.grindSetting), [20, 22, 24]);
       expect(list.map((log) => log.rating), [5, 4, 3]);
     });
 
     test('删除豆子后记录仍保留，beanId 置空（外键 SET NULL）', () async {
       final beanId = await harness.beans.save(makeBean());
-      final logId = (await harness.logs.save(makeLog(beanId: beanId))).brewLogId;
+      final logId = (await harness.logs.save(makeLog(beanId: beanId)))
+          .brewLogId;
 
       await harness.beans.delete(beanId);
 
@@ -359,8 +397,7 @@ void main() {
             PourStage(order: 2, waterGrams: 210, atSecond: 30),
           ],
         ),
-      ))
-          .brewLogId;
+      )).brewLogId;
 
       final loaded = await harness.logs.getById(logId);
       expect(loaded!.isBest, isTrue);

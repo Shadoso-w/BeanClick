@@ -132,8 +132,9 @@ void main() {
       await fill(tester, 'brew.water', '240');
       await tapSave(tester);
 
-      final List<BrewLog> logs =
-          await harness.container.read(brewLogRepositoryProvider).getAll();
+      final List<BrewLog> logs = await harness.container
+          .read(brewLogRepositoryProvider)
+          .getAll();
       expect(logs, hasLength(1));
       expect(logs.single.doseGrams, 15);
       expect(logs.single.waterGrams, 240);
@@ -144,7 +145,9 @@ void main() {
     });
 
     testWidgets('复制上次：预填参数但不继承评分与备注', (tester) async {
-      await harness.container.read(brewLogRepositoryProvider).save(
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
             BrewLog(
               method: BrewMethod.mokaPot,
               doseGrams: 18,
@@ -180,7 +183,9 @@ void main() {
     });
 
     testWidgets('保存后新记录不覆盖原记录', (tester) async {
-      await harness.container.read(brewLogRepositoryProvider).save(
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
             BrewLog(
               doseGrams: 15,
               waterGrams: 240,
@@ -197,8 +202,9 @@ void main() {
       await tester.pumpAndSettle();
       await tapSave(tester);
 
-      final List<BrewLog> logs =
-          await harness.container.read(brewLogRepositoryProvider).getAll();
+      final List<BrewLog> logs = await harness.container
+          .read(brewLogRepositoryProvider)
+          .getAll();
       expect(logs, hasLength(2), reason: '复制上次应生成新记录而不是覆盖');
       // 原记录评分还在。
       expect(logs.where((BrewLog log) => log.rating == 5), hasLength(1));
@@ -241,8 +247,9 @@ void main() {
 
       expect(find.text('花魁'), findsOneWidget);
 
-      final List<CoffeeBean> beans =
-          await harness.container.read(beanRepositoryProvider).getAll();
+      final List<CoffeeBean> beans = await harness.container
+          .read(beanRepositoryProvider)
+          .getAll();
       expect(beans.single.name, '花魁');
       expect(beans.single.origin, '埃塞俄比亚');
       expect(beans.single.remainingGrams, 200);
@@ -252,7 +259,9 @@ void main() {
     });
 
     testWidgets('点已有豆子进入编辑，改余量后落库', (tester) async {
-      await harness.container.read(beanRepositoryProvider).save(
+      await harness.container
+          .read(beanRepositoryProvider)
+          .save(
             CoffeeBean(
               name: '曼特宁',
               remainingGrams: 100,
@@ -271,8 +280,9 @@ void main() {
       await fill(tester, 'bean.remaining', '60');
       await tapSave(tester);
 
-      final List<CoffeeBean> beans =
-          await harness.container.read(beanRepositoryProvider).getAll();
+      final List<CoffeeBean> beans = await harness.container
+          .read(beanRepositoryProvider)
+          .getAll();
       expect(beans.single.remainingGrams, 60);
 
       await harness.finish(tester);
@@ -289,7 +299,9 @@ void main() {
               updatedAt: DateTime(2026, 1, 1),
             ),
           );
-      await harness.container.read(brewLogRepositoryProvider).save(
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
             BrewLog(
               beanId: beanId,
               doseGrams: 15,
@@ -313,8 +325,9 @@ void main() {
         await harness.container.read(beanRepositoryProvider).getAll(),
         isEmpty,
       );
-      final List<BrewLog> logs =
-          await harness.container.read(brewLogRepositoryProvider).getAll();
+      final List<BrewLog> logs = await harness.container
+          .read(brewLogRepositoryProvider)
+          .getAll();
       expect(logs, hasLength(1), reason: '删除豆子不应删掉历史记录');
       expect(logs.single.beanId, isNull, reason: '外键应置空');
 
@@ -359,8 +372,9 @@ void main() {
       // 还没有冲煮记录，所以只展示机型与零点。
       expect(find.text('Comandante C40 / 零点 0'), findsOneWidget);
 
-      final List<Grinder> grinders =
-          await harness.container.read(grinderRepositoryProvider).getAll();
+      final List<Grinder> grinders = await harness.container
+          .read(grinderRepositoryProvider)
+          .getAll();
       expect(grinders.single.brand, 'Comandante');
       expect(grinders.single.model, 'C40');
       expect(grinders.single.zeroPoint, 0);
@@ -371,7 +385,9 @@ void main() {
 
   group('编辑冲煮记录', () {
     testWidgets('点记录卡片进入编辑，能看到原评分与备注', (tester) async {
-      await harness.container.read(brewLogRepositoryProvider).save(
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
             BrewLog(
               doseGrams: 16,
               waterGrams: 256,
@@ -408,7 +424,9 @@ void main() {
               updatedAt: DateTime(2026, 1, 1),
             ),
           );
-      await harness.container.read(brewLogRepositoryProvider).save(
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
             BrewLog(
               beanId: beanId,
               doseGrams: 15,
@@ -425,8 +443,9 @@ void main() {
       await fill(tester, 'brew.dose', '20');
       await tapSave(tester);
 
-      final CoffeeBean bean =
-          (await harness.container.read(beanRepositoryProvider).getById(beanId))!;
+      final CoffeeBean bean = (await harness.container
+          .read(beanRepositoryProvider)
+          .getById(beanId))!;
       // 200 - 15 = 185；改成 20 后按差值再扣 5 → 180。
       expect(bean.remainingGrams, 180);
 
@@ -444,7 +463,9 @@ void main() {
               updatedAt: DateTime(2026, 1, 1),
             ),
           );
-      await harness.container.read(brewLogRepositoryProvider).save(
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
             BrewLog(
               beanId: beanId,
               doseGrams: 15,
@@ -466,8 +487,9 @@ void main() {
         await harness.container.read(brewLogRepositoryProvider).getAll(),
         isEmpty,
       );
-      final CoffeeBean bean =
-          (await harness.container.read(beanRepositoryProvider).getById(beanId))!;
+      final CoffeeBean bean = (await harness.container
+          .read(beanRepositoryProvider)
+          .getById(beanId))!;
       expect(bean.remainingGrams, 185, reason: '删记录不回补余量');
 
       await harness.finish(tester);

@@ -35,18 +35,18 @@ class PourStage {
   final String? note;
 
   Map<String, Object?> toJson() => {
-        'order': order,
-        'waterGrams': waterGrams,
-        'atSecond': atSecond,
-        'note': note,
-      };
+    'order': order,
+    'waterGrams': waterGrams,
+    'atSecond': atSecond,
+    'note': note,
+  };
 
   factory PourStage.fromJson(Map<String, Object?> json) => PourStage(
-        order: (json['order'] as num).toInt(),
-        waterGrams: (json['waterGrams'] as num).toDouble(),
-        atSecond: (json['atSecond'] as num).toInt(),
-        note: json['note'] as String?,
-      );
+    order: (json['order'] as num).toInt(),
+    waterGrams: (json['waterGrams'] as num).toDouble(),
+    atSecond: (json['atSecond'] as num).toInt(),
+    note: json['note'] as String?,
+  );
 
   PourStage copyWith({
     int? order,
@@ -54,13 +54,12 @@ class PourStage {
     int? atSecond,
     String? note,
     bool clearNote = false,
-  }) =>
-      PourStage(
-        order: order ?? this.order,
-        waterGrams: waterGrams ?? this.waterGrams,
-        atSecond: atSecond ?? this.atSecond,
-        note: clearNote ? null : (note ?? this.note),
-      );
+  }) => PourStage(
+    order: order ?? this.order,
+    waterGrams: waterGrams ?? this.waterGrams,
+    atSecond: atSecond ?? this.atSecond,
+    note: clearNote ? null : (note ?? this.note),
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -137,42 +136,42 @@ class CoffeeBean {
   }
 
   Map<String, Object?> toJson() => {
-        'id': id,
-        'name': name,
-        'origin': origin,
-        'farm': farm,
-        'process': process?.name,
-        'roastLevel': roastLevel?.name,
-        'roastDate': roastDate?.toIso8601String(),
-        'flavorTags': flavorTags,
-        'remainingGrams': remainingGrams,
-        'initialGrams': initialGrams,
-        'price': price,
-        'photoPath': photoPath,
-        'notes': notes,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'origin': origin,
+    'farm': farm,
+    'process': process?.name,
+    'roastLevel': roastLevel?.name,
+    'roastDate': roastDate?.toIso8601String(),
+    'flavorTags': flavorTags,
+    'remainingGrams': remainingGrams,
+    'initialGrams': initialGrams,
+    'price': price,
+    'photoPath': photoPath,
+    'notes': notes,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   factory CoffeeBean.fromJson(Map<String, Object?> json) => CoffeeBean(
-        id: (json['id'] as num?)?.toInt(),
-        name: json['name'] as String,
-        origin: json['origin'] as String?,
-        farm: json['farm'] as String?,
-        process: ProcessMethod.fromName(json['process'] as String?),
-        roastLevel: RoastLevel.fromName(json['roastLevel'] as String?),
-        roastDate: _date(json['roastDate']),
-        flavorTags: (json['flavorTags'] as List<Object?>? ?? const [])
-            .map((e) => e as String)
-            .toList(growable: false),
-        remainingGrams: (json['remainingGrams'] as num?)?.toDouble() ?? 0,
-        initialGrams: (json['initialGrams'] as num?)?.toDouble(),
-        price: (json['price'] as num?)?.toDouble(),
-        photoPath: json['photoPath'] as String?,
-        notes: json['notes'] as String?,
-        createdAt: _date(json['createdAt']) ?? DateTime.now(),
-        updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
-      );
+    id: (json['id'] as num?)?.toInt(),
+    name: json['name'] as String,
+    origin: json['origin'] as String?,
+    farm: json['farm'] as String?,
+    process: ProcessMethod.fromName(json['process'] as String?),
+    roastLevel: RoastLevel.fromName(json['roastLevel'] as String?),
+    roastDate: _date(json['roastDate']),
+    flavorTags: (json['flavorTags'] as List<Object?>? ?? const [])
+        .map((e) => e as String)
+        .toList(growable: false),
+    remainingGrams: (json['remainingGrams'] as num?)?.toDouble() ?? 0,
+    initialGrams: (json['initialGrams'] as num?)?.toDouble(),
+    price: (json['price'] as num?)?.toDouble(),
+    photoPath: json['photoPath'] as String?,
+    notes: json['notes'] as String?,
+    createdAt: _date(json['createdAt']) ?? DateTime.now(),
+    updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
+  );
 
   CoffeeBean copyWith({
     int? id,
@@ -199,25 +198,25 @@ class CoffeeBean {
     bool clearPrice = false,
     bool clearPhotoPath = false,
     bool clearNotes = false,
-  }) =>
-      CoffeeBean(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        origin: clearOrigin ? null : (origin ?? this.origin),
-        farm: clearFarm ? null : (farm ?? this.farm),
-        process: clearProcess ? null : (process ?? this.process),
-        roastLevel: clearRoastLevel ? null : (roastLevel ?? this.roastLevel),
-        roastDate: clearRoastDate ? null : (roastDate ?? this.roastDate),
-        flavorTags: flavorTags ?? this.flavorTags,
-        remainingGrams: remainingGrams ?? this.remainingGrams,
-        initialGrams:
-            clearInitialGrams ? null : (initialGrams ?? this.initialGrams),
-        price: clearPrice ? null : (price ?? this.price),
-        photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
-        notes: clearNotes ? null : (notes ?? this.notes),
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
+  }) => CoffeeBean(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    origin: clearOrigin ? null : (origin ?? this.origin),
+    farm: clearFarm ? null : (farm ?? this.farm),
+    process: clearProcess ? null : (process ?? this.process),
+    roastLevel: clearRoastLevel ? null : (roastLevel ?? this.roastLevel),
+    roastDate: clearRoastDate ? null : (roastDate ?? this.roastDate),
+    flavorTags: flavorTags ?? this.flavorTags,
+    remainingGrams: remainingGrams ?? this.remainingGrams,
+    initialGrams: clearInitialGrams
+        ? null
+        : (initialGrams ?? this.initialGrams),
+    price: clearPrice ? null : (price ?? this.price),
+    photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
+    notes: clearNotes ? null : (notes ?? this.notes),
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -241,25 +240,26 @@ class CoffeeBean {
 
   @override
   int get hashCode => Object.hash(
-        id,
-        name,
-        origin,
-        farm,
-        process,
-        roastLevel,
-        roastDate,
-        Object.hashAll(flavorTags),
-        remainingGrams,
-        initialGrams,
-        price,
-        photoPath,
-        notes,
-        createdAt,
-        updatedAt,
-      );
+    id,
+    name,
+    origin,
+    farm,
+    process,
+    roastLevel,
+    roastDate,
+    Object.hashAll(flavorTags),
+    remainingGrams,
+    initialGrams,
+    price,
+    photoPath,
+    notes,
+    createdAt,
+    updatedAt,
+  );
 
   @override
-  String toString() => 'CoffeeBean(id: $id, name: $name, remaining: $remainingGrams g)';
+  String toString() =>
+      'CoffeeBean(id: $id, name: $name, remaining: $remainingGrams g)';
 }
 
 /// 磨豆机。
@@ -299,7 +299,11 @@ class Grinder {
       final setting = grindSetting == grindSetting.roundToDouble()
           ? grindSetting.toInt().toString()
           : grindSetting.toString();
-      parts.add(clicks == null ? '$setting ${scaleUnit.label}' : '$setting ${scaleUnit.label} + $clicks click');
+      parts.add(
+        clicks == null
+            ? '$setting ${scaleUnit.label}'
+            : '$setting ${scaleUnit.label} + $clicks click',
+      );
     }
     if (zeroPoint != null) {
       final zero = zeroPoint == zeroPoint!.roundToDouble()
@@ -311,32 +315,32 @@ class Grinder {
   }
 
   Map<String, Object?> toJson() => {
-        'id': id,
-        'brand': brand,
-        'model': model,
-        'burrType': burrType,
-        'scaleUnit': scaleUnit.name,
-        'zeroPoint': zeroPoint,
-        'clicksPerRevolution': clicksPerRevolution,
-        'calibrationNote': calibrationNote,
-        'notes': notes,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'brand': brand,
+    'model': model,
+    'burrType': burrType,
+    'scaleUnit': scaleUnit.name,
+    'zeroPoint': zeroPoint,
+    'clicksPerRevolution': clicksPerRevolution,
+    'calibrationNote': calibrationNote,
+    'notes': notes,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   factory Grinder.fromJson(Map<String, Object?> json) => Grinder(
-        id: (json['id'] as num?)?.toInt(),
-        brand: json['brand'] as String,
-        model: json['model'] as String,
-        burrType: json['burrType'] as String?,
-        scaleUnit: GrindScaleUnit.fromName(json['scaleUnit'] as String?),
-        zeroPoint: (json['zeroPoint'] as num?)?.toDouble(),
-        clicksPerRevolution: (json['clicksPerRevolution'] as num?)?.toInt(),
-        calibrationNote: json['calibrationNote'] as String?,
-        notes: json['notes'] as String?,
-        createdAt: _date(json['createdAt']) ?? DateTime.now(),
-        updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
-      );
+    id: (json['id'] as num?)?.toInt(),
+    brand: json['brand'] as String,
+    model: json['model'] as String,
+    burrType: json['burrType'] as String?,
+    scaleUnit: GrindScaleUnit.fromName(json['scaleUnit'] as String?),
+    zeroPoint: (json['zeroPoint'] as num?)?.toDouble(),
+    clicksPerRevolution: (json['clicksPerRevolution'] as num?)?.toInt(),
+    calibrationNote: json['calibrationNote'] as String?,
+    notes: json['notes'] as String?,
+    createdAt: _date(json['createdAt']) ?? DateTime.now(),
+    updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
+  );
 
   Grinder copyWith({
     int? id,
@@ -355,23 +359,23 @@ class Grinder {
     bool clearClicksPerRevolution = false,
     bool clearCalibrationNote = false,
     bool clearNotes = false,
-  }) =>
-      Grinder(
-        id: id ?? this.id,
-        brand: brand ?? this.brand,
-        model: model ?? this.model,
-        burrType: clearBurrType ? null : (burrType ?? this.burrType),
-        scaleUnit: scaleUnit ?? this.scaleUnit,
-        zeroPoint: clearZeroPoint ? null : (zeroPoint ?? this.zeroPoint),
-        clicksPerRevolution: clearClicksPerRevolution
-            ? null
-            : (clicksPerRevolution ?? this.clicksPerRevolution),
-        calibrationNote:
-            clearCalibrationNote ? null : (calibrationNote ?? this.calibrationNote),
-        notes: clearNotes ? null : (notes ?? this.notes),
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
+  }) => Grinder(
+    id: id ?? this.id,
+    brand: brand ?? this.brand,
+    model: model ?? this.model,
+    burrType: clearBurrType ? null : (burrType ?? this.burrType),
+    scaleUnit: scaleUnit ?? this.scaleUnit,
+    zeroPoint: clearZeroPoint ? null : (zeroPoint ?? this.zeroPoint),
+    clicksPerRevolution: clearClicksPerRevolution
+        ? null
+        : (clicksPerRevolution ?? this.clicksPerRevolution),
+    calibrationNote: clearCalibrationNote
+        ? null
+        : (calibrationNote ?? this.calibrationNote),
+    notes: clearNotes ? null : (notes ?? this.notes),
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -390,8 +394,19 @@ class Grinder {
           other.updatedAt == updatedAt;
 
   @override
-  int get hashCode => Object.hash(id, brand, model, burrType, scaleUnit, zeroPoint,
-      clicksPerRevolution, calibrationNote, notes, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    brand,
+    model,
+    burrType,
+    scaleUnit,
+    zeroPoint,
+    clicksPerRevolution,
+    calibrationNote,
+    notes,
+    createdAt,
+    updatedAt,
+  );
 
   @override
   String toString() => 'Grinder(id: $id, ${displayName()})';
@@ -500,78 +515,79 @@ class BrewLog {
   }
 
   Map<String, Object?> toJson() => {
-        'id': id,
-        'beanId': beanId,
-        'grinderId': grinderId,
-        'recipeId': recipeId,
-        'method': method.name,
-        'grindSetting': grindSetting,
-        'grindClicks': grindClicks,
-        'doseGrams': doseGrams,
-        'waterGrams': waterGrams,
-        'ratio': ratio,
-        'waterTemp': waterTemp,
-        'totalTimeSeconds': totalTimeSeconds,
-        'dripper': dripper,
-        'rating': rating,
-        'flavorTags': flavorTags,
-        'notes': notes,
-        'photoPath': photoPath,
-        'brewedAt': brewedAt.toIso8601String(),
-        'isBest': isBest,
-        'tds': tds,
-        'extractionYield': extractionYield,
-        'waterPpm': waterPpm,
-        'ambientTemp': ambientTemp,
-        'ambientHumidity': ambientHumidity,
-        'beanTemp': beanTemp,
-        'pressure': pressure,
-        'pourStages': pourStages?.map((e) => e.toJson()).toList(growable: false),
-        'heatLevel': heatLevel,
-        'yieldGrams': yieldGrams,
-        'preheatUpperChamber': preheatUpperChamber,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'beanId': beanId,
+    'grinderId': grinderId,
+    'recipeId': recipeId,
+    'method': method.name,
+    'grindSetting': grindSetting,
+    'grindClicks': grindClicks,
+    'doseGrams': doseGrams,
+    'waterGrams': waterGrams,
+    'ratio': ratio,
+    'waterTemp': waterTemp,
+    'totalTimeSeconds': totalTimeSeconds,
+    'dripper': dripper,
+    'rating': rating,
+    'flavorTags': flavorTags,
+    'notes': notes,
+    'photoPath': photoPath,
+    'brewedAt': brewedAt.toIso8601String(),
+    'isBest': isBest,
+    'tds': tds,
+    'extractionYield': extractionYield,
+    'waterPpm': waterPpm,
+    'ambientTemp': ambientTemp,
+    'ambientHumidity': ambientHumidity,
+    'beanTemp': beanTemp,
+    'pressure': pressure,
+    'pourStages': pourStages?.map((e) => e.toJson()).toList(growable: false),
+    'heatLevel': heatLevel,
+    'yieldGrams': yieldGrams,
+    'preheatUpperChamber': preheatUpperChamber,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   factory BrewLog.fromJson(Map<String, Object?> json) => BrewLog(
-        id: (json['id'] as num?)?.toInt(),
-        beanId: (json['beanId'] as num?)?.toInt(),
-        grinderId: (json['grinderId'] as num?)?.toInt(),
-        recipeId: (json['recipeId'] as num?)?.toInt(),
-        method: BrewMethod.fromName(json['method'] as String?) ?? BrewMethod.pourOver,
-        grindSetting: (json['grindSetting'] as num?)?.toDouble(),
-        grindClicks: (json['grindClicks'] as num?)?.toInt(),
-        doseGrams: (json['doseGrams'] as num?)?.toDouble(),
-        waterGrams: (json['waterGrams'] as num?)?.toDouble(),
-        ratio: (json['ratio'] as num?)?.toDouble(),
-        waterTemp: (json['waterTemp'] as num?)?.toDouble(),
-        totalTimeSeconds: (json['totalTimeSeconds'] as num?)?.toInt(),
-        dripper: json['dripper'] as String?,
-        rating: (json['rating'] as num?)?.toInt(),
-        flavorTags: (json['flavorTags'] as List<Object?>? ?? const [])
-            .map((e) => e as String)
-            .toList(growable: false),
-        notes: json['notes'] as String?,
-        photoPath: json['photoPath'] as String?,
-        brewedAt: _date(json['brewedAt']) ?? DateTime.now(),
-        isBest: json['isBest'] as bool? ?? false,
-        tds: (json['tds'] as num?)?.toDouble(),
-        extractionYield: (json['extractionYield'] as num?)?.toDouble(),
-        waterPpm: (json['waterPpm'] as num?)?.toInt(),
-        ambientTemp: (json['ambientTemp'] as num?)?.toDouble(),
-        ambientHumidity: (json['ambientHumidity'] as num?)?.toDouble(),
-        beanTemp: (json['beanTemp'] as num?)?.toDouble(),
-        pressure: (json['pressure'] as num?)?.toDouble(),
-        pourStages: (json['pourStages'] as List<Object?>?)
-            ?.map((e) => PourStage.fromJson((e as Map).cast<String, Object?>()))
-            .toList(growable: false),
-        heatLevel: json['heatLevel'] as String?,
-        yieldGrams: (json['yieldGrams'] as num?)?.toDouble(),
-        preheatUpperChamber: json['preheatUpperChamber'] as bool?,
-        createdAt: _date(json['createdAt']) ?? DateTime.now(),
-        updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
-      );
+    id: (json['id'] as num?)?.toInt(),
+    beanId: (json['beanId'] as num?)?.toInt(),
+    grinderId: (json['grinderId'] as num?)?.toInt(),
+    recipeId: (json['recipeId'] as num?)?.toInt(),
+    method:
+        BrewMethod.fromName(json['method'] as String?) ?? BrewMethod.pourOver,
+    grindSetting: (json['grindSetting'] as num?)?.toDouble(),
+    grindClicks: (json['grindClicks'] as num?)?.toInt(),
+    doseGrams: (json['doseGrams'] as num?)?.toDouble(),
+    waterGrams: (json['waterGrams'] as num?)?.toDouble(),
+    ratio: (json['ratio'] as num?)?.toDouble(),
+    waterTemp: (json['waterTemp'] as num?)?.toDouble(),
+    totalTimeSeconds: (json['totalTimeSeconds'] as num?)?.toInt(),
+    dripper: json['dripper'] as String?,
+    rating: (json['rating'] as num?)?.toInt(),
+    flavorTags: (json['flavorTags'] as List<Object?>? ?? const [])
+        .map((e) => e as String)
+        .toList(growable: false),
+    notes: json['notes'] as String?,
+    photoPath: json['photoPath'] as String?,
+    brewedAt: _date(json['brewedAt']) ?? DateTime.now(),
+    isBest: json['isBest'] as bool? ?? false,
+    tds: (json['tds'] as num?)?.toDouble(),
+    extractionYield: (json['extractionYield'] as num?)?.toDouble(),
+    waterPpm: (json['waterPpm'] as num?)?.toInt(),
+    ambientTemp: (json['ambientTemp'] as num?)?.toDouble(),
+    ambientHumidity: (json['ambientHumidity'] as num?)?.toDouble(),
+    beanTemp: (json['beanTemp'] as num?)?.toDouble(),
+    pressure: (json['pressure'] as num?)?.toDouble(),
+    pourStages: (json['pourStages'] as List<Object?>?)
+        ?.map((e) => PourStage.fromJson((e as Map).cast<String, Object?>()))
+        .toList(growable: false),
+    heatLevel: json['heatLevel'] as String?,
+    yieldGrams: (json['yieldGrams'] as num?)?.toDouble(),
+    preheatUpperChamber: json['preheatUpperChamber'] as bool?,
+    createdAt: _date(json['createdAt']) ?? DateTime.now(),
+    updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
+  );
 
   BrewLog copyWith({
     int? id,
@@ -631,46 +647,50 @@ class BrewLog {
     bool clearHeatLevel = false,
     bool clearYieldGrams = false,
     bool clearPreheatUpperChamber = false,
-  }) =>
-      BrewLog(
-        id: id ?? this.id,
-        beanId: clearBeanId ? null : (beanId ?? this.beanId),
-        grinderId: clearGrinderId ? null : (grinderId ?? this.grinderId),
-        recipeId: clearRecipeId ? null : (recipeId ?? this.recipeId),
-        method: method ?? this.method,
-        grindSetting: clearGrindSetting ? null : (grindSetting ?? this.grindSetting),
-        grindClicks: clearGrindClicks ? null : (grindClicks ?? this.grindClicks),
-        doseGrams: clearDoseGrams ? null : (doseGrams ?? this.doseGrams),
-        waterGrams: clearWaterGrams ? null : (waterGrams ?? this.waterGrams),
-        ratio: clearRatio ? null : (ratio ?? this.ratio),
-        waterTemp: clearWaterTemp ? null : (waterTemp ?? this.waterTemp),
-        totalTimeSeconds:
-            clearTotalTimeSeconds ? null : (totalTimeSeconds ?? this.totalTimeSeconds),
-        dripper: clearDripper ? null : (dripper ?? this.dripper),
-        rating: clearRating ? null : (rating ?? this.rating),
-        flavorTags: flavorTags ?? this.flavorTags,
-        notes: clearNotes ? null : (notes ?? this.notes),
-        photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
-        brewedAt: brewedAt ?? this.brewedAt,
-        isBest: isBest ?? this.isBest,
-        tds: clearTds ? null : (tds ?? this.tds),
-        extractionYield:
-            clearExtractionYield ? null : (extractionYield ?? this.extractionYield),
-        waterPpm: clearWaterPpm ? null : (waterPpm ?? this.waterPpm),
-        ambientTemp: clearAmbientTemp ? null : (ambientTemp ?? this.ambientTemp),
-        ambientHumidity:
-            clearAmbientHumidity ? null : (ambientHumidity ?? this.ambientHumidity),
-        beanTemp: clearBeanTemp ? null : (beanTemp ?? this.beanTemp),
-        pressure: clearPressure ? null : (pressure ?? this.pressure),
-        pourStages: clearPourStages ? null : (pourStages ?? this.pourStages),
-        heatLevel: clearHeatLevel ? null : (heatLevel ?? this.heatLevel),
-        yieldGrams: clearYieldGrams ? null : (yieldGrams ?? this.yieldGrams),
-        preheatUpperChamber: clearPreheatUpperChamber
-            ? null
-            : (preheatUpperChamber ?? this.preheatUpperChamber),
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
+  }) => BrewLog(
+    id: id ?? this.id,
+    beanId: clearBeanId ? null : (beanId ?? this.beanId),
+    grinderId: clearGrinderId ? null : (grinderId ?? this.grinderId),
+    recipeId: clearRecipeId ? null : (recipeId ?? this.recipeId),
+    method: method ?? this.method,
+    grindSetting: clearGrindSetting
+        ? null
+        : (grindSetting ?? this.grindSetting),
+    grindClicks: clearGrindClicks ? null : (grindClicks ?? this.grindClicks),
+    doseGrams: clearDoseGrams ? null : (doseGrams ?? this.doseGrams),
+    waterGrams: clearWaterGrams ? null : (waterGrams ?? this.waterGrams),
+    ratio: clearRatio ? null : (ratio ?? this.ratio),
+    waterTemp: clearWaterTemp ? null : (waterTemp ?? this.waterTemp),
+    totalTimeSeconds: clearTotalTimeSeconds
+        ? null
+        : (totalTimeSeconds ?? this.totalTimeSeconds),
+    dripper: clearDripper ? null : (dripper ?? this.dripper),
+    rating: clearRating ? null : (rating ?? this.rating),
+    flavorTags: flavorTags ?? this.flavorTags,
+    notes: clearNotes ? null : (notes ?? this.notes),
+    photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
+    brewedAt: brewedAt ?? this.brewedAt,
+    isBest: isBest ?? this.isBest,
+    tds: clearTds ? null : (tds ?? this.tds),
+    extractionYield: clearExtractionYield
+        ? null
+        : (extractionYield ?? this.extractionYield),
+    waterPpm: clearWaterPpm ? null : (waterPpm ?? this.waterPpm),
+    ambientTemp: clearAmbientTemp ? null : (ambientTemp ?? this.ambientTemp),
+    ambientHumidity: clearAmbientHumidity
+        ? null
+        : (ambientHumidity ?? this.ambientHumidity),
+    beanTemp: clearBeanTemp ? null : (beanTemp ?? this.beanTemp),
+    pressure: clearPressure ? null : (pressure ?? this.pressure),
+    pourStages: clearPourStages ? null : (pourStages ?? this.pourStages),
+    heatLevel: clearHeatLevel ? null : (heatLevel ?? this.heatLevel),
+    yieldGrams: clearYieldGrams ? null : (yieldGrams ?? this.yieldGrams),
+    preheatUpperChamber: clearPreheatUpperChamber
+        ? null
+        : (preheatUpperChamber ?? this.preheatUpperChamber),
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -711,39 +731,39 @@ class BrewLog {
 
   @override
   int get hashCode => Object.hashAll([
-        id,
-        beanId,
-        grinderId,
-        recipeId,
-        method,
-        grindSetting,
-        grindClicks,
-        doseGrams,
-        waterGrams,
-        ratio,
-        waterTemp,
-        totalTimeSeconds,
-        dripper,
-        rating,
-        Object.hashAll(flavorTags),
-        notes,
-        photoPath,
-        brewedAt,
-        isBest,
-        tds,
-        extractionYield,
-        waterPpm,
-        ambientTemp,
-        ambientHumidity,
-        beanTemp,
-        pressure,
-        pourStages == null ? null : Object.hashAll(pourStages!),
-        heatLevel,
-        yieldGrams,
-        preheatUpperChamber,
-        createdAt,
-        updatedAt,
-      ]);
+    id,
+    beanId,
+    grinderId,
+    recipeId,
+    method,
+    grindSetting,
+    grindClicks,
+    doseGrams,
+    waterGrams,
+    ratio,
+    waterTemp,
+    totalTimeSeconds,
+    dripper,
+    rating,
+    Object.hashAll(flavorTags),
+    notes,
+    photoPath,
+    brewedAt,
+    isBest,
+    tds,
+    extractionYield,
+    waterPpm,
+    ambientTemp,
+    ambientHumidity,
+    beanTemp,
+    pressure,
+    pourStages == null ? null : Object.hashAll(pourStages!),
+    heatLevel,
+    yieldGrams,
+    preheatUpperChamber,
+    createdAt,
+    updatedAt,
+  ]);
 
   @override
   String toString() =>
@@ -783,38 +803,39 @@ class Recipe {
   final DateTime updatedAt;
 
   Map<String, Object?> toJson() => {
-        'id': id,
-        'name': name,
-        'method': method.name,
-        'doseGrams': doseGrams,
-        'waterGrams': waterGrams,
-        'ratio': ratio,
-        'waterTemp': waterTemp,
-        'totalTimeSeconds': totalTimeSeconds,
-        'pourStages': pourStages?.map((e) => e.toJson()).toList(growable: false),
-        'grindSuggestion': grindSuggestion,
-        'notes': notes,
-        'createdAt': createdAt.toIso8601String(),
-        'updatedAt': updatedAt.toIso8601String(),
-      };
+    'id': id,
+    'name': name,
+    'method': method.name,
+    'doseGrams': doseGrams,
+    'waterGrams': waterGrams,
+    'ratio': ratio,
+    'waterTemp': waterTemp,
+    'totalTimeSeconds': totalTimeSeconds,
+    'pourStages': pourStages?.map((e) => e.toJson()).toList(growable: false),
+    'grindSuggestion': grindSuggestion,
+    'notes': notes,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt.toIso8601String(),
+  };
 
   factory Recipe.fromJson(Map<String, Object?> json) => Recipe(
-        id: (json['id'] as num?)?.toInt(),
-        name: json['name'] as String,
-        method: BrewMethod.fromName(json['method'] as String?) ?? BrewMethod.pourOver,
-        doseGrams: (json['doseGrams'] as num?)?.toDouble(),
-        waterGrams: (json['waterGrams'] as num?)?.toDouble(),
-        ratio: (json['ratio'] as num?)?.toDouble(),
-        waterTemp: (json['waterTemp'] as num?)?.toDouble(),
-        totalTimeSeconds: (json['totalTimeSeconds'] as num?)?.toInt(),
-        pourStages: (json['pourStages'] as List<Object?>?)
-            ?.map((e) => PourStage.fromJson((e as Map).cast<String, Object?>()))
-            .toList(growable: false),
-        grindSuggestion: json['grindSuggestion'] as String?,
-        notes: json['notes'] as String?,
-        createdAt: _date(json['createdAt']) ?? DateTime.now(),
-        updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
-      );
+    id: (json['id'] as num?)?.toInt(),
+    name: json['name'] as String,
+    method:
+        BrewMethod.fromName(json['method'] as String?) ?? BrewMethod.pourOver,
+    doseGrams: (json['doseGrams'] as num?)?.toDouble(),
+    waterGrams: (json['waterGrams'] as num?)?.toDouble(),
+    ratio: (json['ratio'] as num?)?.toDouble(),
+    waterTemp: (json['waterTemp'] as num?)?.toDouble(),
+    totalTimeSeconds: (json['totalTimeSeconds'] as num?)?.toInt(),
+    pourStages: (json['pourStages'] as List<Object?>?)
+        ?.map((e) => PourStage.fromJson((e as Map).cast<String, Object?>()))
+        .toList(growable: false),
+    grindSuggestion: json['grindSuggestion'] as String?,
+    notes: json['notes'] as String?,
+    createdAt: _date(json['createdAt']) ?? DateTime.now(),
+    updatedAt: _date(json['updatedAt']) ?? DateTime.now(),
+  );
 
   Recipe copyWith({
     int? id,
@@ -830,22 +851,21 @@ class Recipe {
     String? notes,
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) =>
-      Recipe(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        method: method ?? this.method,
-        doseGrams: doseGrams ?? this.doseGrams,
-        waterGrams: waterGrams ?? this.waterGrams,
-        ratio: ratio ?? this.ratio,
-        waterTemp: waterTemp ?? this.waterTemp,
-        totalTimeSeconds: totalTimeSeconds ?? this.totalTimeSeconds,
-        pourStages: pourStages ?? this.pourStages,
-        grindSuggestion: grindSuggestion ?? this.grindSuggestion,
-        notes: notes ?? this.notes,
-        createdAt: createdAt ?? this.createdAt,
-        updatedAt: updatedAt ?? this.updatedAt,
-      );
+  }) => Recipe(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    method: method ?? this.method,
+    doseGrams: doseGrams ?? this.doseGrams,
+    waterGrams: waterGrams ?? this.waterGrams,
+    ratio: ratio ?? this.ratio,
+    waterTemp: waterTemp ?? this.waterTemp,
+    totalTimeSeconds: totalTimeSeconds ?? this.totalTimeSeconds,
+    pourStages: pourStages ?? this.pourStages,
+    grindSuggestion: grindSuggestion ?? this.grindSuggestion,
+    notes: notes ?? this.notes,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -866,9 +886,21 @@ class Recipe {
           other.updatedAt == updatedAt;
 
   @override
-  int get hashCode => Object.hash(id, name, method, doseGrams, waterGrams, ratio,
-      waterTemp, totalTimeSeconds, pourStages == null ? null : Object.hashAll(pourStages!),
-      grindSuggestion, notes, createdAt, updatedAt);
+  int get hashCode => Object.hash(
+    id,
+    name,
+    method,
+    doseGrams,
+    waterGrams,
+    ratio,
+    waterTemp,
+    totalTimeSeconds,
+    pourStages == null ? null : Object.hashAll(pourStages!),
+    grindSuggestion,
+    notes,
+    createdAt,
+    updatedAt,
+  );
 
   @override
   String toString() => 'Recipe(id: $id, name: $name)';

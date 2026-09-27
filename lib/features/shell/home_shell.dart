@@ -31,8 +31,9 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   /// 快速记录（手册 §8）：默认复制上次参数，直接进表单。
   Future<void> _onQuickRecordPressed() async {
-    final BrewLog? latest =
-        await ref.read(brewLogRepositoryProvider).getLatest();
+    final BrewLog? latest = await ref
+        .read(brewLogRepositoryProvider)
+        .getLatest();
     if (!mounted) return;
 
     await BrewLogFormPage.show(

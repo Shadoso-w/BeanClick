@@ -42,7 +42,8 @@ class AdjustStockResult {
   final bool beanFound;
 
   @override
-  String toString() => 'AdjustStockResult(bean: $beanId, requested: $requested, '
+  String toString() =>
+      'AdjustStockResult(bean: $beanId, requested: $requested, '
       'applied: $applied, $before -> $after, clamped: $clamped)';
 }
 
@@ -58,8 +59,8 @@ class BeanRepository {
         (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
       ]);
     return query.watch().map(
-          (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
-        );
+      (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
+    );
   }
 
   Future<List<CoffeeBean>> getAll() async {
@@ -72,17 +73,18 @@ class BeanRepository {
   }
 
   Future<CoffeeBean?> getById(int id) async {
-    final row = await (_db.select(_db.coffeeBeans)
-          ..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.coffeeBeans,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     return row?.toEntity();
   }
 
   /// 新增或更新。`id == null` 为新增，返回实际写入的 id。
   Future<int> save(CoffeeBean bean) async {
     final companion = bean.copyWith(updatedAt: DateTime.now()).toCompanion();
-    final id =
-        await _db.into(_db.coffeeBeans).insertOnConflictUpdate(companion);
+    final id = await _db
+        .into(_db.coffeeBeans)
+        .insertOnConflictUpdate(companion);
     return bean.id ?? id;
   }
 
@@ -137,8 +139,9 @@ class BeanRepository {
   Future<AdjustStockResult> adjustStock(int beanId, double deltaGrams) async {
     final beans = _db.coffeeBeans;
     return _db.transaction(() async {
-      final row = await (_db.select(beans)..where((t) => t.id.equals(beanId)))
-          .getSingleOrNull();
+      final row = await (_db.select(
+        beans,
+      )..where((t) => t.id.equals(beanId))).getSingleOrNull();
       if (row == null) {
         return AdjustStockResult(
           beanId: beanId,
@@ -153,7 +156,9 @@ class BeanRepository {
 
       final before = row.remainingGrams;
       // 下限 0：扣多了就扣到 0。
-      final after = (before - deltaGrams).clamp(0.0, double.infinity).toDouble();
+      final after = (before - deltaGrams)
+          .clamp(0.0, double.infinity)
+          .toDouble();
       // 刻意用差值反推，而不是直接用 deltaGrams：
       // 被 0 下限裁剪时（例如 10g 库存要扣 15g），只有 10g 真正生效。
       final applied = before - after;

@@ -96,8 +96,9 @@ class LabeledField extends StatelessWidget {
                 const SizedBox(width: 4),
                 Text(
                   '*',
-                  style: theme.textTheme.titleSmall
-                      ?.copyWith(color: theme.colorScheme.error),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: theme.colorScheme.error,
+                  ),
                 ),
               ],
             ],
@@ -320,9 +321,7 @@ class DateField extends StatelessWidget {
             icon: const Icon(Icons.event_outlined, size: 18),
             label: Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                current == null ? hintText : formatDate(current),
-              ),
+              child: Text(current == null ? hintText : formatDate(current)),
             ),
           ),
         ),
@@ -398,10 +397,12 @@ class FormHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final ColorScheme colors = theme.colorScheme;
-    final Color background =
-        isWarning ? colors.errorContainer : colors.surfaceContainerHighest;
-    final Color foreground =
-        isWarning ? colors.onErrorContainer : colors.onSurfaceVariant;
+    final Color background = isWarning
+        ? colors.errorContainer
+        : colors.surfaceContainerHighest;
+    final Color foreground = isWarning
+        ? colors.onErrorContainer
+        : colors.onSurfaceVariant;
 
     return Container(
       margin: const EdgeInsets.only(top: 12),

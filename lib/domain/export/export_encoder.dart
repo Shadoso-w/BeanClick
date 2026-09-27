@@ -79,15 +79,15 @@ abstract final class ExportEncoder {
     final String stamp = fileTimestamp(document.exportedAt);
     return switch (format) {
       ExportFormat.json => ExportResult(
-          fileName: 'beanclick-backup-$stamp.json',
-          content: encodeJson(document),
-          format: format,
-        ),
+        fileName: 'beanclick-backup-$stamp.json',
+        content: encodeJson(document),
+        format: format,
+      ),
       ExportFormat.csv => ExportResult(
-          fileName: 'beanclick-export-$stamp.csv',
-          content: encodeCsv(document),
-          format: format,
-        ),
+        fileName: 'beanclick-export-$stamp.csv',
+        content: encodeCsv(document),
+        format: format,
+      ),
     };
   }
 
@@ -151,7 +151,8 @@ abstract final class ExportEncoder {
     }
 
     return ExportDocument(
-      exportedAt: DateTime.tryParse(map['exportedAt'] as String? ?? '') ??
+      exportedAt:
+          DateTime.tryParse(map['exportedAt'] as String? ?? '') ??
           DateTime.now(),
       appVersion: map['appVersion'] as String? ?? 'unknown',
       beans: _decodeList(map['coffeeBeans'], CoffeeBean.fromJson),
@@ -201,8 +202,18 @@ abstract final class ExportEncoder {
     section('# 导出于 ${document.exportedAt.toIso8601String()}', <List<String>>[]);
     section('咖啡豆', <List<String>>[
       <String>[
-        'id', '名称', '产地', '庄园', '处理法', '烘焙度', '烘焙日期',
-        '风味标签', '剩余克数', '购入总重', '价格', '备注',
+        'id',
+        '名称',
+        '产地',
+        '庄园',
+        '处理法',
+        '烘焙度',
+        '烘焙日期',
+        '风味标签',
+        '剩余克数',
+        '购入总重',
+        '价格',
+        '备注',
       ],
       for (final CoffeeBean bean in document.beans)
         <String>[
@@ -223,10 +234,7 @@ abstract final class ExportEncoder {
 
     // --- 磨豆机 ---
     section('磨豆机', <List<String>>[
-      <String>[
-        'id', '品牌', '型号', '刀盘', '刻度单位', '零点',
-        '每圈click', '校准说明', '备注',
-      ],
+      <String>['id', '品牌', '型号', '刀盘', '刻度单位', '零点', '每圈click', '校准说明', '备注'],
       for (final Grinder grinder in document.grinders)
         <String>[
           '${grinder.id ?? ''}',
@@ -244,11 +252,34 @@ abstract final class ExportEncoder {
     // --- 冲煮记录 ---
     section('冲煮记录', <List<String>>[
       <String>[
-        'id', '冲煮时间', '方法', '豆子', '磨豆机', '研磨刻度', 'click',
-        '粉量g', '水量g', '粉水比', '水温℃', '总时间秒', '滤杯',
-        '评分', '风味', '最佳', 'TDS%', '萃取率%', '水质ppm',
-        '环境温度℃', '环境湿度%', '豆温℃', '压力bar',
-        '摩卡壶火力', '出液量g', '上壶预热', '分段注水', '备注',
+        'id',
+        '冲煮时间',
+        '方法',
+        '豆子',
+        '磨豆机',
+        '研磨刻度',
+        'click',
+        '粉量g',
+        '水量g',
+        '粉水比',
+        '水温℃',
+        '总时间秒',
+        '滤杯',
+        '评分',
+        '风味',
+        '最佳',
+        'TDS%',
+        '萃取率%',
+        '水质ppm',
+        '环境温度℃',
+        '环境湿度%',
+        '豆温℃',
+        '压力bar',
+        '摩卡壶火力',
+        '出液量g',
+        '上壶预热',
+        '分段注水',
+        '备注',
       ],
       for (final BrewLog log in document.brewLogs)
         <String>[
@@ -261,9 +292,7 @@ abstract final class ExportEncoder {
           log.grindClicks?.toString() ?? '',
           number(log.doseGrams),
           number(log.waterGrams),
-          log.effectiveRatio == null
-              ? ''
-              : '1:${number(log.effectiveRatio)}',
+          log.effectiveRatio == null ? '' : '1:${number(log.effectiveRatio)}',
           number(log.waterTemp),
           log.totalTimeSeconds?.toString() ?? '',
           log.dripper ?? '',
@@ -290,8 +319,16 @@ abstract final class ExportEncoder {
     // --- 配方 ---
     section('配方', <List<String>>[
       <String>[
-        'id', '名称', '方法', '粉量g', '水量g', '粉水比', '水温℃',
-        '总时间秒', '研磨建议', '备注',
+        'id',
+        '名称',
+        '方法',
+        '粉量g',
+        '水量g',
+        '粉水比',
+        '水温℃',
+        '总时间秒',
+        '研磨建议',
+        '备注',
       ],
       for (final Recipe recipe in document.recipes)
         <String>[
@@ -319,7 +356,10 @@ abstract final class ExportEncoder {
     if (safe.isNotEmpty && '=+-@'.contains(safe[0])) {
       safe = "'$safe";
     }
-    if (safe.contains(',') || safe.contains('"') || safe.contains('\n') || safe.contains('\r')) {
+    if (safe.contains(',') ||
+        safe.contains('"') ||
+        safe.contains('\n') ||
+        safe.contains('\r')) {
       return '"${safe.replaceAll('"', '""')}"';
     }
     return safe;
@@ -333,9 +373,11 @@ abstract final class ExportEncoder {
   static String _pourStages(List<PourStage>? stages) {
     if (stages == null || stages.isEmpty) return '';
     return stages
-        .map((PourStage stage) =>
-            '${stage.order}@${stage.atSecond}s:${number(stage.waterGrams)}g'
-            '${stage.note == null ? '' : '(${stage.note})'}')
+        .map(
+          (PourStage stage) =>
+              '${stage.order}@${stage.atSecond}s:${number(stage.waterGrams)}g'
+              '${stage.note == null ? '' : '(${stage.note})'}',
+        )
         .join(' | ');
   }
 }

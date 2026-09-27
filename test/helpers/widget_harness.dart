@@ -83,10 +83,8 @@ class WidgetTestHarness {
   }
 
   /// 把 widget 包进当前测试的 ProviderScope。
-  Widget app(Widget child) => UncontrolledProviderScope(
-        container: _container,
-        child: child,
-      );
+  Widget app(Widget child) =>
+      UncontrolledProviderScope(container: _container, child: child);
 
   /// 测试收尾：卸载 widget 树，让 drift 的订阅取消。
   ///

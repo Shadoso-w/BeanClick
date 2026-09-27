@@ -72,7 +72,10 @@ void main() {
         updatedAt: DateTime(2026, 1, 1),
       );
 
-      expect(grinder.displayName(grindSetting: 22), 'Comandante C40 / 22 click / 零点 0');
+      expect(
+        grinder.displayName(grindSetting: 22),
+        'Comandante C40 / 22 click / 零点 0',
+      );
     });
 
     test('不传刻度时只展示机型与零点', () {
@@ -97,7 +100,10 @@ void main() {
         updatedAt: DateTime(2026, 1, 1),
       );
 
-      expect(grinder.displayName(grindSetting: 3.5), '1Zpresso JX-Pro / 3.5 刻度 / 零点 1.5');
+      expect(
+        grinder.displayName(grindSetting: 3.5),
+        '1Zpresso JX-Pro / 3.5 刻度 / 零点 1.5',
+      );
     });
   });
 

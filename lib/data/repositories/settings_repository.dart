@@ -24,15 +24,18 @@ class SettingsRepository {
   /// 读取某个 key，未设置时返回该 key 的默认值。
   Future<String?> get(String key) async {
     final settings = _db.appSettings;
-    final row = await (_db.select(settings)..where((t) => t.key.equals(key)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      settings,
+    )..where((t) => t.key.equals(key))).getSingleOrNull();
     return row?.value ?? SettingsDefaults.byKey[key];
   }
 
   /// 写入某个 key（不存在则插入）。
   Future<void> set(String key, String value) async {
     final settings = _db.appSettings;
-    await _db.into(settings).insertOnConflictUpdate(
+    await _db
+        .into(settings)
+        .insertOnConflictUpdate(
           AppSettingsCompanion.insert(
             key: key,
             value: value,
@@ -71,12 +74,12 @@ class SettingsRepository {
 
   /// 监听主题模式，供根 MaterialApp 实时响应设置变化。
   Stream<ThemeMode> watchThemeMode() => watch(SettingsKeys.themeMode).map(
-        (value) => switch (value) {
-          'light' => ThemeMode.light,
-          'dark' => ThemeMode.dark,
-          _ => ThemeMode.system,
-        },
-      );
+    (value) => switch (value) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    },
+  );
 
   /// 冲煮后是否自动扣减余量，默认 true（手册 §6.2）。
   Future<bool> getAutoDeductStock() =>
@@ -85,8 +88,9 @@ class SettingsRepository {
   Future<void> setAutoDeductStock(bool value) =>
       setBool(SettingsKeys.autoDeductStock, value);
 
-  Stream<bool> watchAutoDeductStock() => watch(SettingsKeys.autoDeductStock)
-      .map((value) => value == null || value.toLowerCase() == 'true');
+  Stream<bool> watchAutoDeductStock() =>
+      watch(SettingsKeys.autoDeductStock)
+          .map((value) => value == null || value.toLowerCase() == 'true');
 
   /// 默认冲煮方法。
   Future<String> getDefaultMethod() async =>
