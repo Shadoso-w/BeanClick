@@ -35,6 +35,13 @@
   建新表 → 把烘焙日期/烘焙度/余量/购入总重/价格搬成每支豆子的第一个批次 →
   用 `brew_logs.beanId` 回填用量行与烘焙快照 → 最后才删掉 `coffee_beans` 上搬走的列。
   **v1 用户的豆子、记录、设置项全部保留**，不再丢数据
+- **迁移加了工具锁**：`test/drift/schemas/drift_schema_v4.json` 是 v4 的冻结快照，
+  `test/data/schema_snapshot_test.dart` 两个守门用例——
+  ① 当前代码的表结构必须与快照逐列一致（改了表忘了重新 dump 就红，
+  失败信息直接点名那一列）；② 拿 v4 快照灌真实数据、用当前代码打开（真跑
+  `onUpgrade`）后断言数据一条不少。`oldVersion` 永远钉在 4，
+  以后每次升 `schemaVersion` 自动变成「v4 → 新版本」的保活测试。
+  于是**M2.6 及以后的数据，任何升级都不会被静默清掉**
 - **豆库界面**：卡片展示批次聚合（总余量、批次数、最近烘焙距今天数、收藏）；
   新增批次编辑页，「再来一袋」与编辑批次共用
 
@@ -46,7 +53,7 @@
 
 ### 变更
 
-- **测试全量迁移到批次模型**：`test/` 下 240 个用例全部通过；
+- **测试全量迁移到批次模型**：`test/` 下 242 个用例全部通过；
   `test/data/schema_v3_test.dart` 改名为 `test/data/design_decisions_test.dart`
   （表结构已到 v4，旧名字与内容不符）
 - 测试脚手架新增 `addBeanWithBatch` / `addBrewLog` 组合夹具，以及
@@ -58,7 +65,7 @@
 |---|---|
 | `flutter analyze` | 0 问题 |
 | `dart format --output=none --set-exit-if-changed .` | 0 处改动 |
-| `flutter test` | **240 个用例全部通过** |
+| `flutter test` | **242 个用例全部通过** |
 | `flutter build apk --release --split-per-abi` | 成功，2.39 分钟，release 签名（`CN=BeanClick`） |
 
 | ABI | M2.5 | M2.6 |
