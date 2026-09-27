@@ -29,8 +29,8 @@ class BeanClickApp extends ConsumerWidget {
     return MaterialApp(
       title: '豆刻 BeanClick',
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(Brightness.light),
-      darkTheme: _buildTheme(Brightness.dark),
+      theme: buildAppTheme(Brightness.light),
+      darkTheme: buildAppTheme(Brightness.dark),
       themeMode: themeMode,
       home: const HomeShell(),
     );
@@ -42,7 +42,10 @@ class BeanClickApp extends ConsumerWidget {
 /// 浅色用米白背景、深色用深棕黑背景，并显式给出一组暖调 surface 层级；
 /// `fidelity` 变体保留种子色的暖调，避免默认变体把咖啡棕冲淡成灰调。
 /// 字体一律使用系统默认，不额外指定 fontFamily。
-ThemeData _buildTheme(Brightness brightness) {
+///
+/// 公开出来是给 `tool/design_preview/` 的设计稿渲染用：设计稿必须用**真主题**
+/// 渲染，否则配色和间距会和实际界面不一致。
+ThemeData buildAppTheme(Brightness brightness) {
   final bool isLight = brightness == Brightness.light;
   final ColorScheme scheme = ColorScheme.fromSeed(
     seedColor: _seedColor,
