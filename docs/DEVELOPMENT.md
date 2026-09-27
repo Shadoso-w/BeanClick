@@ -402,19 +402,22 @@ keytool -genkeypair -v `
 | `flutter analyze` | `No issues found!`，退出码 0 |
 | `dart format --output=none --set-exit-if-changed .` | 0 处改动，退出码 0（CI 同款检查） |
 | `dart run build_runner build --delete-conflicting-outputs` | 成功；生成物与仓库里的 `database.g.dart` 完全一致（无 diff） |
-| `flutter test` | 226 个测试全部通过，退出码 0 |
-| `flutter build apk --release --split-per-abi` | 成功，约 2.3 分钟（**M2.5 时**的基线；批次模型后还没重新量） |
+| `flutter test` | **240 个测试全部通过**，退出码 0（M2.6：批次/拼配/扩展属性/迁移） |
+| `flutter build apk --release --split-per-abi` | 成功，**2.39 分钟**（M2.6，release 签名） |
 
-> 表中 `flutter test` / `flutter build` 的耗时与用例数是**实测值**，
-> 批次模型（M2.6）之后还没重新出包，包体数字仍是 M2.5 的。
+包体（验收清单要求 < 30MB）：
 
-包体（验收清单要求 < 30MB，数字截至 M2.5）：
+| ABI | M1 | M2 | M2.5 | **M2.6** |
+|---|---|---|---|---|
+| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB | **17.46 MB** |
+| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB | **19.93 MB** |
+| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB | **21.32 MB** |
 
-| ABI | M1 | M2 | M2.5 |
-|---|---|---|---|
-| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB |
-| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB |
-| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB |
+M2.6 的 APK 实测（`apksigner verify` / `aapt2 dump badging`）：
+
+- 签名：`CN=BeanClick`，SHA-256 `d967a4c0…6d51`（内测密钥，与 M2.5 同一把，
+  可以直接覆盖安装以验证 v1 → v4 迁移）
+- `versionName 0.1.0`、`versionCode 2001`、`minSdk 24`、`targetSdk 36`、应用名 `豆刻`
 
 ### 构建相关的两个坑
 

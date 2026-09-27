@@ -52,9 +52,24 @@
 - 测试脚手架新增 `addBeanWithBatch` / `addBrewLog` 组合夹具，以及
   `fillField` / `readField` / `tapKey` / `tapSaveButton` 等表单操作扩展
 
+### 验证结果（M2.6 实测）
+
+| 命令 | 结果 |
+|---|---|
+| `flutter analyze` | 0 问题 |
+| `dart format --output=none --set-exit-if-changed .` | 0 处改动 |
+| `flutter test` | **240 个用例全部通过** |
+| `flutter build apk --release --split-per-abi` | 成功，2.39 分钟，release 签名（`CN=BeanClick`） |
+
+| ABI | M2.5 | M2.6 |
+|---|---|---|
+| `app-armeabi-v7a-release.apk` | 17.21 MB | 17.46 MB |
+| `app-arm64-v8a-release.apk` | 19.67 MB | 19.93 MB |
+| `app-x86_64-release.apk` | 21.12 MB | 21.32 MB |
+
 ### 计划中
 
-- M3：内部测试版 APK 与真机验证
+- M3：内部测试版 APK 与真机验证（手机上覆盖安装可验证 v1 → v4 迁移）
 
 ---
 
