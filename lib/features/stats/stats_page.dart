@@ -4,24 +4,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/providers.dart';
 import '../../domain/entities.dart';
 
-/// 全部冲煮记录，用于计算基础统计数字。
-final StreamProvider<List<BrewLog>> _brewLogsProvider =
-    StreamProvider<List<BrewLog>>(
-      (Ref ref) => ref.watch(brewLogRepositoryProvider).watchAll(),
-    );
-
-/// 统计 tab。
+/// 统计视图。
+///
+/// 已并入「记录」页的第二个页签（用户确认的 dock 方案），
+/// 因此自身不带 Scaffold，只渲染内容。
 ///
 /// M1 只给占位说明 + 几个内存里算得出的基础数字；
 /// 真正的图表属 P1，按「评分趋势 → 参数对比 → 消耗」的顺序实现（手册 §6.1）。
-class StatsPage extends ConsumerWidget {
-  const StatsPage({super.key});
+class StatsView extends ConsumerWidget {
+  const StatsView({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final List<BrewLog> logs =
-        ref.watch(_brewLogsProvider).value ?? const <BrewLog>[];
+        ref.watch(brewLogListProvider).value ?? const <BrewLog>[];
 
     final List<BrewLog> ratedLogs = logs
         .where((BrewLog log) => log.rating != null)

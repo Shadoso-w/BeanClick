@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../data/providers.dart';
 import '../../domain/entities.dart';
+import '../stats/stats_page.dart';
 import 'brew_log_form_page.dart';
 
 /// 记录 tab：冲煮时间线（手册 §5.1）。
@@ -18,6 +19,9 @@ class RecordPage extends ConsumerStatefulWidget {
 class _RecordPageState extends ConsumerState<RecordPage> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+
+  /// 0 = 时间线，1 = 统计（统计已并入本页，用户确认的 dock 方案）。
+  int _tab = 0;
 
   @override
   void dispose() {
@@ -84,20 +88,52 @@ class _RecordPageState extends ConsumerState<RecordPage> {
 
     return Column(
       children: <Widget>[
-        _buildSearchField(context),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: _handleRefresh,
-            child: logsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (Object error, StackTrace stackTrace) =>
-                  _ErrorView(message: '记录加载失败：$error', onRetry: _handleRefresh),
-              data: (List<BrewLog> logs) =>
-                  _buildTimeline(logs, beanNames, grinders),
+        _buildTabSelector(),
+        if (_tab == 0) ...<Widget>[
+          _buildSearchField(context),
+          Expanded(
+            child: RefreshIndicator(
+              onRefresh: _handleRefresh,
+              child: logsAsync.when(
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (Object error, StackTrace stackTrace) => _ErrorView(
+                  message: '记录加载失败：$error',
+                  onRetry: _handleRefresh,
+                ),
+                data: (List<BrewLog> logs) =>
+                    _buildTimeline(logs, beanNames, grinders),
+              ),
             ),
           ),
-        ),
+        ] else
+          const Expanded(child: StatsView()),
       ],
+    );
+  }
+
+  /// 时间线 / 统计 页签。
+  Widget _buildTabSelector() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: SegmentedButton<int>(
+        expandedInsets: EdgeInsets.zero,
+        showSelectedIcon: false,
+        segments: const <ButtonSegment<int>>[
+          ButtonSegment<int>(
+            value: 0,
+            label: Text('时间线'),
+            icon: Icon(Icons.history),
+          ),
+          ButtonSegment<int>(
+            value: 1,
+            label: Text('统计'),
+            icon: Icon(Icons.insights_outlined),
+          ),
+        ],
+        selected: <int>{_tab},
+        onSelectionChanged: (Set<int> selection) =>
+            setState(() => _tab = selection.first),
+      ),
     );
   }
 
