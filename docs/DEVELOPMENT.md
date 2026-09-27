@@ -431,21 +431,20 @@ keytool -genkeypair -v `
 | `flutter analyze` | `No issues found!`，退出码 0 |
 | `dart format --output=none --set-exit-if-changed .` | 0 处改动，退出码 0（CI 同款检查） |
 | `dart run build_runner build --delete-conflicting-outputs` | 成功；生成物与仓库里的 `database.g.dart` 完全一致（无 diff） |
-| `flutter test` | **256 个测试全部通过**，退出码 0（M2.7：记录交互 + M2.6 的批次/拼配/迁移/快照） |
-| `flutter build apk --release --split-per-abi` | 成功，**1.61 分钟**（M2.7，release 签名） |
+| `flutter test` | **264 个测试全部通过**，退出码 0（M2.8 第一批 + M2.7/M2.6） |
+| `flutter build apk --release --split-per-abi` | 成功，**1.3 分钟**（M2.8，release 签名） |
 
 包体（验收清单要求 < 30MB）：
 
-| ABI | M1 | M2 | M2.5 | M2.6 | **M2.7** |
-|---|---|---|---|---|---|
-| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB | 17.46 MB | **17.46 MB** |
-| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB | 19.93 MB | **19.93 MB** |
-| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB | 21.32 MB | **21.32 MB** |
+| ABI | M1 | M2 | M2.5 | M2.6 | M2.7 | **M2.8** |
+|---|---|---|---|---|---|---|
+| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB | 17.46 MB | 17.46 MB | **18.40 MB** |
+| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB | 19.93 MB | 19.93 MB | **20.75 MB** |
+| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB | 21.32 MB | 21.32 MB | **22.14 MB** |
 
-M2.7 与 M2.6 只差几十字节（arm64 `20,900,363` → `20,900,439`），这次改的都是界面代码。
-
-真机（小米 11 / Android 14，`M2011K2C`）：M2.7 的 APK 覆盖安装后启动，
-logcat 无异常 —— 真机上跑通了 v4 → v5 的加列迁移。
+> M2.8 比 M2.7 大了 **约 0.8 MB**，全部来自 `flutter_localizations`
+> （日期/时间选择器的中文本地化数据 + intl 的日期符号表）。
+> 换来的是弹窗不再是英文的「September / OK / Cancel」。仍在 30MB 以内。
 
 M2.6 的 APK 实测（`apksigner verify` / `aapt2 dump badging`）：
 
