@@ -23,11 +23,13 @@ void main() {
       expect(payload['exportedAt'], isA<String>());
       expect(payload['counts'], <String, int>{
         'beans': 1,
+        'batches': 1,
         'grinders': 1,
         'brewLogs': 1,
         'recipes': 1,
       });
       expect((payload['coffeeBeans'] as List<Object?>), hasLength(1));
+      expect((payload['beanBatches'] as List<Object?>), hasLength(1));
       expect((payload['grinders'] as List<Object?>), hasLength(1));
       expect((payload['brewLogs'] as List<Object?>), hasLength(1));
       expect((payload['recipes'] as List<Object?>), hasLength(1));
@@ -112,14 +114,17 @@ void main() {
       expect(utf8.encode(csv).take(3), <int>[0xEF, 0xBB, 0xBF]);
     });
 
-    test('包含四张表与中文表头', () {
+    test('包含五张表与中文表头', () {
       final String csv = ExportEncoder.encodeCsv(_sampleDocument());
 
       expect(csv, contains('# 咖啡豆'));
+      expect(csv, contains('# 咖啡豆批次'));
       expect(csv, contains('# 磨豆机'));
       expect(csv, contains('# 冲煮记录'));
       expect(csv, contains('# 配方'));
-      expect(csv, contains('名称,产地,庄园,处理法,烘焙度'));
+      // 豆子表只剩身份信息，烘焙度/余量已移到批次表
+      expect(csv, contains('名称,产地,庄园,处理法,风味标签,收藏'));
+      expect(csv, contains('所属豆子,烘焙日期,烘焙度,剩余克数'));
       expect(csv, contains('粉量g,水量g,粉水比'));
     });
 
@@ -245,20 +250,29 @@ void main() {
     Future<ExportDocument> loadFromHarness() => loadExportDocument(harness.db);
 
     test('从数据库读出的快照包含全部表', () async {
-      final int beanId = await harness.beans.save(makeBean(name: '花魁'));
+      // 批次模型下要先有批次，才能关联豆子冲煮。
+      final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
       final int grinderId = await harness.grinders.save(makeGrinder());
       await harness.logs.save(
-        makeLog(beanId: beanId, grinderId: grinderId, doseGrams: 15),
+        makeLog(
+          beanId: a.beanId,
+          batchId: a.batchId,
+          grinderId: grinderId,
+          doseGrams: 15,
+        ),
       );
 
       final ExportDocument document = await loadFromHarness();
 
       expect(document.beans, hasLength(1));
+      expect(document.batches, hasLength(1));
       expect(document.grinders, hasLength(1));
       expect(document.brewLogs, hasLength(1));
       expect(document.recipes, isEmpty);
-      // 余量已被自动扣减，导出应反映当前值。
-      expect(document.beans.single.remainingGrams, 185);
+      // 余量已被自动扣减，导出应反映当前值（余量在批次上）。
+      expect(document.batches.single.remainingGrams, 185);
+      // 冲煮记录应带出豆子用量
+      expect(document.brewLogs.single.beanUsages, hasLength(1));
     });
 
     test('导出会落盘，且文件名与内容一致', () async {
@@ -364,13 +378,22 @@ ExportDocument _sampleDocument({String? note}) {
         origin: '埃塞俄比亚',
         farm: '科契尔',
         process: ProcessMethod.washed,
-        roastLevel: RoastLevel.light,
-        roastDate: DateTime(2025, 12, 20),
         flavorTags: const <String>['草莓', '奶油'],
+        isFavorite: true,
+        notes: note,
+        createdAt: at,
+        updatedAt: at,
+      ),
+    ],
+    batches: <BeanBatch>[
+      BeanBatch(
+        id: 1,
+        beanId: 1,
+        roastDate: DateTime(2025, 12, 20),
+        roastLevel: RoastLevel.light,
         remainingGrams: 185,
         initialGrams: 200,
         price: 88,
-        notes: note,
         createdAt: at,
         updatedAt: at,
       ),

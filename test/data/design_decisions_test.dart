@@ -4,9 +4,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/test_harness.dart';
 
-/// schema v3 的 7 条设计决策验证。
+/// 数据层 7 条设计决策的验证。
 ///
-/// 对应 `docs/M2.5-数据层设计评审.md` §5 的拍板结果。
+/// 对应 `docs/M2.5-数据层设计评审.md` §5 的拍板结果：索引、删除豆子保留历史、
+/// 0.1g 归一、烘焙快照、豆子与批次的关系、多豆按各自粉量扣减、
+/// 指定批次缺失时显式告知。
+///
+/// 原文件名 `schema_v3_test.dart` 是 v3 时代的叫法，表结构已经到 v4，
+/// 名字和内容对不上，因此改名。
 void main() {
   late TestHarness harness;
 
@@ -60,7 +65,10 @@ void main() {
   group('决策 2：删除豆子不破坏拼配记录', () {
     test('删除豆子后，用量行保留且 beanId 置空、快照名还在', () async {
       final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 100);
-      final b = await harness.addBeanWithBatch(name: '曼特宁', remainingGrams: 100);
+      final b = await harness.addBeanWithBatch(
+        name: '曼特宁',
+        remainingGrams: 100,
+      );
 
       final logId = (await harness.logs.save(
         makeLog(
@@ -247,11 +255,7 @@ void main() {
       expect(withBatches!.batches, hasLength(2));
       expect(withBatches.totalRemaining, 450);
       expect(withBatches.latestRoastDate, DateTime(2026, 3, 1));
-      expect(
-        withBatches.bean.batchCount,
-        2,
-        reason: '豆库里仍是一款豆子，不是两支重复的',
-      );
+      expect(withBatches.bean.batchCount, 2, reason: '豆库里仍是一款豆子，不是两支重复的');
     });
   });
 
@@ -329,11 +333,7 @@ void main() {
         ),
       );
 
-      expect(
-        result.hasBatchFallback,
-        isFalse,
-        reason: '已删除的豆子不进扣减流程，所以不该报换批次',
-      );
+      expect(result.hasBatchFallback, isFalse, reason: '已删除的豆子不进扣减流程，所以不该报换批次');
       expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 80);
     });
 
@@ -367,7 +367,9 @@ void main() {
     });
 
     test('批次烘焙日期之后被改，历史记录的快照不变', () async {
-      final a = await harness.addBeanWithBatch(roastDate: DateTime(2026, 1, 10));
+      final a = await harness.addBeanWithBatch(
+        roastDate: DateTime(2026, 1, 10),
+      );
       final logId = (await harness.logs.save(
         makeLog(beanId: a.beanId, batchId: a.batchId, doseGrams: 15),
       )).brewLogId;

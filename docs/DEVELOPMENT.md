@@ -259,6 +259,33 @@ flutter_test 里**先注册的 setUp 先执行**。`setUpWidgetTest()` 在 `main
 
 因此 `WidgetTestHarness.useOverrides()` 除了存下构造器，还会**立刻重建容器**。
 
+### 8.7 批次模型下的夹具
+
+批次模型（schema v4）之后，「余量 / 购入总重 / 价格 / 烘焙日期」都在**批次**上，
+不在豆子上。测试里不要再手写 `CoffeeBean(remainingGrams: ...)`——那个构造函数
+已经没有这些参数了。两个脚手架都提供了组合夹具：
+
+```dart
+final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
+// a.beanId / a.batchId
+await harness.addBrewLog(beanId: a.beanId, batchId: a.batchId, doseGrams: 15);
+```
+
+断言余量时要落到批次：
+
+```dart
+final BeanBatch batch = (await beanRepo.getBatch(a.batchId))!;
+expect(batch.remainingGrams, 185);
+```
+
+反过来，**UI 保存后要顺手断言批次**。踩过一次：`brew_log_form_page` 一度只写
+`brew_logs.doseGrams`、不同步 `brew_log_beans.doseGrams`，于是「编辑粉量」把
+`doseGrams` 改了、余量却一分没动，而只断言 `log.doseGrams` 的测试全绿。
+现在的做法是表单在 `_save` 里用 `_syncUsages()` 把豆子选择与粉量对齐成用量行。
+
+`tapText` 这类按文字点的辅助函数要先滚动再点：视口外的控件**根本不存在**，
+`ensureVisible` 会抛 `Bad state: No element`（不是"找到了但不可见"）。
+
 ---
 
 ## 9. 发布签名

@@ -76,15 +76,15 @@ void main() {
       ]);
 
       expect(
-        (await repo.getForBean(bean.beanId)).firstWhere(
-          (a) => a.key == 'roaster',
-        ).value,
+        (await repo.getForBean(bean.beanId))
+            .firstWhere((a) => a.key == 'roaster')
+            .value,
         '豆子上的',
       );
       expect(
-        (await repo.getForBrewLog(logId)).firstWhere(
-          (a) => a.key == 'filterPaper',
-        ).value,
+        (await repo.getForBrewLog(logId))
+            .firstWhere((a) => a.key == 'filterPaper')
+            .value,
         '记录上的',
       );
       // 磨豆机同 id 上不该有值
@@ -121,15 +121,15 @@ void main() {
       ]);
 
       expect(
-        (await repo.getForGrinder(grinderId)).firstWhere(
-          (a) => a.key == 'serialNumber',
-        ).value,
+        (await repo.getForGrinder(grinderId))
+            .firstWhere((a) => a.key == 'serialNumber')
+            .value,
         'SN-001',
       );
       expect(
-        (await repo.getForBatch(batchId)).firstWhere(
-          (a) => a.key == 'storageMethod',
-        ).value,
+        (await repo.getForBatch(batchId))
+            .firstWhere((a) => a.key == 'storageMethod')
+            .value,
         '密封罐',
       );
       expect(logId, greaterThan(0));
@@ -218,10 +218,7 @@ void main() {
 
   group('枚举扩展性', () {
     test('每个枚举都有 selectable 子集，且是 values 的子集', () {
-      expect(
-        BrewMethod.selectable.every(BrewMethod.values.contains),
-        isTrue,
-      );
+      expect(BrewMethod.selectable.every(BrewMethod.values.contains), isTrue);
       expect(RoastLevel.selectable.every(RoastLevel.values.contains), isTrue);
       expect(
         ProcessMethod.selectable.every(ProcessMethod.values.contains),
@@ -239,11 +236,14 @@ void main() {
         greaterThanOrEqualTo(BrewMethod.selectable.length),
       );
       // 预留值必须在存储全集里，否则将来加值会改到表
-      expect(BrewMethod.values, containsAll(<BrewMethod>[
-        BrewMethod.frenchPress,
-        BrewMethod.aeropress,
-        BrewMethod.espresso,
-      ]));
+      expect(
+        BrewMethod.values,
+        containsAll(<BrewMethod>[
+          BrewMethod.frenchPress,
+          BrewMethod.aeropress,
+          BrewMethod.espresso,
+        ]),
+      );
     });
 
     test('fromName 对未知值返回 null 而不是抛异常', () {

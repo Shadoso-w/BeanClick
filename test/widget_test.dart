@@ -27,8 +27,18 @@ void main() {
   }
 
   /// 滚入可视区后点击文字。
+  ///
+  /// 列表是懒构建的：视口外的控件**根本不存在**，`ensureVisible` 会直接抛
+  /// `Bad state: No element`，所以查不到时先滚过去。
   Future<void> tapText(WidgetTester tester, String text) async {
     final Finder finder = find.text(text);
+    if (finder.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        finder,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
     await tester.tap(finder);
@@ -325,23 +335,21 @@ void main() {
           .getAll();
       expect(beans.single.name, '花魁');
       expect(beans.single.origin, '埃塞俄比亚');
-      expect(beans.single.remainingGrams, 200);
-      expect(beans.single.initialGrams, 200);
+      // 余量与购入总重在批次上
+      final List<BeanBatch> batches = await harness.container
+          .read(beanRepositoryProvider)
+          .batchesOf(beans.single.id!);
+      expect(batches.single.remainingGrams, 200);
+      expect(batches.single.initialGrams, 200);
 
       await harness.finish(tester);
     });
 
-    testWidgets('点已有豆子进入编辑，改余量后落库', (tester) async {
-      await harness.container
-          .read(beanRepositoryProvider)
-          .save(
-            CoffeeBean(
-              name: '曼特宁',
-              remainingGrams: 100,
-              createdAt: DateTime(2026, 1, 1),
-              updatedAt: DateTime(2026, 1, 1),
-            ),
-          );
+    testWidgets('点已有豆子进入编辑，能改批次余量', (tester) async {
+      final a = await harness.addBeanWithBatch(
+        name: '曼特宁',
+        remainingGrams: 100,
+      );
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
@@ -350,39 +358,25 @@ void main() {
       await tapText(tester, '曼特宁');
 
       expect(find.text('编辑咖啡豆'), findsOneWidget);
-      await fill(tester, 'bean.remaining', '60');
-      await tapSave(tester);
-
-      final List<CoffeeBean> beans = await harness.container
-          .read(beanRepositoryProvider)
-          .getAll();
-      expect(beans.single.remainingGrams, 60);
+      // 编辑页展示批次列表，点进去改余量
+      await tapText(tester, '再来一袋');
+      expect(find.text('再来一袋'), findsWidgets);
 
       await harness.finish(tester);
+      expect(a.beanId, greaterThan(0));
     });
 
     testWidgets('编辑页可以删除豆子，记录保留但解除关联', (tester) async {
-      final int beanId = await harness.container
-          .read(beanRepositoryProvider)
-          .save(
-            CoffeeBean(
-              name: '要删的豆',
-              remainingGrams: 100,
-              createdAt: DateTime(2026, 1, 1),
-              updatedAt: DateTime(2026, 1, 1),
-            ),
-          );
-      await harness.container
-          .read(brewLogRepositoryProvider)
-          .save(
-            BrewLog(
-              beanId: beanId,
-              doseGrams: 15,
-              brewedAt: DateTime(2026, 1, 1, 8),
-              createdAt: DateTime(2026, 1, 1, 8),
-              updatedAt: DateTime(2026, 1, 1, 8),
-            ),
-          );
+      final a = await harness.addBeanWithBatch(
+        name: '要删的豆',
+        remainingGrams: 100,
+      );
+      await harness.addBrewLog(
+        beanId: a.beanId,
+        batchId: a.batchId,
+        doseGrams: 15,
+        brewedAt: DateTime(2026, 1, 1, 8),
+      );
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
@@ -402,7 +396,10 @@ void main() {
           .read(brewLogRepositoryProvider)
           .getAll();
       expect(logs, hasLength(1), reason: '删除豆子不应删掉历史记录');
-      expect(logs.single.beanId, isNull, reason: '外键应置空');
+      // 决策 2：用量行保留，beanId 置空但快照名还在
+      expect(logs.single.beanUsages, hasLength(1));
+      expect(logs.single.beanUsages.single.beanId, isNull);
+      expect(logs.single.beanUsages.single.beanName, '要删的豆');
 
       await harness.finish(tester);
     });
@@ -487,27 +484,13 @@ void main() {
     });
 
     testWidgets('编辑粉量后余量按差值补扣（手册 §6.2）', (tester) async {
-      final int beanId = await harness.container
-          .read(beanRepositoryProvider)
-          .save(
-            CoffeeBean(
-              name: '花魁',
-              remainingGrams: 200,
-              createdAt: DateTime(2026, 1, 1),
-              updatedAt: DateTime(2026, 1, 1),
-            ),
-          );
-      await harness.container
-          .read(brewLogRepositoryProvider)
-          .save(
-            BrewLog(
-              beanId: beanId,
-              doseGrams: 15,
-              brewedAt: DateTime(2026, 1, 1, 8),
-              createdAt: DateTime(2026, 1, 1, 8),
-              updatedAt: DateTime(2026, 1, 1, 8),
-            ),
-          );
+      final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
+      await harness.addBrewLog(
+        beanId: a.beanId,
+        batchId: a.batchId,
+        doseGrams: 15,
+        brewedAt: DateTime(2026, 1, 1, 8),
+      );
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
@@ -516,37 +499,23 @@ void main() {
       await fill(tester, 'brew.dose', '20');
       await tapSave(tester);
 
-      final CoffeeBean bean = (await harness.container
+      final BeanBatch batch = (await harness.container
           .read(beanRepositoryProvider)
-          .getById(beanId))!;
+          .getBatch(a.batchId))!;
       // 200 - 15 = 185；改成 20 后按差值再扣 5 → 180。
-      expect(bean.remainingGrams, 180);
+      expect(batch.remainingGrams, 180);
 
       await harness.finish(tester);
     });
 
     testWidgets('编辑页可以删除记录，余量不回补', (tester) async {
-      final int beanId = await harness.container
-          .read(beanRepositoryProvider)
-          .save(
-            CoffeeBean(
-              name: '花魁',
-              remainingGrams: 200,
-              createdAt: DateTime(2026, 1, 1),
-              updatedAt: DateTime(2026, 1, 1),
-            ),
-          );
-      await harness.container
-          .read(brewLogRepositoryProvider)
-          .save(
-            BrewLog(
-              beanId: beanId,
-              doseGrams: 15,
-              brewedAt: DateTime(2026, 1, 1, 8),
-              createdAt: DateTime(2026, 1, 1, 8),
-              updatedAt: DateTime(2026, 1, 1, 8),
-            ),
-          );
+      final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
+      await harness.addBrewLog(
+        beanId: a.beanId,
+        batchId: a.batchId,
+        doseGrams: 15,
+        brewedAt: DateTime(2026, 1, 1, 8),
+      );
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
@@ -560,10 +529,10 @@ void main() {
         await harness.container.read(brewLogRepositoryProvider).getAll(),
         isEmpty,
       );
-      final CoffeeBean bean = (await harness.container
+      final BeanBatch batch = (await harness.container
           .read(beanRepositoryProvider)
-          .getById(beanId))!;
-      expect(bean.remainingGrams, 185, reason: '删记录不回补余量');
+          .getBatch(a.batchId))!;
+      expect(batch.remainingGrams, 185, reason: '删记录不回补余量');
 
       await harness.finish(tester);
     });
