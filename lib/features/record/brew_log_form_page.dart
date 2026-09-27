@@ -256,6 +256,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       clearHeatLevel: _heatLevel.text.trim().isEmpty,
       clearYieldGrams: parseNumber(_yieldGrams.text) == null,
       clearPreheatUpperChamber: _preheatUpperChamber == null,
+      beanUsages: _syncUsages(base, parseNumber(_dose.text)),
     );
 
     try {
@@ -276,6 +277,35 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       setState(() => _saving = false);
       _showMessage('保存失败：$error');
     }
+  }
+
+  /// 把表单里的豆子选择同步成记录关联的做豆用量。
+  ///
+  /// 余量自动扣减（手册 §6.2）靠的就是这些用量行：仓储按每支豆子的
+  /// [BeanUsage.doseGrams] 扣减批次余量。表单这边只有一个「豆子 + 粉量」，
+  /// 所以要在这里把它们对齐，否则会出现「换了粉量但余量没跟着变」。
+  ///
+  /// 拼配记录（多支豆子）**原样保留**：当前表单还画不出「每支豆子各多少克」
+  /// 的分配界面，硬把总粉量塞给主豆会悄悄改掉别人的配方。
+  /// 等拼配 UI 落地后这里再换成真正的分配逻辑。
+  ///
+  /// 未选豆子时返回空列表——既解除了关联，也让仓储把原来扣的余量回补。
+  List<BeanUsage> _syncUsages(BrewLog base, double? doseGrams) {
+    final int? beanId = _beanId;
+    if (beanId == null) return const <BeanUsage>[];
+    if (base.beanUsages.length > 1) return base.beanUsages;
+
+    final double grams = doseGrams ?? 0;
+    final BeanUsage? previous = base.beanUsages.isEmpty
+        ? null
+        : base.beanUsages.first;
+
+    // 换了豆子：丢掉旧用量（仓储按 beanId 差值回补旧豆），换上新豆。
+    // 批次留空，让仓储按烘焙日期自动挑。
+    if (previous == null || previous.beanId != beanId) {
+      return <BeanUsage>[BeanUsage(beanId: beanId, doseGrams: grams)];
+    }
+    return <BeanUsage>[previous.copyWith(doseGrams: grams)];
   }
 
   Future<void> _delete() async {
