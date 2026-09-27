@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../helpers/test_harness.dart' show makeLog;
 import '../helpers/widget_harness.dart';
 
-/// 记录页的右滑操作（收藏 / 删除）、收藏筛选，以及表单里的复制按钮。
+/// 记录页的左滑操作（收藏 / 删除）、收藏筛选，以及表单里的复制按钮。
 void main() {
   final WidgetTestHarness harness = setUpWidgetTest();
 
@@ -41,13 +41,13 @@ void main() {
     matching: find.text(label),
   );
 
-  /// 右滑第一条记录，露出操作按钮。
+  /// 左滑第一条记录，露出右侧的操作按钮。
   Future<void> swipeOpen(WidgetTester tester) async {
-    await tester.drag(find.byType(SwipeActions), const Offset(220, 0));
+    await tester.drag(find.byType(SwipeActions), const Offset(-220, 0));
     await tester.pumpAndSettle();
   }
 
-  testWidgets('右滑露出「收藏」与「删除」，点收藏只改标记', (tester) async {
+  testWidgets('左滑露出「收藏」与「删除」，点收藏只改标记', (tester) async {
     final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
     final int logId =
         (await harness.container
@@ -69,7 +69,8 @@ void main() {
     // 滑开后卡片被推到右边，操作按钮露出来。
     expect(swipeAction('收藏'), findsOneWidget);
     expect(swipeAction('删除'), findsOneWidget);
-    expect(tester.getRect(find.byType(Card).first).left, greaterThan(100));
+    // 滑开后卡片被推到左边（越出屏幕），操作按钮露在右侧。
+    expect(tester.getRect(find.byType(Card).first).left, lessThan(0));
 
     await tester.tap(swipeAction('收藏'));
     await tester.pumpAndSettle();
@@ -92,7 +93,7 @@ void main() {
     await harness.finish(tester);
   });
 
-  testWidgets('滑开后右滑的那条已收藏，按钮变成「取消收藏」', (tester) async {
+  testWidgets('滑开后已收藏的那条，按钮变成「取消收藏」', (tester) async {
     final a = await harness.addBeanWithBatch(name: '花魁');
     await harness.container
         .read(brewLogRepositoryProvider)
@@ -110,7 +111,7 @@ void main() {
     await harness.finish(tester);
   });
 
-  testWidgets('右滑删除：先确认再删，且不回补余量', (tester) async {
+  testWidgets('左滑删除：先确认再删，且不回补余量', (tester) async {
     final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
     await harness.container
         .read(brewLogRepositoryProvider)
@@ -150,13 +151,16 @@ void main() {
     await swipeOpen(tester);
     expect(swipeAction('收藏'), findsOneWidget);
 
-    // 点卡片区域（右侧没被按钮盖住的地方）
-    await tester.tapAt(tester.getCenter(find.text('花魁')));
+    // 点卡片露在外面的部分（左滑后豆名已经滑出屏幕，所以点卡片中心而不是文字）
+    await tester.tapAt(tester.getCenter(find.byType(Card).first));
     await tester.pumpAndSettle();
 
     expect(find.text('编辑记录'), findsNothing, reason: '滑开状态下不该误进详情');
-    // 收起来了：卡片回到原位（滑开时会被推到 100 之后）。
-    expect(tester.getRect(find.byType(Card).first).left, lessThan(100));
+    // 收起来了：卡片回到原位（左滑时会越出屏幕左侧）。
+    expect(
+      tester.getRect(find.byType(Card).first).left,
+      greaterThanOrEqualTo(0),
+    );
 
     await harness.finish(tester);
   });
@@ -212,7 +216,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('还没有收藏的参数'), findsOneWidget);
-    expect(find.textContaining('向右滑动'), findsOneWidget);
+    expect(find.textContaining('向左滑动'), findsOneWidget);
 
     await harness.finish(tester);
   });

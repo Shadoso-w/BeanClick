@@ -125,6 +125,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   int? _rating;
   bool _isBest = false;
   bool _isFavorite = false;
+
+  /// 时分是否已被确认过（编辑旧记录算已确认）。
+  ///
+  /// 只影响「选完日期要不要顺手弹时间」这一个行为，见 [_onBrewedDatePicked]。
+  bool _timeConfirmed = false;
   bool? _preheatUpperChamber;
   DateTime _brewedAt = DateTime.now();
   bool _advancedExpanded = false;
@@ -180,6 +185,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     _isFavorite = widget.existing?.isFavorite ?? false;
     _preheatUpperChamber = source?.preheatUpperChamber;
     _brewedAt = widget.existing?.brewedAt ?? DateTime.now();
+    // 编辑旧记录时，时分就是它当时真实的时间，不需要再确认一次。
+    _timeConfirmed = widget.existing != null;
 
     if (_method != BrewMethod.pourOver && _method != BrewMethod.mokaPot) {
       _showAllMethods = true;
@@ -507,6 +514,25 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     }
   }
 
+  /// 选完日期后：新建的记录如果**从没设过时分**，顺手把时间选择器弹一次。
+  ///
+  /// 为什么只在「首次」弹：编辑旧记录时它的时分是当时真实的时间，
+  /// 每改一次日期都弹一次是打扰；新建的第一次则确实该确认是几点。
+  Future<void> _onBrewedDatePicked(DateTime date) async {
+    setState(() => _brewedAt = withDate(_brewedAt, date));
+    if (_timeConfirmed) return;
+
+    final TimeOfDay? picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_brewedAt),
+    );
+    if (picked == null) return;
+    setState(() {
+      _brewedAt = withTime(_brewedAt, picked);
+      _timeConfirmed = true;
+    });
+  }
+
   /// 单击复制按钮：直接复制**上次**那杯的参数。
   Future<void> _applyCopyFromLast() async {
     final BrewLog? latest = await ref
@@ -694,12 +720,15 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                 ),
                 LabeledField(
                   label: '冲煮时间',
-                  child: DateField(
+                  helper: '日期与时分各改各的',
+                  child: DateTimeField(
                     value: _brewedAt,
-                    hintText: '选择冲煮时间',
+                    dateKey: const Key('brew.brewedDate'),
+                    timeKey: const Key('brew.brewedTime'),
                     lastDate: DateTime.now().add(const Duration(days: 1)),
-                    onPick: (DateTime value) =>
-                        setState(() => _brewedAt = value),
+                    onDatePicked: _onBrewedDatePicked,
+                    onTimePicked: (TimeOfDay time) =>
+                        setState(() => _brewedAt = withTime(_brewedAt, time)),
                   ),
                 ),
               ],
