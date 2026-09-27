@@ -22,33 +22,71 @@ class _BeansPageState extends State<BeansPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    final bool isBeans = _segment == 0;
+
+    return Stack(
       children: <Widget>[
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: SegmentedButton<int>(
-            expandedInsets: EdgeInsets.zero,
-            segments: const <ButtonSegment<int>>[
-              ButtonSegment<int>(
-                value: 0,
-                label: Text('咖啡豆'),
-                icon: Icon(Icons.coffee_outlined),
+        Column(
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: SegmentedButton<int>(
+                expandedInsets: EdgeInsets.zero,
+                segments: const <ButtonSegment<int>>[
+                  ButtonSegment<int>(
+                    value: 0,
+                    label: Text('咖啡豆'),
+                    icon: Icon(Icons.coffee_outlined),
+                  ),
+                  ButtonSegment<int>(
+                    value: 1,
+                    label: Text('磨豆机'),
+                    icon: Icon(Icons.tune_outlined),
+                  ),
+                ],
+                selected: <int>{_segment},
+                onSelectionChanged: (Set<int> selection) =>
+                    setState(() => _segment = selection.first),
               ),
-              ButtonSegment<int>(
-                value: 1,
-                label: Text('磨豆机'),
-                icon: Icon(Icons.tune_outlined),
-              ),
-            ],
-            selected: <int>{_segment},
-            onSelectionChanged: (Set<int> selection) =>
-                setState(() => _segment = selection.first),
-          ),
+            ),
+            Expanded(child: isBeans ? const _BeanList() : const _GrinderList()),
+          ],
         ),
-        Expanded(
-          child: _segment == 0 ? const _BeanList() : const _GrinderList(),
+        _AddFab(
+          label: isBeans ? '咖啡豆' : '磨豆机',
+          onPressed: () => isBeans
+              ? BeanFormPage.show(context)
+              : GrinderFormPage.show(context),
         ),
       ],
+    );
+  }
+}
+
+/// 豆库页右下角的新增按钮。
+///
+/// 中栏已被「新加一杯」占用，所以豆库的新增入口单独放这里；
+/// 动作跟随当前分段：咖啡豆段新增豆子，磨豆机段新增磨豆机。
+/// 用 [Align] 定位而不是 Scaffold 的 FAB 槽位，避免和外壳那个大 + 号冲突。
+class _AddFab extends StatelessWidget {
+  const _AddFab({required this.label, required this.onPressed});
+
+  final String label;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.bottomRight,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(0, 0, 16, 16),
+        child: FloatingActionButton.small(
+          heroTag: 'beans.add',
+          onPressed: onPressed,
+          tooltip: '新增$label',
+          child: const Icon(Icons.add),
+        ),
+      ),
     );
   }
 }
