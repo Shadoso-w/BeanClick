@@ -410,14 +410,18 @@ keytool -genkeypair -v `
 
 ## 10. 应用图标
 
-图标是**代码画出来的**（`System.Drawing`），没有外部素材，也没有引图标生成器。
-几何比例、配色与重新生成方法见 [`tool/README.md`](../tool/README.md)。
+图标是**用户提供的成品图**（米白圆角方块 + 深棕圆环 + 咖啡豆 + 一圈刻度点）：
 
-改动 `mipmap-*` 后必须重新构建 APK 才生效（编译期资源）。
+- 原图留档 `assets/icon/app_icon_source.png`
+- 生成脚本 `tool/make_app_icons.ps1`（把原图切成传统图标 / 自适应前景，
+  按亮度抠掉白色页面与米白背景），详细说明见 [`tool/README.md`](../tool/README.md)
+- 自适应图标的 XML 在 `res/mipmap-anydpi-v26/`，背景色 `#F3EBDC` 在 `res/values/colors.xml`
 
-> 生成脚本本身没有留在仓库里：Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，
+改动 `mipmap-*` 后必须重新构建 APK 才生效（编译期资源）；
+桌面可能缓存旧图标，重装后若还是旧的，重启桌面或卸载重装。
+
+> 脚本本身只有英文注释：Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，
 > 中文注释被解码坏以后会连带把语法解析搞崩（报 `Unexpected token '}'`）。
-> `tool/README.md` 里记录了全部参数，需要时重建即可。
 
 ---
 
