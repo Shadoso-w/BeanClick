@@ -45,10 +45,17 @@ class BrewLogFormPage extends ConsumerStatefulWidget {
   ///
   /// 刻意清空：`id`（保持 null，否则会被当成编辑那条旧记录）、`rating`、
   /// `notes`、`photoPath`、`isBest`，并把冲煮时间设为当前时间。
+  ///
+  /// 豆子（含拼配配方）会一起复制，但**批次清空**：那一袋很可能已经用完了，
+  /// 留着它会让扣减落到空袋上。批次交给仓储按烘焙日期重新挑最新的一袋。
   static BrewLog copyFrom(BrewLog source, {DateTime? now}) {
     final DateTime timestamp = now ?? DateTime.now();
     return BrewLog(
       beanId: source.beanId,
+      beanUsages: <BeanUsage>[
+        for (final BeanUsage usage in source.beanUsages)
+          usage.copyWith(clearBatchId: true),
+      ],
       grinderId: source.grinderId,
       recipeId: source.recipeId,
       method: source.method,
@@ -105,7 +112,14 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   late final TextEditingController _yieldGrams;
 
   BrewMethod _method = BrewMethod.pourOver;
-  int? _beanId;
+
+  /// 这一杯用到的豆子（拼配时多于一支）。顺序就是 [BeanUsage.position]。
+  late final List<_BeanPick> _picks;
+
+  /// 打开时发现有几支豆子已被删除（用量行的 `beanId` 为空）。
+  /// 这些行没法重新选中，保存后不再保留，所以要如实告诉用户。
+  int _orphanUsageCount = 0;
+
   int? _grinderId;
   int? _rating;
   bool _isBest = false;
@@ -156,7 +170,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     _yieldGrams = TextEditingController(text: numberToText(source?.yieldGrams));
 
     _method = source?.method ?? BrewMethod.pourOver;
-    _beanId = source?.beanId;
+    _picks = _initialPicks(source);
     _grinderId = source?.grinderId;
     // 复制上次时不继承评分与备注（见 copyFrom 的说明）。
     _rating = widget.existing?.rating;
@@ -171,6 +185,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   @override
   void dispose() {
+    for (final _BeanPick pick in _picks) {
+      pick.dispose();
+    }
     for (final TextEditingController controller in <TextEditingController>[
       _grindSetting,
       _grindClicks,
@@ -198,6 +215,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    if (!_validatePicks()) return;
     setState(() => _saving = true);
 
     final DateTime now = DateTime.now();
@@ -205,9 +223,13 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
         widget.existing ??
         BrewLog(brewedAt: _brewedAt, createdAt: now, updatedAt: now);
 
+    final int? primaryBeanId = _picks
+        .where((p) => p.beanId != null)
+        .firstOrNull
+        ?.beanId;
     final int? totalTime = int.tryParse(_totalTime.text.trim());
     final BrewLog log = base.copyWith(
-      beanId: _beanId,
+      beanId: primaryBeanId,
       grinderId: _grinderId,
       method: _method,
       grindSetting: parseNumber(_grindSetting.text),
@@ -235,7 +257,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
           ? _preheatUpperChamber
           : null,
       updatedAt: now,
-      clearBeanId: _beanId == null,
+      clearBeanId: primaryBeanId == null,
       clearGrinderId: _grinderId == null,
       clearGrindSetting: parseNumber(_grindSetting.text) == null,
       clearGrindClicks: int.tryParse(_grindClicks.text.trim()) == null,
@@ -256,7 +278,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       clearHeatLevel: _heatLevel.text.trim().isEmpty,
       clearYieldGrams: parseNumber(_yieldGrams.text) == null,
       clearPreheatUpperChamber: _preheatUpperChamber == null,
-      beanUsages: _syncUsages(base, parseNumber(_dose.text)),
+      beanUsages: _usagesFromPicks(),
     );
 
     try {
@@ -269,7 +291,13 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
       if (!mounted) return;
       if (result.hasStockShortage) {
-        _showMessage('已保存，但这支豆子余量不足，已扣至 0');
+        _showMessage(
+          result.stockAdjustments.length > 1
+              ? '已保存，但有豆子余量不足，已扣至 0'
+              : '已保存，但这支豆子余量不足，已扣至 0',
+        );
+      } else if (result.hasBatchFallback) {
+        _showMessage('已保存。原来那一袋批次已不在，余量扣到了别的批次上');
       }
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -279,33 +307,167 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     }
   }
 
-  /// 把表单里的豆子选择同步成记录关联的做豆用量。
+  // ---------------------------------------------------------------------------
+  // 豆子与拼配
+  // ---------------------------------------------------------------------------
+
+  /// 从数据来源（编辑原记录 / 复制上次的预填）还原豆子列表。
   ///
-  /// 余量自动扣减（手册 §6.2）靠的就是这些用量行：仓储按每支豆子的
-  /// [BeanUsage.doseGrams] 扣减批次余量。表单这边只有一个「豆子 + 粉量」，
-  /// 所以要在这里把它们对齐，否则会出现「换了粉量但余量没跟着变」。
+  /// 拼配的占比是从**各支豆子的粉量**倒推的：一条记录只存总粉量
+  /// （`brew_logs.doseGrams`）和每支豆子的粉量（`brew_log_beans.doseGrams`），
+  /// 界面上的「占比」是这两者的比值。
+  List<_BeanPick> _initialPicks(BrewLog? source) {
+    final List<BeanUsage> usages = source?.beanUsages ?? const <BeanUsage>[];
+    _orphanUsageCount = usages.where((u) => u.beanId == null).length;
+    final List<BeanUsage> usable = usages
+        .where((u) => u.beanId != null)
+        .toList(growable: false);
+
+    if (usable.isEmpty) {
+      // 新记录（或旧记录没关联任何豆子）：留一个空行给用户选。
+      return <_BeanPick>[_BeanPick(beanId: source?.beanId)];
+    }
+    if (usable.length == 1) {
+      return <_BeanPick>[
+        _BeanPick(
+          beanId: usable.first.beanId,
+          batchId: usable.first.batchId,
+          beanName: usable.first.beanName,
+        ),
+      ];
+    }
+
+    final double total =
+        source?.doseGrams ?? usable.fold<double>(0, (s, u) => s + u.doseGrams);
+    return <_BeanPick>[
+      for (final BeanUsage usage in usable)
+        _BeanPick(
+          beanId: usage.beanId,
+          batchId: usage.batchId,
+          beanName: usage.beanName,
+          share: total > 0
+              ? usage.doseGrams / total * 100
+              : 100 / usable.length,
+        ),
+    ];
+  }
+
+  /// 是否拼配（多于一支豆子）。
+  bool get _isBlend => _picks.length > 1;
+
+  /// 占比合计。单支时恒为 100（那一支就是全部）。
+  double get _shareSum => _picks.length < 2
+      ? 100
+      : _picks.fold<double>(0, (s, p) => s + (parseNumber(p.share.text) ?? 0));
+
+  /// 归一化后的占比（合计正好 100）。
   ///
-  /// 拼配记录（多支豆子）**原样保留**：当前表单还画不出「每支豆子各多少克」
-  /// 的分配界面，硬把总粉量塞给主豆会悄悄改掉别人的配方。
-  /// 等拼配 UI 落地后这里再换成真正的分配逻辑。
+  /// 不直接用输入值，是为了容忍 33.3 + 33.3 + 33.4 这种输入；
+  /// 合计偏离 100 太多的情况在 [_validatePicks] 里已经被拦下。
+  double _shareOf(_BeanPick pick) {
+    if (!_isBlend) return 100;
+    final double sum = _shareSum;
+    if (sum <= 0) return 0;
+    return (parseNumber(pick.share.text) ?? 0) / sum * 100;
+  }
+
+  /// 这支豆子分到的粉量（按当前总粉量与占比实时算出来，给界面显示）。
+  double _gramsOf(_BeanPick pick) {
+    final double total = parseNumber(_dose.text) ?? 0;
+    return roundGrams(total * _shareOf(pick) / 100);
+  }
+
+  /// 保存前的拼配校验。返回 false 表示已经提示过用户，不要继续。
+  bool _validatePicks() {
+    if (!_isBlend) return true;
+
+    final double sum = _shareSum;
+    if ((sum - 100).abs() > 0.5) {
+      _showMessage('各支豆子的占比合计要等于 100%（现在是 ${formatNumber(sum)}%）');
+      return false;
+    }
+    if (_picks.any((p) => p.beanId == null)) {
+      _showMessage('有一支豆子还没选，请选上或删掉这一行');
+      return false;
+    }
+    final List<int> ids = _picks
+        .map((p) => p.beanId)
+        .whereType<int>()
+        .toList(growable: false);
+    if (ids.length != ids.toSet().length) {
+      _showMessage('同一支豆子不能在一条记录里选两次');
+      return false;
+    }
+    return true;
+  }
+
+  /// 把「豆子 + 占比 + 总粉量」换算成记录关联的用量行。
+  ///
+  /// 余量自动扣减（手册 §6.2）就是按这些用量行的 `doseGrams` 走的：
+  /// 新建时各支按各自粉量扣，编辑时按各支的差值补扣，换豆则旧豆回补。
   ///
   /// 未选豆子时返回空列表——既解除了关联，也让仓储把原来扣的余量回补。
-  List<BeanUsage> _syncUsages(BrewLog base, double? doseGrams) {
-    final int? beanId = _beanId;
-    if (beanId == null) return const <BeanUsage>[];
-    if (base.beanUsages.length > 1) return base.beanUsages;
+  List<BeanUsage> _usagesFromPicks() {
+    final List<_BeanPick> picks = _picks
+        .where((p) => p.beanId != null)
+        .toList(growable: false);
+    if (picks.isEmpty) return const <BeanUsage>[];
 
-    final double grams = doseGrams ?? 0;
-    final BeanUsage? previous = base.beanUsages.isEmpty
-        ? null
-        : base.beanUsages.first;
-
-    // 换了豆子：丢掉旧用量（仓储按 beanId 差值回补旧豆），换上新豆。
-    // 批次留空，让仓储按烘焙日期自动挑。
-    if (previous == null || previous.beanId != beanId) {
-      return <BeanUsage>[BeanUsage(beanId: beanId, doseGrams: grams)];
+    final double total = parseNumber(_dose.text) ?? 0;
+    if (picks.length == 1) {
+      final _BeanPick only = picks.first;
+      return <BeanUsage>[
+        BeanUsage(beanId: only.beanId, batchId: only.batchId, doseGrams: total),
+      ];
     }
-    return <BeanUsage>[previous.copyWith(doseGrams: grams)];
+
+    // 拼配：按归一化占比分摊总粉量。**最后一支吃掉四舍五入的零头**，
+    // 这样各支粉量之和一定等于总粉量，不会出现「加总比总粉量多 0.1g」。
+    final List<BeanUsage> usages = <BeanUsage>[];
+    double assigned = 0;
+    for (int i = 0; i < picks.length; i++) {
+      final _BeanPick pick = picks[i];
+      final bool isLast = i == picks.length - 1;
+      final double grams = isLast
+          ? roundGrams(total - assigned)
+          : roundGrams(total * _shareOf(pick) / 100);
+      assigned = roundGrams(assigned + grams);
+      usages.add(
+        BeanUsage(
+          beanId: pick.beanId,
+          batchId: pick.batchId,
+          doseGrams: grams < 0 ? 0 : grams,
+          position: i,
+        ),
+      );
+    }
+    return usages;
+  }
+
+  void _addPick() {
+    setState(() {
+      if (_picks.length == 1) {
+        // 1 → 2：默认对半分，省得用户先算一遍
+        _picks[0].share.text = '50';
+        _picks.add(_BeanPick(share: 50));
+      } else {
+        _picks.add(_BeanPick(share: 0));
+      }
+    });
+  }
+
+  void _removePick(int index) {
+    setState(() {
+      // 拿掉一支就把它的粉量从总粉量里减掉，剩下几支实际克数**保持不变**。
+      // 否则「删掉 30% 那支」会把这 30% 悄悄转给剩下的豆子，余量跟着多扣。
+      final double removed = _gramsOf(_picks[index]);
+      final double? total = parseNumber(_dose.text);
+      if (_isBlend && total != null) {
+        _dose.text = numberToText(roundGrams(total - removed));
+      }
+      _picks.removeAt(index).dispose();
+      if (_picks.length == 1) _picks.first.share.text = '100';
+    });
   }
 
   Future<void> _delete() async {
@@ -371,7 +533,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       _heatLevel.text = copied.heatLevel ?? '';
       _yieldGrams.text = numberToText(copied.yieldGrams);
       _method = copied.method;
-      _beanId = copied.beanId;
+      _resetPicks(copied);
       _grinderId = copied.grinderId;
       _preheatUpperChamber = copied.preheatUpperChamber;
       _rating = null;
@@ -384,6 +546,16 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// 用「复制上次」的数据整体替换豆子列表（拼配也一起复制）。
+  void _resetPicks(BrewLog copied) {
+    for (final _BeanPick pick in _picks) {
+      pick.dispose();
+    }
+    _picks
+      ..clear()
+      ..addAll(_initialPicks(copied));
   }
 
   @override
@@ -428,7 +600,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                   isRequired: true,
                   child: _buildMethodSelector(),
                 ),
-                LabeledField(label: '豆子', child: _buildBeanSelector(beans)),
+                LabeledField(
+                  label: '豆子',
+                  helper: _isBlend ? '拼配：按占比分摊下面的总粉量' : null,
+                  child: _buildBeanPicker(beans),
+                ),
                 LabeledField(
                   label: '磨豆机',
                   child: _buildGrinderSelector(grinders),
@@ -481,7 +657,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
               title: '核心参数',
               children: <Widget>[
                 LabeledField(
-                  label: '粉量',
+                  label: _isBlend ? '总粉量' : '粉量',
+                  helper: _isBlend ? '下面几支豆子的粉量加起来就是它' : null,
                   child: NumberField(
                     key: const Key('brew.dose'),
                     controller: _dose,
@@ -717,50 +894,200 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     );
   }
 
-  Widget _buildBeanSelector(List<CoffeeBean> beans) {
+  /// 豆子选择（含拼配）。
+  ///
+  /// 单支时不显示占比——那一支就是全部；一旦加到两支以上，每行多出「占比」，
+  /// 各支按归一化占比分摊「核心参数」里的总粉量。这样总粉量始终只有一个
+  /// 真值，不会出现「各支加起来和总粉量对不上」。
+  Widget _buildBeanPicker(List<CoffeeBean> beans) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        DropdownButtonFormField<int?>(
-          initialValue: _beanId,
-          isExpanded: true,
-          decoration: const InputDecoration(
-            isDense: true,
-            border: OutlineInputBorder(),
-            hintText: '选择豆子',
+        for (int i = 0; i < _picks.length; i++) _buildBeanRow(beans, i),
+        if (_isBlend) _buildShareSummary(),
+        if (_orphanUsageCount > 0)
+          FormHint(
+            message: _orphanUsageCount == 1
+                ? '这条记录里有一支豆子已被删除；保存后它的用量行不再保留。'
+                : '这条记录里有 $_orphanUsageCount 支豆子已被删除；保存后它们的用量行不再保留。',
+            isWarning: true,
           ),
-          items: <DropdownMenuItem<int?>>[
-            const DropdownMenuItem<int?>(child: Text('未指定')),
-            for (final CoffeeBean bean in beans)
-              DropdownMenuItem<int?>(
-                value: bean.id,
-                child: Text(
-                  // 余量在批次上，这里只显示豆子名；余量提示见下方。
-                  bean.name,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-          ],
-          onChanged: (int? value) => setState(() => _beanId = value),
-        ),
         if (beans.isEmpty)
           FormHint(
             message: '还没有咖啡豆。建议先添加一支，记录才能关联到豆子并自动扣减余量。',
             isWarning: true,
           ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _saving ? null : _addBean,
-            icon: const Icon(Icons.add, size: 18),
-            label: const Text('新增豆子'),
-          ),
+        Wrap(
+          spacing: 4,
+          children: <Widget>[
+            TextButton.icon(
+              key: const Key('brew.addBean'),
+              onPressed: _saving ? null : _addBean,
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('新增豆子'),
+            ),
+            if (beans.isNotEmpty)
+              TextButton.icon(
+                key: const Key('brew.addPick'),
+                onPressed: _saving ? null : _addPick,
+                icon: const Icon(Icons.blender_outlined, size: 18),
+                label: Text(_isBlend ? '再加一支' : '加一支（拼配）'),
+              ),
+          ],
         ),
       ],
     );
   }
 
+  Widget _buildBeanRow(List<CoffeeBean> beans, int index) {
+    final _BeanPick pick = _picks[index];
+    // 同一支豆子不能在一条记录里选两次（仓储按 beanId 汇总差值，重复会算错），
+    // 所以别的行已经选过的豆子不在这一行的候选里。
+    final Set<int> takenElsewhere = <int>{
+      for (int i = 0; i < _picks.length; i++)
+        if (i != index && _picks[i].beanId != null) _picks[i].beanId!,
+    };
+    // 按 id 去重：豆子列表理论上不会重复，但一旦重复，
+    // DropdownButton 会因为「同一 value 有多个 item」直接抛断言。
+    final Map<int, CoffeeBean> byId = <int, CoffeeBean>{
+      for (final CoffeeBean bean in beans)
+        if (bean.id != null) bean.id!: bean,
+    };
+
+    final List<DropdownMenuItem<int?>> items = <DropdownMenuItem<int?>>[
+      const DropdownMenuItem<int?>(child: Text('未指定')),
+      for (final CoffeeBean bean in byId.values)
+        if (bean.id == pick.beanId || !takenElsewhere.contains(bean.id))
+          DropdownMenuItem<int?>(
+            value: bean.id,
+            child: Text(
+              // 余量在批次上，这里只显示豆子名。
+              bean.name,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+    ];
+    // 选中的豆子还不在候选里（豆子列表尚在加载，或这支豆子刚被删掉）：
+    // 补一个占位项，否则 DropdownButton 会因为「没有对应 value 的 item」抛断言。
+    // 列表加载完/换成真名后，占位项自然消失。
+    if (pick.beanId != null &&
+        !items.any(
+          (DropdownMenuItem<int?> item) => item.value == pick.beanId,
+        )) {
+      items.add(
+        DropdownMenuItem<int?>(
+          value: pick.beanId,
+          child: Text(
+            pick.beanName ?? '豆子#${pick.beanId}',
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      );
+    }
+
+    final Widget dropdown = DropdownButtonFormField<int?>(
+      key: Key('brew.bean.$index'),
+      initialValue: pick.beanId,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        isDense: true,
+        border: OutlineInputBorder(),
+        hintText: '选择豆子',
+      ),
+      items: items,
+      onChanged: (int? value) => setState(() {
+        pick.beanId = value;
+        pick.beanName = null;
+        // 换了豆子，原来那一袋不能再沿用，交回给仓储按烘焙日期重挑。
+        if (pick.batchId != null) pick.batchId = null;
+      }),
+    );
+
+    if (!_isBlend) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 4),
+        child: dropdown,
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(child: dropdown),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 104,
+                child: NumberField(
+                  key: Key('brew.share.$index'),
+                  controller: pick.share,
+                  hintText: '占比',
+                  suffixText: '%',
+                  onChanged: (_) => setState(() {}),
+                ),
+              ),
+              IconButton(
+                tooltip: '删掉这一支',
+                onPressed: _saving ? null : () => _removePick(index),
+                icon: const Icon(Icons.close, size: 18),
+              ),
+            ],
+          ),
+          if (pick.beanId != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 2, bottom: 2),
+              child: Text(
+                '这一支约 ${formatNumber(_gramsOf(pick))} g',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShareSummary() {
+    final double sum = _shareSum;
+    final bool ok = (sum - 100).abs() <= 0.5;
+    final double total = parseNumber(_dose.text) ?? 0;
+
+    return FormHint(
+      message: ok
+          ? '占比合计 100%，共 ${formatNumber(total)} g 由 ${_picks.length} 支豆子分摊'
+          : '占比合计 ${formatNumber(sum)}%，要凑成 100% 才能保存',
+      isWarning: !ok,
+    );
+  }
+
   Widget _buildGrinderSelector(List<Grinder> grinders) {
+    final Map<int, Grinder> byId = <int, Grinder>{
+      for (final Grinder grinder in grinders)
+        if (grinder.id != null) grinder.id!: grinder,
+    };
+    final List<DropdownMenuItem<int?>> items = <DropdownMenuItem<int?>>[
+      const DropdownMenuItem<int?>(child: Text('未指定')),
+      for (final Grinder grinder in byId.values)
+        DropdownMenuItem<int?>(
+          value: grinder.id,
+          child: Text(grinder.displayName(), overflow: TextOverflow.ellipsis),
+        ),
+    ];
+    // 同豆子下拉：列表还在加载（或这台磨豆机刚被删）时补一个占位项，
+    // 否则 initialValue 找不到对应的 item，DropdownButton 会直接抛断言。
+    if (_grinderId != null &&
+        !items.any((DropdownMenuItem<int?> item) => item.value == _grinderId)) {
+      items.add(
+        DropdownMenuItem<int?>(
+          value: _grinderId,
+          child: const Text('原磨豆机', overflow: TextOverflow.ellipsis),
+        ),
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -772,17 +1099,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
             border: OutlineInputBorder(),
             hintText: '选择磨豆机',
           ),
-          items: <DropdownMenuItem<int?>>[
-            const DropdownMenuItem<int?>(child: Text('未指定')),
-            for (final Grinder grinder in grinders)
-              DropdownMenuItem<int?>(
-                value: grinder.id,
-                child: Text(
-                  grinder.displayName(),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-          ],
+          items: items,
           onChanged: (int? value) => setState(() => _grinderId = value),
         ),
         Align(
@@ -798,16 +1115,43 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   }
 
   /// 内联新增豆子：保存后自动选中新豆。
+  ///
+  /// 挂在第一个还空着的行上；都选满了就新开一行（拼配时这是常见动作）。
   Future<void> _addBean() async {
     final bool changed = await BeanFormPage.show(context);
     if (!mounted || !changed) return;
     final List<CoffeeBean> beans = await ref
         .read(beanRepositoryProvider)
         .getAll();
-    if (!mounted) return;
+    if (!mounted || beans.isEmpty) return;
+    // 自增 id 最大的就是刚建的那支。列表按 createdAt 倒序，但 Drift 的
+    // dateTime 只到秒，同一秒建的两支会并列，所以这里不看排序看 id。
+    final int newId = _newestId(beans.map((CoffeeBean b) => b.id));
+
     setState(() {
-      _beanId = beans.isEmpty ? _beanId : beans.first.id;
+      final _BeanPick? empty = _picks
+          .where((p) => p.beanId == null)
+          .firstOrNull;
+      if (empty != null) {
+        empty.beanId = newId;
+        empty.batchId = null;
+      } else {
+        _addPickSilently(newId);
+      }
     });
+  }
+
+  static int _newestId(Iterable<int?> ids) =>
+      ids.whereType<int>().reduce((int a, int b) => a > b ? a : b);
+
+  /// 加一行并选好豆子。调用方负责已经处在 `setState` 里或自行刷新。
+  void _addPickSilently(int beanId) {
+    if (_picks.length == 1) {
+      _picks[0].share.text = '50';
+      _picks.add(_BeanPick(beanId: beanId, share: 50));
+    } else {
+      _picks.add(_BeanPick(beanId: beanId, share: 0));
+    }
   }
 
   /// 内联新增磨豆机：保存后自动选中新磨豆机。
@@ -817,10 +1161,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     final List<Grinder> grinders = await ref
         .read(grinderRepositoryProvider)
         .getAll();
-    if (!mounted) return;
-    setState(() {
-      _grinderId = grinders.isEmpty ? _grinderId : grinders.last.id;
-    });
+    if (!mounted || grinders.isEmpty) return;
+    final int newId = _newestId(grinders.map((Grinder g) => g.id));
+    setState(() => _grinderId = newId);
   }
 
   String? _ratioHint() {
@@ -837,4 +1180,25 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     if (seconds == null) return null;
     return '即 ${formatDuration(seconds)}';
   }
+}
+
+/// 表单里的一支豆子。
+///
+/// [share] 是拼配占比的输入框（单支时不显示，恒等于 100%）。
+/// [batchId] 只在编辑已有记录时带出来——新建时留空，让仓储按烘焙日期
+/// 自己挑一袋（见 `BeanRepository.adjustStock`）。
+class _BeanPick {
+  _BeanPick({this.beanId, this.batchId, this.beanName, double share = 100})
+    : share = TextEditingController(text: numberToText(share));
+
+  int? beanId;
+  int? batchId;
+
+  /// 豆子名快照（来自用量行）。豆子列表还没加载出来时用它显示，
+  /// 免得下拉框既没有候选也说不清选的是谁。
+  String? beanName;
+
+  final TextEditingController share;
+
+  void dispose() => share.dispose();
 }

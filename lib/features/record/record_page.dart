@@ -58,7 +58,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
         .where((BrewLog log) {
           final Grinder? grinder = grinders[log.grinderId];
           final String haystack = <String>[
-            beanNames[log.beanId] ?? '',
+            // 拼配时 `beanLabel` 是「A + B」，只按主豆搜会漏掉第二支。
+            log.beanLabel ?? beanNames[log.beanId] ?? '',
             log.method.label,
             if (grinder != null) grinder.brand,
             if (grinder != null) grinder.model,
@@ -251,7 +252,8 @@ class _BrewLogCard extends StatelessWidget {
                 children: <Widget>[
                   Expanded(
                     child: Text(
-                      beanName ?? '未指定豆子',
+                      // 拼配时用「A + B」，没有用量行才退回主豆名。
+                      log.beanLabel ?? beanName ?? '未指定豆子',
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -273,6 +275,13 @@ class _BrewLogCard extends StatelessWidget {
                   Text(_grindLabel(log, grinder), style: mutedStyle),
                 ],
               ),
+              if (log.isBlend) ...<Widget>[
+                const SizedBox(height: 8),
+                Text(
+                  '拼配 ${log.beanUsages.map((BeanUsage u) => '${_formatNumber(u.doseGrams)} g').join(' + ')}',
+                  style: mutedStyle,
+                ),
+              ],
               const SizedBox(height: 10),
               Wrap(
                 spacing: 14,
