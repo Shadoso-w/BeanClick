@@ -78,24 +78,28 @@
 - 测试脚手架新增 `addBeanWithBatch` / `addBrewLog` 组合夹具，以及
   `fillField` / `readField` / `tapKey` / `tapSaveButton` 等表单操作扩展
 
-### 验证结果（M2.6 实测）
+### 验证结果
 
 | 命令 | 结果 |
 |---|---|
 | `flutter analyze` | 0 问题 |
 | `dart format --output=none --set-exit-if-changed .` | 0 处改动 |
-| `flutter test` | **256 个用例全部通过** |
-| `flutter build apk --release --split-per-abi` | 成功，2.39 分钟，release 签名（`CN=BeanClick`） |
+| `flutter test` | **256 个用例全部通过**（M2.6 时是 242） |
+| `flutter build apk --release --split-per-abi` | 成功，1.61 分钟，release 签名（`CN=BeanClick`） |
 
-| ABI | M2.5 | M2.6 |
-|---|---|---|
-| `app-armeabi-v7a-release.apk` | 17.21 MB | 17.46 MB |
-| `app-arm64-v8a-release.apk` | 19.67 MB | 19.93 MB |
-| `app-x86_64-release.apk` | 21.12 MB | 21.32 MB |
+| ABI | M2.5 | M2.6 | M2.7 |
+|---|---|---|---|
+| `app-armeabi-v7a-release.apk` | 17.21 MB | 17.46 MB | 17.46 MB |
+| `app-arm64-v8a-release.apk` | 19.67 MB | 19.93 MB | 19.93 MB |
+| `app-x86_64-release.apk` | 21.12 MB | 21.32 MB | 21.32 MB |
+
+> M2.7 与 M2.6 的包体只差几十字节（arm64 从 20,900,363 到 20,900,439），
+> 这次改的都是界面代码。M2.7 的 APK 已在小米 11（Android 14）上覆盖安装并启动，
+> logcat 无异常 —— 也就是真机上跑通了 v4 → v5 的加列迁移。
 
 ### 计划中
 
-- M3：内部测试版 APK 与真机验证（手机上覆盖安装可验证 v1 → v4 迁移）
+- M3：内部测试版 APK 与真机验证（CSV BOM 在 Excel 里、冷启动）
 
 ---
 

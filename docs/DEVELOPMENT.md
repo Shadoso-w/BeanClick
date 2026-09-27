@@ -431,21 +431,26 @@ keytool -genkeypair -v `
 | `flutter analyze` | `No issues found!`，退出码 0 |
 | `dart format --output=none --set-exit-if-changed .` | 0 处改动，退出码 0（CI 同款检查） |
 | `dart run build_runner build --delete-conflicting-outputs` | 成功；生成物与仓库里的 `database.g.dart` 完全一致（无 diff） |
-| `flutter test` | **242 个测试全部通过**，退出码 0（M2.6：批次/拼配/扩展属性/迁移/快照） |
-| `flutter build apk --release --split-per-abi` | 成功，**2.39 分钟**（M2.6，release 签名） |
+| `flutter test` | **256 个测试全部通过**，退出码 0（M2.7：记录交互 + M2.6 的批次/拼配/迁移/快照） |
+| `flutter build apk --release --split-per-abi` | 成功，**1.61 分钟**（M2.7，release 签名） |
 
 包体（验收清单要求 < 30MB）：
 
-| ABI | M1 | M2 | M2.5 | **M2.6** |
-|---|---|---|---|---|
-| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB | **17.46 MB** |
-| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB | **19.93 MB** |
-| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB | **21.32 MB** |
+| ABI | M1 | M2 | M2.5 | M2.6 | **M2.7** |
+|---|---|---|---|---|---|
+| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB | 17.46 MB | **17.46 MB** |
+| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB | 19.93 MB | **19.93 MB** |
+| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB | 21.32 MB | **21.32 MB** |
+
+M2.7 与 M2.6 只差几十字节（arm64 `20,900,363` → `20,900,439`），这次改的都是界面代码。
+
+真机（小米 11 / Android 14，`M2011K2C`）：M2.7 的 APK 覆盖安装后启动，
+logcat 无异常 —— 真机上跑通了 v4 → v5 的加列迁移。
 
 M2.6 的 APK 实测（`apksigner verify` / `aapt2 dump badging`）：
 
 - 签名：`CN=BeanClick`，SHA-256 `d967a4c0…6d51`（内测密钥，与 M2.5 同一把，
-  可以直接覆盖安装以验证 v1 → v4 迁移）
+  可以直接覆盖安装以验证迁移）
 - `versionName 0.1.0`、`versionCode 2001`、`minSdk 24`、`targetSdk 36`、应用名 `豆刻`
 
 ### 构建相关的两个坑
