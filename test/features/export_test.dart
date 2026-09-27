@@ -24,7 +24,9 @@ void main() {
 
   setUp(() {
     service = _RecordingExportService();
-    harness.useOverrides(() => [exportServiceProvider.overrideWithValue(service)]);
+    harness.useOverrides(
+      () => [exportServiceProvider.overrideWithValue(service)],
+    );
   });
 
   Future<void> gotoSettings(WidgetTester tester) async {
@@ -49,10 +51,10 @@ void main() {
 
   /// 对话框里当前选中的格式。
   ExportFormat selectedFormat(WidgetTester tester) {
-    final RadioGroup<ExportFormat> group =
-        tester.widget<RadioGroup<ExportFormat>>(
-      find.byType(RadioGroup<ExportFormat>),
-    );
+    final RadioGroup<ExportFormat> group = tester
+        .widget<RadioGroup<ExportFormat>>(
+          find.byType(RadioGroup<ExportFormat>),
+        );
     return group.groupValue!;
   }
 
@@ -187,10 +189,10 @@ class _RecordingExportService implements Exporter {
   }
 
   static ExportDocument _emptyDocument() => ExportDocument(
-        exportedAt: DateTime(2026, 3, 7, 9, 5),
-        beans: const <CoffeeBean>[],
-        grinders: const <Grinder>[],
-        brewLogs: const <BrewLog>[],
-        recipes: const <Recipe>[],
-      );
+    exportedAt: DateTime(2026, 3, 7, 9, 5),
+    beans: const <CoffeeBean>[],
+    grinders: const <Grinder>[],
+    brewLogs: const <BrewLog>[],
+    recipes: const <Recipe>[],
+  );
 }

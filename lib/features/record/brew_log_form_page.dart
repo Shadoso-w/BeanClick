@@ -124,8 +124,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   void initState() {
     super.initState();
     final BrewLog? source = _source;
-    _grindSetting =
-        TextEditingController(text: numberToText(source?.grindSetting));
+    _grindSetting = TextEditingController(
+      text: numberToText(source?.grindSetting),
+    );
     _grindClicks = TextEditingController(
       text: source?.grindClicks?.toString() ?? '',
     );
@@ -139,14 +140,16 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     _flavors = TextEditingController(text: source?.flavorTags.join('、') ?? '');
     _notes = TextEditingController(text: source?.notes ?? '');
     _tds = TextEditingController(text: numberToText(source?.tds));
-    _extractionYield =
-        TextEditingController(text: numberToText(source?.extractionYield));
-    _waterPpm =
-        TextEditingController(text: source?.waterPpm?.toString() ?? '');
-    _ambientTemp =
-        TextEditingController(text: numberToText(source?.ambientTemp));
-    _ambientHumidity =
-        TextEditingController(text: numberToText(source?.ambientHumidity));
+    _extractionYield = TextEditingController(
+      text: numberToText(source?.extractionYield),
+    );
+    _waterPpm = TextEditingController(text: source?.waterPpm?.toString() ?? '');
+    _ambientTemp = TextEditingController(
+      text: numberToText(source?.ambientTemp),
+    );
+    _ambientHumidity = TextEditingController(
+      text: numberToText(source?.ambientHumidity),
+    );
     _beanTemp = TextEditingController(text: numberToText(source?.beanTemp));
     _pressure = TextEditingController(text: numberToText(source?.pressure));
     _heatLevel = TextEditingController(text: source?.heatLevel ?? '');
@@ -198,7 +201,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     setState(() => _saving = true);
 
     final DateTime now = DateTime.now();
-    final BrewLog base = widget.existing ??
+    final BrewLog base =
+        widget.existing ??
         BrewLog(brewedAt: _brewedAt, createdAt: now, updatedAt: now);
 
     final int? totalTime = int.tryParse(_totalTime.text.trim());
@@ -227,8 +231,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       pressure: parseNumber(_pressure.text),
       heatLevel: _heatLevel.text.trim().isEmpty ? null : _heatLevel.text.trim(),
       yieldGrams: parseNumber(_yieldGrams.text),
-      preheatUpperChamber:
-          _method == BrewMethod.mokaPot ? _preheatUpperChamber : null,
+      preheatUpperChamber: _method == BrewMethod.mokaPot
+          ? _preheatUpperChamber
+          : null,
       updatedAt: now,
       clearBeanId: _beanId == null,
       clearGrinderId: _grinderId == null,
@@ -254,8 +259,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     );
 
     try {
-      final bool autoDeduct =
-          await ref.read(settingsRepositoryProvider).getAutoDeductStock();
+      final bool autoDeduct = await ref
+          .read(settingsRepositoryProvider)
+          .getAutoDeductStock();
       final SaveBrewLogResult result = await ref
           .read(brewLogRepositoryProvider)
           .save(log, autoDeductStock: autoDeduct);
@@ -307,7 +313,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   /// 手动再复制一次「上次」。仅新增时有意义。
   Future<void> _applyCopyFromLast() async {
-    final BrewLog? latest = await ref.read(brewLogRepositoryProvider).getLatest();
+    final BrewLog? latest = await ref
+        .read(brewLogRepositoryProvider)
+        .getLatest();
     if (!mounted) return;
     if (latest == null) {
       _showMessage('还没有可复制的记录');
@@ -390,10 +398,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                   isRequired: true,
                   child: _buildMethodSelector(),
                 ),
-                LabeledField(
-                  label: '豆子',
-                  child: _buildBeanSelector(beans),
-                ),
+                LabeledField(label: '豆子', child: _buildBeanSelector(beans)),
                 LabeledField(
                   label: '磨豆机',
                   child: _buildGrinderSelector(grinders),
@@ -436,7 +441,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                     value: _brewedAt,
                     hintText: '选择冲煮时间',
                     lastDate: DateTime.now().add(const Duration(days: 1)),
-                    onPick: (DateTime value) => setState(() => _brewedAt = value),
+                    onPick: (DateTime value) =>
+                        setState(() => _brewedAt = value),
                   ),
                 ),
               ],
@@ -503,7 +509,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                     label: '火力',
                     child: EnumSelector<String>(
                       values: const <String>['小火', '中火', '大火'],
-                      selected: _heatLevel.text.isEmpty ? null : _heatLevel.text,
+                      selected: _heatLevel.text.isEmpty
+                          ? null
+                          : _heatLevel.text,
                       allowDeselect: true,
                       labelOf: (String value) => value,
                       onSelected: (String? value) =>
@@ -651,9 +659,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     final List<BrewMethod> visible = showAll
         ? BrewMethod.values
         : BrewMethod.values
-            .where((BrewMethod m) =>
-                BrewMethod.primary.contains(m) || m == _method)
-            .toList();
+              .where(
+                (BrewMethod m) =>
+                    BrewMethod.primary.contains(m) || m == _method,
+              )
+              .toList();
 
     return Wrap(
       spacing: 8,
@@ -760,7 +770,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   Future<void> _addBean() async {
     final bool changed = await BeanFormPage.show(context);
     if (!mounted || !changed) return;
-    final List<CoffeeBean> beans = await ref.read(beanRepositoryProvider).getAll();
+    final List<CoffeeBean> beans = await ref
+        .read(beanRepositoryProvider)
+        .getAll();
     if (!mounted) return;
     setState(() {
       _beanId = beans.isEmpty ? _beanId : beans.first.id;
@@ -771,8 +783,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   Future<void> _addGrinder() async {
     final bool changed = await GrinderFormPage.show(context);
     if (!mounted || !changed) return;
-    final List<Grinder> grinders =
-        await ref.read(grinderRepositoryProvider).getAll();
+    final List<Grinder> grinders = await ref
+        .read(grinderRepositoryProvider)
+        .getAll();
     if (!mounted) return;
     setState(() {
       _grinderId = grinders.isEmpty ? _grinderId : grinders.last.id;

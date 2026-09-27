@@ -45,8 +45,8 @@ class BrewLogRepository {
         (t) => OrderingTerm(expression: t.brewedAt, mode: OrderingMode.desc),
       ]);
     return query.watch().map(
-          (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
-        );
+      (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
+    );
   }
 
   /// 调磨对比：同一支豆 + 同一台磨，按研磨刻度升序（手册 §8）。
@@ -58,8 +58,8 @@ class BrewLogRepository {
         (t) => OrderingTerm(expression: t.brewedAt, mode: OrderingMode.desc),
       ]);
     return query.watch().map(
-          (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
-        );
+      (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
+    );
   }
 
   Future<List<BrewLog>> getAll() async {
@@ -72,8 +72,9 @@ class BrewLogRepository {
   }
 
   Future<BrewLog?> getById(int id) async {
-    final row = await (_db.select(_db.brewLogs)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.brewLogs,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     return row?.toEntity();
   }
 
@@ -153,11 +154,12 @@ class BrewLogRepository {
       }
 
       // --- 编辑 ---
-      final previous = await (_db.select(logs)
-            ..where((t) => t.id.equals(existingId)))
-          .getSingleOrNull();
-      await (_db.update(logs)..where((t) => t.id.equals(existingId)))
-          .write(log.copyWith(updatedAt: now).toCompanion());
+      final previous = await (_db.select(
+        logs,
+      )..where((t) => t.id.equals(existingId))).getSingleOrNull();
+      await (_db.update(logs)..where((t) => t.id.equals(existingId))).write(
+        log.copyWith(updatedAt: now).toCompanion(),
+      );
 
       if (autoDeductStock) {
         final previousBeanId = previous?.beanId;
@@ -174,8 +176,9 @@ class BrewLogRepository {
         } else {
           // 换了豆子：旧豆回补原粉量，新豆扣减新粉量。
           if (previousBeanId != null && previousDose != 0) {
-            adjustments
-                .add(await _beans.adjustStock(previousBeanId, -previousDose));
+            adjustments.add(
+              await _beans.adjustStock(previousBeanId, -previousDose),
+            );
           }
           if (newBeanId != null && newDose != 0) {
             adjustments.add(await _beans.adjustStock(newBeanId, newDose));

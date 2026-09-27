@@ -345,4 +345,3 @@ String _formatNumber(double value) {
   if (value == value.roundToDouble()) return value.toStringAsFixed(0);
   return value.toStringAsFixed(1);
 }
-

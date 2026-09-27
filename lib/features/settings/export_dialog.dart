@@ -14,9 +14,8 @@ Future<ExportFormat?> showExportFormatDialog(
 }) {
   return showDialog<ExportFormat>(
     context: context,
-    builder: (BuildContext context) => _ExportFormatDialog(
-      defaultFormat: defaultFormat,
-    ),
+    builder: (BuildContext context) =>
+        _ExportFormatDialog(defaultFormat: defaultFormat),
   );
 }
 
@@ -62,8 +61,8 @@ class _ExportFormatDialogState extends State<_ExportFormatDialog> {
           Text(
             '数据只存在这台设备上，导出文件由你自己保管。',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -97,10 +96,7 @@ Future<bool> runExport(
       _show(messenger, '已导出 ${outcome.fileName}');
     } else {
       // 文件其实已经写成功了，只是没能唤起分享面板。
-      _show(
-        messenger,
-        '已保存 ${outcome.fileName}（未能唤起分享：${outcome.shareError}）',
-      );
+      _show(messenger, '已保存 ${outcome.fileName}（未能唤起分享：${outcome.shareError}）');
     }
     return true;
   } catch (error) {
@@ -113,9 +109,6 @@ void _show(ScaffoldMessengerState messenger, String message) {
   messenger
     ..hideCurrentSnackBar()
     ..showSnackBar(
-      SnackBar(
-        content: Text(message),
-        duration: const Duration(seconds: 5),
-      ),
+      SnackBar(content: Text(message), duration: const Duration(seconds: 5)),
     );
 }

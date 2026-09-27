@@ -21,13 +21,16 @@ void main() {
   test('建库后包含设计稿 §1–§5 的全部表', () async {
     final tables = await tableNames();
 
-    expect(tables, containsAll(<String>[
-      'coffee_beans',
-      'grinders',
-      'brew_logs',
-      'recipes',
-      'app_settings',
-    ]));
+    expect(
+      tables,
+      containsAll(<String>[
+        'coffee_beans',
+        'grinders',
+        'brew_logs',
+        'recipes',
+        'app_settings',
+      ]),
+    );
   });
 
   test('schemaVersion 为 1', () {
@@ -41,7 +44,9 @@ void main() {
   });
 
   test('brew_logs 的三个外键都指向正确的表且为 SET NULL', () async {
-    final rows = await db.customSelect('PRAGMA foreign_key_list(brew_logs)').get();
+    final rows = await db
+        .customSelect('PRAGMA foreign_key_list(brew_logs)')
+        .get();
 
     final byColumn = {
       for (final row in rows)
@@ -167,11 +172,17 @@ void main() {
     await db.customStatement(
       "INSERT INTO app_settings (key, value) VALUES ('x', 'y')",
     );
-    expect((await db.customSelect('SELECT * FROM app_settings').get()).length, 8);
+    expect(
+      (await db.customSelect('SELECT * FROM app_settings').get()).length,
+      8,
+    );
 
     await db.clearAll();
 
     expect(await tableNames(), contains('app_settings'));
-    expect((await db.customSelect('SELECT * FROM app_settings').get()), isEmpty);
+    expect(
+      (await db.customSelect('SELECT * FROM app_settings').get()),
+      isEmpty,
+    );
   });
 }

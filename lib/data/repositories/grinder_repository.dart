@@ -17,8 +17,8 @@ class GrinderRepository {
         (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.asc),
       ]);
     return query.watch().map(
-          (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
-        );
+      (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
+    );
   }
 
   Future<List<Grinder>> getAll() async {
@@ -31,15 +31,15 @@ class GrinderRepository {
   }
 
   Future<Grinder?> getById(int id) async {
-    final row = await (_db.select(_db.grinders)..where((t) => t.id.equals(id)))
-        .getSingleOrNull();
+    final row = await (_db.select(
+      _db.grinders,
+    )..where((t) => t.id.equals(id))).getSingleOrNull();
     return row?.toEntity();
   }
 
   Future<int> save(Grinder grinder) async {
     final companion = grinder.copyWith(updatedAt: DateTime.now()).toCompanion();
-    final id =
-        await _db.into(_db.grinders).insertOnConflictUpdate(companion);
+    final id = await _db.into(_db.grinders).insertOnConflictUpdate(companion);
     return grinder.id ?? id;
   }
 

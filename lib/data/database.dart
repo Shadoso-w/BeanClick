@@ -86,8 +86,9 @@ class CoffeeBeans extends Table {
   DateTimeColumn get roastDate => dateTime().nullable()();
 
   /// 风味标签，JSON 数组。
-  TextColumn get flavorTags =>
-      text().map(const StringListConverter()).withDefault(const Constant('[]'))();
+  TextColumn get flavorTags => text()
+      .map(const StringListConverter())
+      .withDefault(const Constant('[]'))();
 
   /// 余量（g），下限 0，由 Repository 保证。
   RealColumn get remainingGrams => real().withDefault(const Constant(0.0))();
@@ -121,7 +122,8 @@ class Grinders extends Table {
   TextColumn get scaleUnit =>
       textEnum<GrindScaleUnit>().withDefault(const Constant('click'))();
 
-  RealColumn get zeroPoint => real().nullable().withDefault(const Constant(0.0))();
+  RealColumn get zeroPoint =>
+      real().nullable().withDefault(const Constant(0.0))();
 
   IntColumn get clicksPerRevolution => integer().nullable()();
 
@@ -140,17 +142,23 @@ class BrewLogs extends Table {
   IntColumn get id => integer().autoIncrement()();
 
   // --- 外键：豆子/磨豆机/配方被删除时置空，保留历史记录 ---
-  IntColumn get beanId => integer()
-      .nullable()
-      .references(CoffeeBeans, #id, onDelete: KeyAction.setNull)();
+  IntColumn get beanId => integer().nullable().references(
+    CoffeeBeans,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
 
-  IntColumn get grinderId => integer()
-      .nullable()
-      .references(Grinders, #id, onDelete: KeyAction.setNull)();
+  IntColumn get grinderId => integer().nullable().references(
+    Grinders,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
 
-  IntColumn get recipeId => integer()
-      .nullable()
-      .references(Recipes, #id, onDelete: KeyAction.setNull)();
+  IntColumn get recipeId => integer().nullable().references(
+    Recipes,
+    #id,
+    onDelete: KeyAction.setNull,
+  )();
 
   TextColumn get method =>
       textEnum<BrewMethod>().withDefault(const Constant('pourOver'))();
@@ -176,8 +184,9 @@ class BrewLogs extends Table {
   /// 评分 1–5。
   IntColumn get rating => integer().nullable()();
 
-  TextColumn get flavorTags =>
-      text().map(const StringListConverter()).withDefault(const Constant('[]'))();
+  TextColumn get flavorTags => text()
+      .map(const StringListConverter())
+      .withDefault(const Constant('[]'))();
 
   TextColumn get notes => text().nullable()();
 
@@ -284,19 +293,19 @@ class AppDatabase extends _$AppDatabase {
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-        onCreate: (m) async {
-          await m.createAll();
-          await _seedDefaultSettings();
-        },
-        onUpgrade: (m, from, to) async {
-          // v1 是首个版本，暂无迁移。
-          // 将来改表时在这里按 from→to 逐个补 Migration，并递增 schemaVersion。
-        },
-        beforeOpen: (details) async {
-          // SQLite 默认不启用外键，必须显式开启。
-          await customStatement('PRAGMA foreign_keys = ON');
-        },
-      );
+    onCreate: (m) async {
+      await m.createAll();
+      await _seedDefaultSettings();
+    },
+    onUpgrade: (m, from, to) async {
+      // v1 是首个版本，暂无迁移。
+      // 将来改表时在这里按 from→to 逐个补 Migration，并递增 schemaVersion。
+    },
+    beforeOpen: (details) async {
+      // SQLite 默认不启用外键，必须显式开启。
+      await customStatement('PRAGMA foreign_keys = ON');
+    },
+  );
 
   /// 首次建库时写入手册 §6.3 的默认设置值。
   Future<void> _seedDefaultSettings() async {

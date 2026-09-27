@@ -237,8 +237,10 @@ Future<void> _exportData(BuildContext context, WidgetRef ref) async {
   );
 
   if (!context.mounted) return;
-  final ExportFormat? chosen =
-      await showExportFormatDialog(context, defaultFormat: defaultFormat);
+  final ExportFormat? chosen = await showExportFormatDialog(
+    context,
+    defaultFormat: defaultFormat,
+  );
   if (chosen == null || !context.mounted) return;
 
   await runExport(context, ref.read(exportServiceProvider), chosen);

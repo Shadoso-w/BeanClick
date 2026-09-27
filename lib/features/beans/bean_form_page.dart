@@ -86,7 +86,8 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     setState(() => _saving = true);
 
     final DateTime now = DateTime.now();
-    final CoffeeBean base = widget.bean ?? CoffeeBean(name: '', createdAt: now, updatedAt: now);
+    final CoffeeBean base =
+        widget.bean ?? CoffeeBean(name: '', createdAt: now, updatedAt: now);
     final CoffeeBean bean = base.copyWith(
       name: _name.text.trim(),
       origin: _origin.text.trim().isEmpty ? null : _origin.text.trim(),
@@ -162,9 +163,10 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
   Widget build(BuildContext context) {
     final double? remaining = parseNumber(_remaining.text);
     final double? initial = parseNumber(_initial.text);
-    final String? ratioHint = (initial != null && initial > 0 && remaining != null)
+    final String? ratioHint =
+        (initial != null && initial > 0 && remaining != null)
         ? '已消耗 ${formatNumber((initial - remaining).clamp(0, initial))} g'
-          '（${((1 - remaining / initial) * 100).clamp(0, 100).toStringAsFixed(0)}%）'
+              '（${((1 - remaining / initial) * 100).clamp(0, 100).toStringAsFixed(0)}%）'
         : null;
 
     return Scaffold(
@@ -196,8 +198,8 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                     hintText: '例如：耶加雪菲 科契尔',
                     validator: (String? value) =>
                         (value == null || value.trim().isEmpty)
-                            ? '请填写豆子名称'
-                            : null,
+                        ? '请填写豆子名称'
+                        : null,
                   ),
                 ),
                 LabeledField(

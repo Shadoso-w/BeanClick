@@ -58,10 +58,10 @@ class ExportService implements Exporter {
     required Future<ExportDocument> Function() loadDocument,
     Future<Directory> Function()? directoryResolver,
     Future<void> Function(String path, String fileName)? sharer,
-  })  : _resolveDirectory = directoryResolver ?? _defaultExportDirectory,
-        _share = sharer,
-        // ignore: prefer_initializing_formals
-        _loadDocument = loadDocument;
+  }) : _resolveDirectory = directoryResolver ?? _defaultExportDirectory,
+       _share = sharer,
+       // ignore: prefer_initializing_formals
+       _loadDocument = loadDocument;
 
   final Future<ExportDocument> Function() _loadDocument;
   final Future<Directory> Function() _resolveDirectory;

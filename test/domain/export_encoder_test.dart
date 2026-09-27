@@ -14,8 +14,9 @@ void main() {
     test('完整备份包含全部表与计数', () {
       final ExportDocument document = _sampleDocument();
 
-      final Map<String, Object?> payload =
-          jsonDecode(ExportEncoder.encodeJson(document)) as Map<String, Object?>;
+      final Map<String, Object?> payload = jsonDecode(
+        ExportEncoder.encodeJson(document),
+      ) as Map<String, Object?>;
 
       expect(payload['schemaVersion'], ExportDocument.schemaVersion);
       expect(payload['appVersion'], '0.1.0');
@@ -35,8 +36,9 @@ void main() {
     test('往返后数据完全一致（备份真的能读回来）', () {
       final ExportDocument source = _sampleDocument();
 
-      final ExportDocument restored =
-          ExportEncoder.decodeJson(ExportEncoder.encodeJson(source));
+      final ExportDocument restored = ExportEncoder.decodeJson(
+        ExportEncoder.encodeJson(source),
+      );
 
       expect(restored.beans, source.beans);
       expect(restored.grinders, source.grinders);
@@ -47,8 +49,9 @@ void main() {
     test('分段注水与专业字段在往返后保留', () {
       final ExportDocument source = _sampleDocument();
 
-      final ExportDocument restored =
-          ExportEncoder.decodeJson(ExportEncoder.encodeJson(source));
+      final ExportDocument restored = ExportEncoder.decodeJson(
+        ExportEncoder.encodeJson(source),
+      );
 
       final BrewLog log = restored.brewLogs.single;
       expect(log.tds, 1.35);
@@ -91,8 +94,9 @@ void main() {
         recipes: const [],
       );
 
-      final ExportDocument restored =
-          ExportEncoder.decodeJson(ExportEncoder.encodeJson(empty));
+      final ExportDocument restored = ExportEncoder.decodeJson(
+        ExportEncoder.encodeJson(empty),
+      );
 
       expect(restored.beans, isEmpty);
       expect(restored.brewLogs, isEmpty);
@@ -175,14 +179,14 @@ void main() {
     });
 
     test('用户输入里的逗号不会破坏列数', () {
-      final ExportDocument document = _sampleDocument(
-        note: '酸甜平衡,尾段微苦',
-      );
+      final ExportDocument document = _sampleDocument(note: '酸甜平衡,尾段微苦');
 
       final String csv = ExportEncoder.encodeCsv(document);
       final List<String> logLines = csv
           .split('\n')
-          .where((String line) => line.startsWith('1,2026') || line.contains('酸甜平衡'))
+          .where(
+            (String line) => line.startsWith('1,2026') || line.contains('酸甜平衡'),
+          )
           .toList();
 
       expect(logLines, isNotEmpty);
@@ -268,8 +272,9 @@ void main() {
         sharer: (String path, String fileName) async {},
       );
 
-      final ExportOutcome outcome =
-          await service.exportAndShare(ExportFormat.json);
+      final ExportOutcome outcome = await service.exportAndShare(
+        ExportFormat.json,
+      );
 
       final File file = File(outcome.path);
       expect(await file.exists(), isTrue);
@@ -294,8 +299,9 @@ void main() {
         },
       );
 
-      final ExportOutcome outcome =
-          await service.exportAndShare(ExportFormat.csv);
+      final ExportOutcome outcome = await service.exportAndShare(
+        ExportFormat.csv,
+      );
 
       expect(await File(outcome.path).exists(), isTrue);
       expect(outcome.shared, isFalse);
@@ -312,8 +318,9 @@ void main() {
         sharer: (String path, String fileName) async {},
       );
 
-      final ExportOutcome outcome =
-          await service.exportAndShare(ExportFormat.csv);
+      final ExportOutcome outcome = await service.exportAndShare(
+        ExportFormat.csv,
+      );
       final List<int> bytes = await File(outcome.path).readAsBytes();
 
       expect(bytes.take(3), <int>[0xEF, 0xBB, 0xBF]);
