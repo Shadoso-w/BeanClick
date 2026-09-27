@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/widgets/form_fields.dart';
@@ -212,6 +213,8 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                 ),
                 LabeledField(
                   label: '庄园 / 处理厂',
+                  // 选填字段统一标注，避免被当成必填（本来就是可选的）。
+                  helper: '选填',
                   child: PlainTextField(
                     key: const Key('bean.farm'),
                     controller: _farm,
@@ -251,6 +254,8 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                   child: DateField(
                     value: _roastDate,
                     lastDate: DateTime.now().add(const Duration(days: 1)),
+                    // 中文日期：2026年1月1日
+                    formatter: formatDateChinese,
                     onPick: (DateTime value) =>
                         setState(() => _roastDate = value),
                     onClear: () => setState(() => _roastDate = null),
@@ -270,6 +275,17 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                     hintText: '0',
                     suffixText: 'g',
                     onChanged: (_) => setState(() {}),
+                    // 剩余不能超过购入总重（修：原来没有这条校验）。
+                    validator: (String? value) {
+                      final double? remaining = parseNumber(value);
+                      final double? initial = parseNumber(_initial.text);
+                      if (remaining != null &&
+                          initial != null &&
+                          remaining > initial) {
+                        return '剩余克数不能大于购入总重（${formatNumber(initial)} g）';
+                      }
+                      return null;
+                    },
                   ),
                 ),
                 LabeledField(
@@ -291,6 +307,10 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                     hintText: '选填',
                     suffixText: '元',
                     textInputAction: TextInputAction.next,
+                    // 金额最多两位小数（修：原来没有限制）。
+                    extraFormatters: const <TextInputFormatter>[
+                      PriceInputFormatter(),
+                    ],
                   ),
                 ),
               ],
@@ -302,8 +322,13 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                   label: '风味标签',
                   helper: '用「、」或逗号分隔，例如：柑橘、花香、蜂蜜',
                   child: PlainTextField(
+                    key: const Key('bean.flavors'),
                     controller: _flavors,
                     hintText: '柑橘、花香',
+                    // 输入阶段就过滤掉表情与其他符号，只留文字、数字与分隔符。
+                    inputFormatters: const <TextInputFormatter>[
+                      FilteringTagFormatter(),
+                    ],
                   ),
                 ),
                 LabeledField(

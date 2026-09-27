@@ -133,6 +133,7 @@ class NumberField extends StatelessWidget {
     this.allowNegative = false,
     this.validator,
     this.textInputAction = TextInputAction.next,
+    this.extraFormatters = const <TextInputFormatter>[],
   });
 
   final TextEditingController controller;
@@ -142,6 +143,9 @@ class NumberField extends StatelessWidget {
   final bool allowNegative;
   final String? Function(String?)? validator;
   final TextInputAction textInputAction;
+
+  /// 追加的输入过滤（如金额的两位小数限制），排在默认过滤之后。
+  final List<TextInputFormatter> extraFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +160,7 @@ class NumberField extends StatelessWidget {
         FilteringTextInputFormatter.allow(
           allowNegative ? RegExp(r'[0-9.\-]') : RegExp(r'[0-9.]'),
         ),
+        ...extraFormatters,
       ],
       onChanged: (String value) => onChanged?.call(parseNumber(value)),
       validator: validator,
@@ -215,6 +220,7 @@ class PlainTextField extends StatelessWidget {
     this.maxLines = 1,
     this.textInputAction = TextInputAction.next,
     this.validator,
+    this.inputFormatters = const <TextInputFormatter>[],
   });
 
   final TextEditingController controller;
@@ -222,6 +228,7 @@ class PlainTextField extends StatelessWidget {
   final int maxLines;
   final TextInputAction textInputAction;
   final String? Function(String?)? validator;
+  final List<TextInputFormatter> inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -229,6 +236,7 @@ class PlainTextField extends StatelessWidget {
       controller: controller,
       maxLines: maxLines,
       textInputAction: textInputAction,
+      inputFormatters: inputFormatters,
       validator: validator,
       decoration: InputDecoration(
         hintText: hintText,
@@ -291,6 +299,7 @@ class DateField extends StatelessWidget {
     this.onClear,
     this.lastDate,
     this.firstDate,
+    this.formatter = formatDate,
   });
 
   final DateTime? value;
@@ -299,6 +308,9 @@ class DateField extends StatelessWidget {
   final String hintText;
   final DateTime? lastDate;
   final DateTime? firstDate;
+
+  /// 显示用的格式化函数，默认 `yyyy-MM-dd`；传 [formatDateChinese] 得中文日期。
+  final String Function(DateTime) formatter;
 
   @override
   Widget build(BuildContext context) {
@@ -321,7 +333,7 @@ class DateField extends StatelessWidget {
             icon: const Icon(Icons.event_outlined, size: 18),
             label: Align(
               alignment: Alignment.centerLeft,
-              child: Text(current == null ? hintText : formatDate(current)),
+              child: Text(current == null ? hintText : formatter(current)),
             ),
           ),
         ),
@@ -503,6 +515,76 @@ String formatDate(DateTime value) {
   final String month = local.month.toString().padLeft(2, '0');
   final String day = local.day.toString().padLeft(2, '0');
   return '${local.year}-$month-$day';
+}
+
+/// `yyyy年M月d日`，中文日期。
+String formatDateChinese(DateTime value) {
+  final DateTime local = value.toLocal();
+  return '${local.year}年${local.month}月${local.day}日';
+}
+
+/// 过滤风味标签输入：只保留中日韩文字、英文字母、数字与分隔符。
+///
+/// 用于 `TextInputFormatter`，在**输入阶段**就把表情、符号等清掉，
+/// 避免它们进入标签后污染导出结果与将来的统计分组。
+///
+/// 空格保留（`parseTags` 会把它当分隔符切分），但括号、点号、感叹号
+/// 这类符号会被删掉。
+String filterTagInput(String raw) {
+  final StringBuffer buffer = StringBuffer();
+  for (final int rune in raw.runes) {
+    final bool keep =
+        (rune >= 0x4E00 && rune <= 0x9FFF) || // 中日韩统一表意文字
+        (rune >= 0x3040 && rune <= 0x30FF) || // 日文假名
+        (rune >= 0xAC00 && rune <= 0xD7A3) || // 韩文
+        (rune >= 0x41 && rune <= 0x5A) || // A-Z
+        (rune >= 0x61 && rune <= 0x7A) || // a-z
+        (rune >= 0x30 && rune <= 0x39) || // 0-9
+        rune == 0x0020 || // 空格
+        rune == 0x3001 || // 、
+        rune == 0x002C || // ,
+        rune == 0xFF0C; // ，
+    if (keep) buffer.writeCharCode(rune);
+  }
+  return buffer.toString();
+}
+
+/// 只允许最多两位小数（用于价格这类金额输入）。
+class PriceInputFormatter extends TextInputFormatter {
+  const PriceInputFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // 只允许数字与至多一个小数点，且小数位不超过两位。
+    if (!RegExp(r'^\d*\.?\d{0,2}$').hasMatch(newValue.text)) return oldValue;
+    return newValue;
+  }
+}
+
+/// 按 [filter] 清洗输入文本，并把光标收回到末尾。
+///
+/// 必须显式设置 selection：过滤会缩短文本，若沿用旧的 selection，
+/// 位置可能超出新文本长度，触发
+/// `'range.start >= 0 && range.start <= text.length'` 断言。
+/// 粘贴含表情的文本时，这个问题在真机上同样会发生。
+class FilteringTagFormatter extends TextInputFormatter {
+  const FilteringTagFormatter();
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    final String filtered = filterTagInput(newValue.text);
+    if (filtered == newValue.text) return newValue;
+    return TextEditingValue(
+      text: filtered,
+      selection: TextSelection.collapsed(offset: filtered.length),
+    );
+  }
 }
 
 /// 把「、,，空格换行」分隔的输入切成标签列表，去空去重。
