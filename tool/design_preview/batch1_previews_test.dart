@@ -49,7 +49,7 @@ void main() {
 
   testWidgets('第一批 UI 改稿', (WidgetTester tester) async {
     // 画布要足够高，否则下半部分会被裁掉（golden 只截视口）。
-    tester.view.physicalSize = const Size(760, 3760);
+    tester.view.physicalSize = const Size(760, 5360);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
 
@@ -89,49 +89,66 @@ class _MockSheet extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            const _SectionTitle('① 记录卡片标题：[B2] 豆子（方法）'),
-            const _RowLabel('改前'),
+            const _SectionTitle('① 记录卡片标题：[B2] 第一行「所有豆名 + 方法 chip」'),
+            const _RowLabel('改前（方法 chip 在第二行，标题只有豆名）'),
             _MockLogCard(
               title: '黑猫拼配',
-              showMethodChip: true,
-              method: '手冲',
+              method: '拿铁',
+              methodOnSecondRow: true,
               grind: 'C40 / 22 click',
             ),
             const SizedBox(height: 12),
-            const _RowLabel('改后（方法进标题，第二行去掉方法 chip）'),
-            _MockLogCard(
-              title: '黑猫拼配（拿铁）',
-              showMethodChip: false,
-              grind: 'C40 / 22 click',
-            ),
+            const _RowLabel('改后 · 变体 A「紧跟豆名」——单豆'),
+            _MockLogCard(title: '黑猫拼配', method: '拿铁', grind: 'C40 / 22 click'),
             const SizedBox(height: 12),
-            const _RowLabel('改后 · 拼配（主豆 + 其余，方法在最后）'),
+            const _RowLabel('改后 · 变体 A「紧跟豆名」——拼配（chip 在所有豆名之后）'),
             _MockLogCard(
-              title: '黑猫拼配 + 花魁（拿铁）',
-              showMethodChip: false,
+              title: '黑猫拼配 + 花魁',
+              method: '拿铁',
               grind: 'C40 / 22 click',
               blend: '拼配 14 g + 6 g',
+            ),
+            const SizedBox(height: 12),
+            const _RowLabel('变体 A + 长豆名 + 长方法名（豆名省略，chip 始终完整）'),
+            _MockLogCard(
+              title: '埃塞俄比亚耶加雪菲日晒G1',
+              method: '燕麦拿铁',
+              grind: 'C40 / 22 click',
+            ),
+            const SizedBox(height: 12),
+            const _RowLabel('改后 · 变体 B「chip 靠右」对齐在评分星之前'),
+            _MockLogCard(
+              title: '埃塞俄比亚耶加雪菲日晒G1',
+              method: '燕麦拿铁',
+              grind: 'C40 / 22 click',
+              chipHugsName: false,
+            ),
+            const SizedBox(height: 12),
+            const _RowLabel('变体 B「chip 靠右」——单豆（对比 A 的间距）'),
+            _MockLogCard(
+              title: '黑猫拼配',
+              method: '拿铁',
+              grind: 'C40 / 22 click',
+              chipHugsName: false,
             ),
 
             const SizedBox(height: 28),
             const _SectionTitle('② [C1] 左滑露出「收藏 / 删除」'),
             const _RowLabel('左滑前'),
-            _MockLogCard(
-              title: '黑猫拼配（拿铁）',
-              showMethodChip: false,
-              grind: 'C40 / 22 click',
-            ),
+            _MockLogCard(title: '黑猫拼配', method: '拿铁', grind: 'C40 / 22 click'),
             const SizedBox(height: 12),
-            const _RowLabel('左滑后（按钮在右侧，删除在最外侧）'),
+            const _RowLabel('左滑后（卡片整体左移，按钮在右侧，删除在最外侧）'),
             _MockSwipeOpen(
-              title: '黑猫拼配（拿铁）',
+              title: '黑猫拼配',
+              method: '拿铁',
               grind: 'C40 / 22 click',
               favorited: false,
             ),
             const SizedBox(height: 12),
             const _RowLabel('已收藏的那条（文案变「取消收藏」）'),
             _MockSwipeOpen(
-              title: '花魁（手冲）',
+              title: '花魁',
+              method: '手冲',
               grind: 'C40 / 22 click',
               favorited: true,
             ),
@@ -226,22 +243,29 @@ class _RowLabel extends StatelessWidget {
 }
 
 /// 记录卡片的 mock：结构与 `record_page.dart` 的 `_BrewLogCard` 对齐。
+///
+/// 第一行 = 收藏标记 + **所有豆名** + 方法 chip + 评分星。
+/// [chipHugsName] 决定 chip 是紧跟豆名（变体 A）还是靠右对齐（变体 B）。
 class _MockLogCard extends StatelessWidget {
   const _MockLogCard({
     required this.title,
-    required this.showMethodChip,
-    this.method,
+    required this.method,
     this.grind,
     this.blend,
     this.favorited = false,
+    this.chipHugsName = true,
+    this.methodOnSecondRow = false,
   });
 
   final String title;
-  final bool showMethodChip;
-  final String? method;
+  final String method;
   final String? grind;
   final String? blend;
   final bool favorited;
+  final bool chipHugsName;
+
+  /// 改动前的样子：方法 chip 在第二行。
+  final bool methodOnSecondRow;
 
   @override
   Widget build(BuildContext context) {
@@ -250,6 +274,27 @@ class _MockLogCard extends StatelessWidget {
     final TextStyle? muted = theme.textTheme.bodySmall?.copyWith(
       color: colors.onSurfaceVariant,
     );
+
+    final Widget titleText = Text(
+      title,
+      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
+
+    // 变体 A：豆名与 chip 放在同一个 Row 里，chip 紧跟豆名；
+    // 外层 Expanded 让这一组占满星标左边的空间，多余空白落在 chip 之后。
+    final Widget firstLine = chipHugsName
+        ? Expanded(
+            child: Row(
+              children: <Widget>[
+                Flexible(child: titleText),
+                const SizedBox(width: 6),
+                _MockChip(label: method),
+              ],
+            ),
+          )
+        : Expanded(child: titleText);
 
     return Card(
       child: Padding(
@@ -264,16 +309,14 @@ class _MockLogCard extends StatelessWidget {
                   Icon(Icons.bookmark_rounded, size: 18, color: colors.primary),
                   const SizedBox(width: 4),
                 ],
-                Expanded(
-                  child: Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                if (methodOnSecondRow)
+                  Expanded(child: titleText)
+                else
+                  firstLine,
+                if (!chipHugsName && !methodOnSecondRow) ...<Widget>[
+                  const SizedBox(width: 8),
+                  _MockChip(label: method),
+                ],
                 const SizedBox(width: 8),
                 const _MockStars(4),
               ],
@@ -284,7 +327,7 @@ class _MockLogCard extends StatelessWidget {
               runSpacing: 8,
               crossAxisAlignment: WrapCrossAlignment.center,
               children: <Widget>[
-                if (showMethodChip) _MockChip(label: method ?? '手冲'),
+                if (methodOnSecondRow) _MockChip(label: method),
                 if (grind != null) Text(grind!, style: muted),
               ],
             ),
@@ -324,11 +367,13 @@ class _MockLogCard extends StatelessWidget {
 class _MockSwipeOpen extends StatelessWidget {
   const _MockSwipeOpen({
     required this.title,
+    required this.method,
     required this.grind,
     required this.favorited,
   });
 
   final String title;
+  final String method;
   final String grind;
   final bool favorited;
 
@@ -375,7 +420,7 @@ class _MockSwipeOpen extends StatelessWidget {
             offset: Offset(-shift, 0),
             child: _MockLogCard(
               title: title,
-              showMethodChip: false,
+              method: method,
               grind: grind,
               favorited: favorited,
             ),
