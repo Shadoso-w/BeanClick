@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 应用图标背景色：咖啡棕，与 lib/app.dart 的主题 seed 一致（#6F4E37）。 -->
+<!--
+  自适应图标的背景色。
+  取用户提供的图标原图里那层米白（#F3EBDC），这样系统裁切后
+  与 mipmap-*/ic_launcher.png（整块米白圆角方块）看起来是一致的。
+-->
 <resources>
-    <color name="ic_launcher_background">#6F4E37</color>
+    <color name="ic_launcher_background">#F3EBDC</color>
 </resources>

@@ -7,52 +7,49 @@
 
 ## 应用图标
 
-图标的原始设计是**代码画出来的**，没有用图标生成器，也没有外部素材：
+现在的图标是**用户提供的成品图**：米白圆角方块 + 深棕圆环 + 中间一颗咖啡豆 +
+一圈刻度点（呼应「记录刻度」）。
 
-- 咖啡棕圆角底（`#6F4E37`，与 `lib/app.dart` 的主题 seed 一致）
-- 白色咖啡杯剪影（杯身梯形 + 圆角把手，把手先画、被杯身盖住内端）
-- 奶泡色横带（`#C49A6C`）表示液面
+- 原图留档：`assets/icon/app_icon_source.png`（1254×1254，24bpp 无透明通道）
+- 生成脚本：`tool/make_app_icons.ps1`
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\make_app_icons.ps1
+```
 
 输出：
 
 | 文件 | 用途 |
 |---|---|
-| `android/app/src/main/res/mipmap-*/ic_launcher.png` | 传统图标（48 / 72 / 96 / 144 / 192 px） |
-| `android/app/src/main/res/mipmap-*/ic_launcher_foreground.png` | 自适应图标前景（透明底，尺寸为传统图标的 2.25 倍） |
-| `assets/icon/app_icon_512.png` | 512px 源图，留档与商店用 |
+| `android/app/src/main/res/mipmap-*/ic_launcher.png` | 传统图标（48 / 72 / 96 / 144 / 192 px）。把原图里**圆角方块之外的白色页面**抠成透明，留下米白方块 |
+| `android/app/src/main/res/mipmap-*/ic_launcher_foreground.png` | 自适应图标前景（尺寸为传统图标的 2.25 倍）。把米白背景**也**抠成透明，只留圆环 / 豆 / 刻度点 |
+| `assets/icon/app_icon_512.png` | 512px 留档与商店用 |
+| `tool/out/app_icon_preview.png` | 复核用对照表（传统图标 / 前景叠米白底 / 前景叠棋盘格） |
 
-自适应图标的 XML 在 `android/app/src/main/res/mipmap-anydpi-v26/`，
-背景色定义在 `res/values/colors.xml`。
+抠图是**按亮度**做的（`Key-OutPixels`）：传统图标把亮度 ≥252 的当页面白去掉；
+前景把亮度 ≥215 的（页面白 + 米白背景）都去掉，中间一段做线性过渡当作抗锯齿边。
+`res/values/colors.xml` 里的 `ic_launcher_background` 取原图的米白 `#F3EBDC`，
+所以自适应图标裁切后的观感和传统图标一致。
 
-### 重新生成
+### 重新生成 / 换图
 
-图标脚本用 PowerShell + `System.Drawing` 直接绘制。**注意两点**：
+换图标时把新图覆盖 `assets/icon/app_icon_source.png` 再跑一次脚本即可；
+如果新图的背景色不同，记得同步改 `res/values/colors.xml` 与脚本里的两个亮度阈值。
 
-1. 脚本必须存成 **ANSI/UTF-8 无 BOM 且不含中文注释**——
-   Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，
-   中文注释被解码坏以后会连带把语法解析搞崩（报 `Unexpected token '}'`）。
-   所以这里没有把脚本文件留在仓库里，需要时按下文重建即可。
-2. 改尺寸或配色时，改脚本顶部的颜色变量与几何比例即可。
+> ⚠️ 脚本必须存成 **ANSI/UTF-8 无 BOM 且不含中文注释**——
+> Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，中文注释被解码坏以后
+> 连带把语法解析搞崩（报 `Unexpected token '}'`）。所以这个文件里只有英文注释。
 
-重建脚本要点（可直接复制到 PowerShell 里执行）：
+改动 `mipmap-*` 后必须重新构建 APK 才生效（编译期资源），
+而且**桌面可能缓存旧图标**：重装后如果还是旧的，重启桌面或卸载重装。
 
-```powershell
-Add-Type -AssemblyName System.Drawing
-$brown = [System.Drawing.Color]::FromArgb(255,111,78,55)
-$white = [System.Drawing.Color]::FromArgb(255,250,246,240)
-$crema = [System.Drawing.Color]::FromArgb(255,196,154,108)
-# 几何全部按画布比例给，保证各密度一致：
-#   杯口半宽 0.265  杯底半宽 0.17  杯口 -0.205  杯底 +0.215
-#   把手半径 0.19   把手中心 x +0.245  把手中心 y +0.005  笔宽 0.085
-# 自适应图标前景用 scale = 0.72（给系统裁切留边）
-```
-
-> 图标改动后需要重新构建 APK 才会生效（`mipmap-*` 是编译期资源）。
+> 历史：M1～M2.7 的图标是代码画出来的（棕色底 + 白色咖啡杯剪影），
+> 那个脚本没留在仓库里（见 git 历史）。M2.8 起改用用户提供的成品图。
 
 ---
 
 ## 为什么不用 flutter_launcher_icons
 
-试过，但它的输入必须是一张现成的 PNG。既然图标本身要画，
-直接画到各个密度反而少一层依赖（它还会顺带拉进 5 个传递依赖）。
-如果将来换成设计师给的成品图，再引入这类工具更合适。
+试过，但它的输入必须是一张现成的 PNG，而且不方便做「自适应前景要单独抠背景」
+这种处理。本项目需要一个几十行的脚本把原图切成三份不同处理方式的产物，
+自己写反而更清楚，也少 5 个传递依赖。
