@@ -229,6 +229,21 @@ await tester.ensureVisible(field);
 `find.text('15')` 找不到它。本项目给关键字段加了 `Key`（`brew.dose`、`bean.name`、
 `grinder.brand` 等），测试用 `find.byKey` 定位，比按 hint 文字或按下标更稳。
 
+**`scrollUntilVisible` 只朝一个方向滚。** 它（内部是 `dragUntilVisible`）固定把列表
+往下推，所以目标在**上方**时永远滚不到：滚满 50 次后抛 `Bad state: No element`
+（不是「找不到控件」那种友好报错）。典型触发场景：先填下面的「粉量」，再回头点上面
+豆子那一栏的按钮。
+
+因此 `test/helpers/widget_harness.dart` 给 `WidgetTester` 加了扩展
+（`scrollTo` / `fillField` / `readField` / `tapKey` / `tapTextScrolled` /
+`tapSaveButton`）：先看控件在不在树里，不在就**先拉回顶部**再往下找，两个方向都能到。
+
+```dart
+await tester.fillField('brew.dose', '20');
+await tester.tapKey('brew.addPick');     // 这个按钮在上方，也不会失败
+await tester.tapSaveButton();
+```
+
 ### 8.4 内存库测试
 
 仓储测试统一用 `AppDatabase.memory()`（SQLite 内存库），
