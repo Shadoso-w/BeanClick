@@ -1,0 +1,54 @@
+# 统一换行符：本仓库在 Windows 上开发，但要在 GitHub / Linux CI 上构建。
+#
+# 不做这个配置的话，Windows 检出会把 LF 变成 CRLF，导致：
+# - CI 上 `dart format --set-exit-if-changed` 失败
+# - PR diff 里出现整文件改动
+#
+# 规则：文本文件一律以 LF 存进仓库，检出时也保持 LF（`eol=lf`）。
+# 只有明确需要 CRLF 的 Windows 脚本才单独指定。
+
+# 默认：自动识别文本文件并在仓库内规范为 LF
+* text=auto eol=lf
+
+# 源码与配置：强制 LF
+*.dart   text eol=lf
+*.yaml   text eol=lf
+*.yml    text eol=lf
+*.json   text eol=lf
+*.md     text eol=lf
+*.xml    text eol=lf
+*.kts    text eol=lf
+*.gradle text eol=lf
+*.properties text eol=lf
+*.ps1    text eol=lf
+*.sh     text eol=lf
+
+# Windows 批处理必须 CRLF，否则可能无法执行
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+gradlew.bat text eol=crlf
+
+# Unix 可执行脚本必须保持 LF
+gradlew  text eol=lf
+
+# 二进制文件：不要让 Git 做任何换行转换
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.webp   binary
+*.gif    binary
+*.ico    binary
+*.ttf    binary
+*.otf    binary
+*.jar    binary
+*.apk    binary
+*.so     binary
+*.dll    binary
+*.sqlite binary
+*.p12    binary
+*.jks    binary
+*.keystore binary
+
+# 生成代码与锁文件：折叠 diff，避免淹没 PR
+lib/data/database.g.dart linguist-generated=true
+pubspec.lock             linguist-generated=true

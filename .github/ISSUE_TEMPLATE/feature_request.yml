@@ -1,0 +1,34 @@
+name: 功能建议
+description: 提出一个新功能或改进
+title: "[Feature] "
+labels: ["feature"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        提出前请先看一眼开发手册的范围与边界（`docs/BeanClick-开发手册-v0.2.md` §2），
+        确认它不属于「MVP 不做」的范畴。
+  - type: textarea
+    id: problem
+    attributes:
+      label: 你想解决什么问题
+      description: 请描述场景，而不是直接给方案。
+      placeholder: 我经常一次买三支豆，想知道哪支快喝完了。
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: 你设想的方案
+    validations:
+      required: false
+  - type: dropdown
+    id: priority
+    attributes:
+      label: 你认为的优先级
+      options:
+        - P0 - 不做就没法用
+        - P1 - 明显提升体验
+        - P2 - 锦上添花
+    validations:
+      required: true
