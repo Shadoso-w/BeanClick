@@ -62,16 +62,42 @@ void main() {
     return editable.controller.text;
   }
 
-  group('外壳', () {
-    testWidgets('启动后展示四个 tab 与快速记录 FAB', (tester) async {
+  group('外壳（三栏 dock）', () {
+    testWidgets('dock 是三栏：记录 / 新加一杯 / 豆库', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
       expect(find.byType(NavigationBar), findsOneWidget);
-      for (final String label in <String>['记录', '豆库', '统计', '我的']) {
+      final NavigationBar bar = tester.widget<NavigationBar>(
+        find.byType(NavigationBar),
+      );
+      expect(bar.destinations, hasLength(3));
+      for (final String label in <String>['记录', '新加一杯', '豆库']) {
         expect(find.text(label), findsWidgets);
       }
+      // 统计与我的不再占栏位
+      expect(find.text('我的'), findsNothing);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('「新加一杯」是常驻的大 + 号', (tester) async {
+      await tester.pumpWidget(harness.app(const BeanClickApp()));
+      await tester.pump(const Duration(milliseconds: 100));
+
       expect(find.byType(FloatingActionButton), findsOneWidget);
+      expect(
+        tester.widget<FloatingActionButton>(find.byType(FloatingActionButton)),
+        isA<FloatingActionButton>(),
+      );
+      // 常驻底部中间
+      final Scaffold scaffold = tester.widget<Scaffold>(
+        find.byType(Scaffold).first,
+      );
+      expect(
+        scaffold.floatingActionButtonLocation,
+        FloatingActionButtonLocation.centerFloat,
+      );
 
       await harness.finish(tester);
     });
@@ -86,15 +112,62 @@ void main() {
       await harness.finish(tester);
     });
 
-    testWidgets('可以切换到豆库、统计、我的', (tester) async {
+    testWidgets('可以切换到豆库', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      for (final String label in <String>['豆库', '统计', '我的']) {
-        await tester.tap(find.text(label).last);
-        await tester.pump(const Duration(milliseconds: 100));
-        expect(tester.takeException(), isNull);
-      }
+      await tester.tap(find.text('豆库').last);
+      await tester.pump(const Duration(milliseconds: 100));
+      expect(tester.takeException(), isNull);
+      expect(find.text('咖啡豆'), findsWidgets);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('点 dock 中间的「新加一杯」会打开表单，且不切走当前栏', (tester) async {
+      await tester.pumpWidget(harness.app(const BeanClickApp()));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.tap(find.text('新加一杯').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('记录一杯'), findsOneWidget);
+
+      // 表单是 fullscreenDialog，用关闭图标（X）而不是返回箭头。
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pumpAndSettle();
+      expect(find.text('时间线'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('统计已并入记录页，作为第二个页签', (tester) async {
+      await tester.pumpWidget(harness.app(const BeanClickApp()));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('时间线'), findsOneWidget);
+      expect(find.text('统计'), findsOneWidget);
+
+      await tester.tap(find.text('统计'));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('总记录数'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('「我的」移到右上角，可进入设置', (tester) async {
+      await tester.pumpWidget(harness.app(const BeanClickApp()));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.tap(find.byIcon(Icons.person_outline));
+      await tester.pumpAndSettle();
+
+      // 设置页的内容在
+      expect(find.text('导出数据'), findsOneWidget);
+      expect(find.text('主题模式'), findsOneWidget);
 
       await harness.finish(tester);
     });
