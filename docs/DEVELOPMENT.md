@@ -520,6 +520,7 @@ kotlin.incremental=false
 | 构建突然变得极慢（小时级） | 见 §11「构建相关的两个坑」，清残留 java 进程 |
 | `Could not close incremental caches ... compileReleaseKotlin` | 已在 `android/gradle.properties` 关掉 Kotlin 增量编译，见 §11 |
 | 用 PowerShell 改源码后 `flutter test` 报 `Failed to decode data using encoding 'utf-8'` | 见 §13，**别用 PowerShell 的文本 cmdlet 碰源码** |
+| CI 的 Build APK 偶发失败：`Building assets for package:sqlite3 failed` / `SocketException: Connection reset by peer`（连 `release-assets.githubusercontent.com`） | `sqlite3` 的构建钩子要从 GitHub 下预编译库，网络抖动就会失败。**不是代码问题**：`gh run rerun <id> --failed` 重跑即可（实测一次就过）。本地因为库已缓存所以看不到 |
 
 ---
 
