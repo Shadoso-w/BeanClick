@@ -1,0 +1,62 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# 发布签名：密钥库与口令文件绝不能进仓库。
+# 生成方法见 docs/DEVELOPMENT.md「发布签名」。
+/android/key.properties
+/android/keystore/
+*.jks
+*.keystore
+
+# 测试用的 SQLite 原生库（供 flutter test 在桌面加载）
+# 说明见 docs/DEVELOPMENT.md §8.1；它可复现，不入库。
+/sqlite3.dll
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# 内测用的 APK 暂存目录（产物不入库，见 RELEASING.md）
+/dist/
+
+# Widget Preview related
+.widget_preview/

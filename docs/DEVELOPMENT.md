@@ -1,0 +1,395 @@
+# 开发环境搭建（Windows）
+
+本项目在 Windows 上使用**便携式（免安装）工具链**，全部放在 `D:\devtools`，
+Android SDK 放在 `D:\Android\Sdk`。不依赖任何安装程序，也不写入 `C:\` 全局目录
+（除用户级环境变量外）。
+
+---
+
+## 1. 工具链布局
+
+| 组件 | 版本 | 路径 |
+|---|---|---|
+| Git | 2.55.0.5 | `D:\devtools\Git` |
+| JDK | Temurin 17.0.20.1+1 | `D:\devtools\jdk17` |
+| Flutter SDK | 3.47.5 (Dart 3.13.4) | `D:\devtools\flutter` |
+| Android SDK | cmdline-tools latest | `D:\Android\Sdk` |
+| Gradle 缓存 | — | `D:\devtools\gradle-home` |
+| 工程 | — | `D:\BeanClick` |
+
+选便携布局的原因：Flutter + Android SDK + Gradle 缓存合计会超过 10GB，
+放在 D 盘可以避免撑爆系统盘；全部解压式安装也便于整体删除或迁移。
+
+---
+
+## 2. 环境变量（用户级）
+
+安装脚本已写入以下**用户级**环境变量（不需要管理员权限）：
+
+| 变量 | 值 |
+|---|---|
+| `JAVA_HOME` | `D:\devtools\jdk17` |
+| `ANDROID_HOME` | `D:\Android\Sdk` |
+| `ANDROID_SDK_ROOT` | `D:\Android\Sdk` |
+| `GRADLE_USER_HOME` | `D:\devtools\gradle-home` |
+| `PUB_HOSTED_URL` | `https://pub.flutter-io.cn` |
+| `FLUTTER_STORAGE_BASE_URL` | `https://storage.flutter-io.cn` |
+| `PATH` | 追加 `D:\devtools\flutter\bin`、`D:\devtools\Git\cmd`、`D:\devtools\jdk17\bin`、`D:\Android\Sdk\platform-tools`、`D:\Android\Sdk\cmdline-tools\latest\bin` |
+
+> `PUB_HOSTED_URL` / `FLUTTER_STORAGE_BASE_URL` 指向国内镜像，用于加速
+> `flutter pub get` 与 SDK 组件下载。若镜像异常，清空这两个变量即可回落到官方源。
+
+**环境变量生效需要重开终端。** 当前已打开的终端可以临时加载：
+
+```powershell
+$env:Path = [Environment]::GetEnvironmentVariable('Path','User') + ';' + [Environment]::GetEnvironmentVariable('Path','Machine')
+```
+
+---
+
+## 3. 从零重建工具链
+
+如果换了机器或需要重装，按顺序执行：
+
+```powershell
+# 1. 目录
+New-Item -ItemType Directory -Force D:\devtools\_dl, D:\devtools\_tmp, D:\Android\Sdk | Out-Null
+
+# 2. Git（便携版自解压）
+Invoke-WebRequest 'https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/PortableGit-2.55.0.5-64-bit.7z.exe' -OutFile D:\devtools\_dl\PortableGit.7z.exe
+& D:\devtools\_dl\PortableGit.7z.exe -oD:\devtools\Git -y
+
+# 3. JDK 17（清华 Adoptium 镜像）
+Invoke-WebRequest 'https://mirrors.tuna.tsinghua.edu.cn/Adoptium/17/jdk/x64/windows/OpenJDK17U-jdk_x64_windows_hotspot_17.0.20.1_1.zip' -OutFile D:\devtools\_dl\jdk17.zip
+Expand-Archive D:\devtools\_dl\jdk17.zip -DestinationPath D:\devtools\_tmp -Force
+Move-Item D:\devtools\_tmp\jdk-17.0.20.1+1 D:\devtools\jdk17
+
+# 4. Flutter SDK
+Invoke-WebRequest 'https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_3.47.5-stable.zip' -OutFile D:\devtools\_dl\flutter.zip
+Expand-Archive D:\devtools\_dl\flutter.zip -DestinationPath D:\devtools -Force
+
+# 5. Android cmdline-tools
+Invoke-WebRequest 'https://dl.google.com/android/repository/commandlinetools-win-13114758_latest.zip' -OutFile D:\devtools\_dl\cmdline-tools.zip
+Expand-Archive D:\devtools\_dl\cmdline-tools.zip -DestinationPath D:\devtools\_tmp\cmdline -Force
+New-Item -ItemType Directory -Force D:\Android\Sdk\cmdline-tools | Out-Null
+Move-Item D:\devtools\_tmp\cmdline\cmdline-tools D:\Android\Sdk\cmdline-tools\latest
+```
+
+---
+
+## 4. 常用命令
+
+```powershell
+flutter doctor -v                # 体检
+flutter pub get                  # 拉依赖
+dart run build_runner build --delete-conflicting-outputs   # 生成 Drift 代码
+flutter analyze                  # 静态分析（PR 必须通过）
+flutter test                     # 单元 + Widget 测试（PR 必须通过）
+flutter run                      # 跑真机/模拟器
+flutter build apk --release      # 出包
+```
+
+修改了 Drift 表结构后**必须**重跑 `build_runner`，否则 `*.g.dart` 与表定义不一致。
+
+---
+
+## 5. 测试策略
+
+| 层级 | 覆盖内容 |
+|---|---|
+| 单元测试 | 数据模型、导出（JSON/CSV）、统计计算、**余量扣减** |
+| Widget 测试 | 表单、列表、搜索、主题切换 |
+| 真机测试 | 低端机、中端机、暗黑模式 |
+| 内测 | GitHub Releases APK + Issue 反馈 |
+
+每个 P0 功能都必须有对应验收用例，清单见开发手册附录 A。
+
+---
+
+## 6. 目录结构
+
+```text
+D:\BeanClick
+  docs/            开发手册、开发环境、数据模型、隐私政策、更新日志
+  lib/
+    app.dart       根 MaterialApp、主题（咖啡棕 + 米白/深棕黑）
+    main.dart      入口：先开库，再 override databaseProvider 后 runApp
+    core/widgets/  通用组件（EmptyState 等）
+    domain/        纯 Dart 领域层：enums.dart、entities.dart、settings_keys.dart
+    data/
+      database.dart  一行内包含：类型转换器 + 表定义 + AppDatabase（+ database.g.dart）
+      mappers.dart   行对象 ↔ 领域实体
+      providers.dart Riverpod providers
+      repositories/  bean / grinder / brew_log / settings
+    features/      按功能切分的 UI（shell / record / beans / stats / settings）
+  test/
+    helpers/       共用测试脚手架（内存库 + ProviderContainer）
+    domain/        实体与派生值测试
+    data/          仓储、余量规则、schema 测试
+    widget_test.dart  应用外壳冒烟测试
+  .github/         Issue/PR 模板、CI 工作流
+```
+
+---
+
+## 7. Drift 使用约定（踩过的坑）
+
+这几条是 M1 实际调试出来的，违反任意一条都会产生**很难读的报错**。
+
+### 7.1 表对象必须用数据库实例上的访问器
+
+```dart
+// 错：报 "The argument type 'BrewLogs' can't be assigned to
+//      the parameter type 'ResultSetImplementation<HasResultSet, dynamic>'"
+_db.select(BrewLogs());
+
+// 对
+_db.select(_db.brewLogs);
+_db.into(_db.brewLogs);
+_db.update(_db.brewLogs);
+_db.delete(_db.brewLogs);
+```
+
+生成的访问器名是**表类名的首字母小写**：`CoffeeBeans` → `_db.coffeeBeans`。
+
+### 7.2 表定义必须和用了自定义类型的代码在同一个 library
+
+`textEnum<ProcessMethod>()`、`.map(const StringListConverter())` 这类写法，
+要求生成器能在 `part` 文件里解析到这些类型。**drift_dev 不会把相对导入写进
+`*.g.dart`**，所以把表拆到 `tables.dart`、枚举拆到 `enum.dart` 再互相相对导入，
+会导致 `database.g.dart` 里出现上百条 `Undefined class`。
+
+因此：**转换器、表定义、`AppDatabase` 全部放在 `lib/data/database.dart` 一个文件里。**
+跨文件引用一律用 `package:beanclick/...` 绝对导入。
+
+### 7.3 `app_settings` 的复合主键
+
+`AppSettings` 用 `key` 作主键，写入走 `insertOnConflictUpdate` 实现 upsert。
+
+---
+
+## 8. 测试注意事项
+
+### 8.1 测试需要 SQLite 原生库
+
+`flutter test` 在桌面运行，需要能找到 `sqlite3.dll`。本仓库把 DLL 放在工程根目录
+（`D:\BeanClick\sqlite3.dll`），Dart 进程启动时会从当前目录加载。
+
+该 DLL 取自 [sqlite.org 官方预编译包](https://www.sqlite.org/download.html)
+（`sqlite-dll-win-x64-*.zip`），SQLite 本身属公有领域，可随仓库分发。
+升级时替换该文件即可，命令：
+
+```powershell
+Invoke-WebRequest 'https://www.sqlite.org/2026/sqlite-dll-win-x64-3530400.zip' -OutFile $env:TEMP\sqlite.zip
+Expand-Archive $env:TEMP\sqlite.zip -DestinationPath $env:TEMP\sqlite -Force
+Copy-Item $env:TEMP\sqlite\sqlite3.dll D:\BeanClick\sqlite3.dll -Force
+```
+
+### 8.2 widget 测试里关库要先拆树并让出若干帧
+
+`AppDatabase.close()` 内部会 `await streamQueries.close()`，而 drift 的流查询
+在订阅未全部取消前不会归零。如果 widget 树还挂着，`close()` 会**永久阻塞**——
+表现为 `flutter test` 卡死且没有任何输出。
+
+**更阴的一点**：`flutter_test` 的 `_runTestBody` 只在**测试没失败时**才卸载 widget 树：
+
+```dart
+if (_pendingExceptionDetails == null) {
+  runApp(Container(key: UniqueKey(), child: _postTestMessage)); // 卸载 widget 树
+  await pump();
+}
+```
+
+所以「测试失败 → 树没卸 → tearDown 里 `close()` 永久等待 → 整个进程卡住」。
+反过来，不拆树直接 `close()` 在测试通过时**反而能过**——这具有欺骗性，不要依赖。
+
+本项目的做法（见 `test/helpers/widget_harness.dart`）：收尾只把 widget 树换成空树，
+让订阅取消；**不 await 关闭**容器与数据库。每个测试各有一个内存库实例，
+进程结束时自然回收——用「泄漏一个几 KB 的内存库」换「绝不卡死」。
+
+```dart
+testWidgets('...', (tester) async {
+  await tester.pumpWidget(harness.app(const BeanClickApp()));
+  // ... 断言 ...
+  await harness.finish(tester);   // 放在最后一行
+});
+```
+
+### 8.3 表单测试：字段要先滚入可视区
+
+表单字段在 `ListView` 里，**视口外的控件不会被构建**，`find.byKey` / `find.text`
+会直接找不到（而不是"找到了但不可见"）。所以断言前要先滚动：
+
+```dart
+await tester.scrollUntilVisible(field, 120, scrollable: find.byType(Scrollable).first);
+await tester.ensureVisible(field);
+```
+
+另外输入框里的值是放在 `EditableText.controller.text` 里，**不是 `Text` widget**，
+`find.text('15')` 找不到它。本项目给关键字段加了 `Key`（`brew.dose`、`bean.name`、
+`grinder.brand` 等），测试用 `find.byKey` 定位，比按 hint 文字或按下标更稳。
+
+### 8.4 内存库测试
+
+仓储测试统一用 `AppDatabase.memory()`（SQLite 内存库），
+每次测试独立一份，见 `test/helpers/test_harness.dart`。
+
+### 8.5 fake-async 下真实文件 I/O 不会完成
+
+`testWidgets` 跑在 fake-async 环境里，`await file.writeAsBytes(...)` 之后的回调
+**不会来**——测试能跑完，但文件其实没写出来，而且不报错，很容易误判成"功能坏了"。
+
+所以导出的测试分两层：
+
+| 层 | 位置 | 覆盖内容 |
+|---|---|---|
+| 编码 + 真实落盘 | `test/domain/export_encoder_test.dart`（普通 `test`，不受 fake-async 影响） | JSON 往返、CSV 转义、BOM、写文件、分享失败兜底 |
+| UI 接线 | `test/features/export_test.dart`（`testWidgets`） | 弹窗默认值、格式选择、传参、选择被记住 |
+
+widget 层注入一个 `Exporter` 的假实现（`_RecordingExportService`）只记录调用与格式，
+不碰文件系统。为此 `ExportService` 抽出了 `Exporter` 接口——
+这也是为什么 UI 依赖接口而不是具体类。
+
+### 8.6 测试脚手架的 setUp 执行顺序
+
+flutter_test 里**先注册的 setUp 先执行**。`setUpWidgetTest()` 在 `main()` 顶部就
+注册了 `reset`，所以业务测试里后注册的 `setUp` 一定在 reset **之后**才跑。
+如果某个覆盖项只在业务 `setUp` 里登记、却指望 reset 时被读到，就会静默失效
+（容器里还是旧实例）。
+
+因此 `WidgetTestHarness.useOverrides()` 除了存下构造器，还会**立刻重建容器**。
+
+---
+
+## 9. 发布签名
+
+签名配置在 `android/app/build.gradle.kts`：
+
+- 读 `android/key.properties`（**不入库**，`.gitignore` 已忽略）
+- 文件不存在时自动回落到 **debug 签名**，构建不会失败——
+  这样新克隆仓库的人和 CI 都能直接 `flutter build`。但那种产物**不能分发**。
+
+`android/key.properties` 格式：
+
+```properties
+storeFile=keystore/beanclick-release.p12
+storePassword=...
+keyAlias=beanclick
+keyPassword=...
+```
+
+> **路径坑**：`storeFile` 是**相对 `android/`** 的路径，所以 Gradle 里必须用
+> `rootProject.file(...)`。若写成 `file(...)`，它会相对 `android/app/` 解析，
+> 报 `Keystore file ... not found for signing config 'release'`。
+
+生成正式密钥：
+
+```powershell
+$env:Path = 'D:\devtools\jdk17\bin;' + $env:Path
+keytool -genkeypair -v `
+  -keystore android\keystore\beanclick-release.p12 -storetype PKCS12 `
+  -keyalg RSA -keysize 2048 -validity 10950 -alias beanclick
+```
+
+两条硬规则：
+
+1. **密钥必须离线备份。** 丢了就无法给已安装用户推送更新，只能让他们卸载重装。
+2. **换密钥后必须先卸载旧版**再安装，否则签名冲突（「应用未安装」）。
+
+用 JKS 也行，但 `keytool` 会提示 JKS 是私有旧格式、建议迁到 PKCS12，所以直接用 PKCS12。
+
+---
+
+## 10. 应用图标
+
+图标是**代码画出来的**（`System.Drawing`），没有外部素材，也没有引图标生成器。
+几何比例、配色与重新生成方法见 [`tool/README.md`](../tool/README.md)。
+
+改动 `mipmap-*` 后必须重新构建 APK 才生效（编译期资源）。
+
+> 生成脚本本身没有留在仓库里：Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，
+> 中文注释被解码坏以后会连带把语法解析搞崩（报 `Unexpected token '}'`）。
+> `tool/README.md` 里记录了全部参数，需要时重建即可。
+
+---
+
+## 11. 已验证状态（实测）
+
+以下是在本机 `D:\BeanClick` 上真实跑过的结果，可作为回归基线：
+
+| 命令 | 结果 |
+|---|---|
+| `flutter doctor` | Flutter / Android toolchain / 设备全部通过（Chrome 与 VS 缺失，与安卓无关） |
+| `flutter analyze` | `No issues found!`，退出码 0 |
+| `flutter test` | 117 个测试全部通过，退出码 0 |
+| `flutter build apk --release --split-per-abi` | 成功，约 2.3 分钟 |
+
+包体（验收清单要求 < 30MB）：
+
+| ABI | M1 | M2 | M2.5 |
+|---|---|---|---|
+| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB |
+| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB |
+| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB |
+
+### 构建相关的两个坑
+
+**① 残留的 Gradle 守护进程会让构建慢到不可用。**
+有一次 `assembleRelease` 耗时 **26741s（约 7.4 小时）**，排查发现是一个从数小时前
+就一直挂着的 `java`（Gradle daemon）在拖后腿。清掉后同样的构建只要 **2~5 分钟**。
+构建异常慢时先看一眼：
+
+```powershell
+Get-Process java | Select-Object Id, CPU, StartTime
+Get-Process java | Stop-Process -Force   # 之后重新构建
+```
+
+**② Kotlin 增量缓存会锁不住，导致构建失败。**
+现象是构建在十几秒内失败，报：
+
+```text
+Execution failed for task ':share_plus:compileReleaseKotlin'.
+> java.lang.Exception: Could not close incremental caches in
+  build\share_plus\kotlin\compileReleaseKotlin\cacheable\caches-jvm\jvm\kotlin:
+  class-fq-name-to-source.tab, source-to-classes.tab, internal-name-to-source.tab
+```
+
+清 `build\share_plus` 只能临时绕开，下次还会犯。本项目已在
+`android/gradle.properties` 里关闭 Kotlin 增量编译：
+
+```properties
+kotlin.incremental=false
+```
+
+代价是增量构建略慢，换来构建稳定。换机器后若想恢复，删掉这一行即可。
+
+### 镜像相关
+
+| 用途 | 源 | 备注 |
+|---|---|---|
+| Flutter SDK / 引擎产物 | `https://storage.flutter-io.cn` | 约 10 MB/s，官方 `storage.googleapis.com` 仅约 120 KB/s |
+| Pub 包 | `https://pub.flutter-io.cn` | 由 `PUB_HOSTED_URL` 控制 |
+| Git for Windows | `https://registry.npmmirror.com/-/binary/git-for-windows/` | 官方 GitHub Releases 极慢 |
+| Gradle 发行包 | `https://mirrors.cloud.tencent.com/gradle/` | **官方 `services.gradle.org` 完全不可达（0 KB/s）**，见 `android/gradle/wrapper/gradle-wrapper.properties` |
+| JDK 17 | `https://mirrors.tuna.tsinghua.edu.cn/Adoptium/` | |
+| Android SDK 组件 | `https://googledownloads.cn/` | 由 sdkmanager 自动走 Google 官方 CDN |
+
+---
+
+## 12. 排障
+
+| 现象 | 处理 |
+|---|---|
+| `flutter` 不是内部或外部命令 | 环境变量未生效，重开终端 |
+| `dart analyze` 报 `Unable to determine engine version` | `git` 不在 PATH 里，Flutter 需要它 |
+| `Android license status unknown` | `flutter doctor --android-licenses` 全部输 `y` |
+| Gradle 下载卡住 | 确认 `GRADLE_USER_HOME` 已指向 D 盘，或配置国内 Maven 镜像 |
+| `pub get` 超时 | 检查 `PUB_HOSTED_URL`，或临时清空该变量回落官方源 |
+| `database.g.dart` 里大量 `Undefined class` | 见 §7.2，把表定义并回 `database.dart` |
+| 仓储里 `Undefined class '%Table%'` / `argument_type_not_assignable` | 见 §7.1，改用 `_db.%table%` 访问器 |
+| `flutter test` 无输出卡死 | 见 §8.2，是 `db.close()` 在等流查询归零 |
+| 构建报 JDK 版本不符 | 确认 `JAVA_HOME` 指向 `D:\devtools\jdk17`，不要用 JDK 21+ |
+| `Keystore file ... not found for signing config 'release'` | 见 §9，`storeFile` 要用 `rootProject.file(...)` 解析 |
+| 构建突然变得极慢（小时级） | 见 §11「构建相关的两个坑」，清残留 java 进程 |
+| `Could not close incremental caches ... compileReleaseKotlin` | 已在 `android/gradle.properties` 关掉 Kotlin 增量编译，见 §11 |
+

@@ -1,0 +1,80 @@
+# 贡献指南 / Contributing
+
+感谢你愿意为豆刻出力。这是一个闲时维护的个人开源项目，
+所以流程尽量轻，但下面几条是硬要求。
+
+---
+
+## 开发环境
+
+见 [docs/DEVELOPMENT.md](DEVELOPMENT.md)。注意本项目使用 D 盘便携式工具链，
+不要自行改成全局安装后提交路径相关的配置。
+
+## 分支模型
+
+- `main` 受保护，**禁止直接推送**，只能通过 PR 合入。
+- 功能分支命名：
+  - `feat/xxx` 新功能
+  - `fix/xxx` 修 bug
+  - `docs/xxx` 文档
+  - `refactor/xxx` 重构
+
+## 提交信息
+
+使用约定式提交（Conventional Commits）：
+
+```text
+feat(record): 支持复制上次冲煮参数
+fix(stock): 修改粉量时按差值补扣余量
+docs(manual): 补充余量扣减边界规则
+test(export): 补充 CSV 导出单元测试
+```
+
+类型：`feat` / `fix` / `docs` / `style` / `refactor` / `test` / `chore`
+
+## PR 要求
+
+提交 PR 前，本地必须通过：
+
+```bash
+flutter analyze     # 零警告
+flutter test        # 全绿
+```
+
+PR 描述里请说明：
+
+1. 改了什么，为什么
+2. 关联的 Issue 编号（如有）
+3. 如何验证（手动步骤或测试用例）
+
+CI 会在 PR 上自动跑分析与测试，未通过不予合并。
+
+## 测试要求
+
+- 新增 P0 功能 → 必须附带对应测试，且对应开发手册附录 A 的验收清单。
+- 修复 bug → 尽量补一个能复现该 bug 的测试。
+- 涉及余量扣减、导出格式、统计计算的改动 → **必须有单元测试**。
+
+## 代码风格
+
+- 遵循 `flutter_lints`，不额外引入风格争议。
+- 表意优先于简短，中文注释可以，但公共 API 用英文文档注释。
+- 不引入任何广告、埋点、崩溃上报类依赖——这是本项目的底线。
+
+## 数据模型变更
+
+改动 Drift 表结构时：
+
+1. 递增数据库 `schemaVersion`
+2. 提供 `MigrationStrategy`
+3. 重跑 `dart run build_runner build --delete-conflicting-outputs`
+4. 在 PR 中说明迁移策略与回滚方式
+
+## Issue
+
+提交 Issue 请选用对应模板（Bug / 功能建议）。
+标签含义：`P0` `P1` `bug` `feature` `docs`。
+
+## 许可证
+
+你的贡献将以 [MIT](LICENSE) 许可证发布。
