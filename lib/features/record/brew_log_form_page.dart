@@ -705,7 +705,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
               DropdownMenuItem<int?>(
                 value: bean.id,
                 child: Text(
-                  '${bean.name}（余 ${formatNumber(bean.remainingGrams)} g）',
+                  // 余量在批次上，这里只显示豆子名；余量提示见下方。
+                  bean.name,
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
