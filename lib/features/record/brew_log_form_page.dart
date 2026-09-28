@@ -125,6 +125,13 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   int _orphanUsageCount = 0;
 
   int? _grinderId;
+
+  /// 写入时的磨豆机零点 / 每圈 click 快照。
+  ///
+  /// 「老研磨度关联老记录，新研磨度关联新记录」：编辑旧记录时沿用**当时**的
+  /// 零点（不是磨豆机现在的），新建时取当前磨豆机的值。
+  double? _grinderZeroPoint;
+  int? _grinderClicksPerRevolution;
   int? _rating;
   bool _isBest = false;
   bool _isFavorite = false;
@@ -193,6 +200,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     ];
     _picks = _initialPicks(source);
     _grinderId = source?.grinderId;
+    // 编辑旧记录：沿用当时的零点快照（= 老研磨度关联老记录）。
+    _grinderZeroPoint = source?.grinderZeroPointSnapshot;
+    _grinderClicksPerRevolution = source?.grinderClicksPerRevolutionSnapshot;
     // 复制上次时不继承评分与备注（见 copyFrom 的说明）。
     _rating = widget.existing?.rating;
     _isBest = widget.existing?.isBest ?? false;
@@ -258,8 +268,13 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     final BrewLog log = base.copyWith(
       beanId: primaryBeanId,
       grinderId: _grinderId,
-      method: _method,
+      // 自定义方法归到「其他」那一档：库里的原文放 methodLabel，
+      // 这样按 method 统计/筛选时自定义项不会混进「手冲」。
+      method: _methodLabel == null ? _method : BrewMethod.other,
       methodLabel: _methodLabel,
+      // 换刻度/重新校准前的老记录保留当时的零点与每圈 click（见 schema v7）。
+      grinderZeroPointSnapshot: _grinderZeroPoint,
+      grinderClicksPerRevolutionSnapshot: _grinderClicksPerRevolution,
       grindSetting: parseNumber(_grindSetting.text),
       grindClicks: int.tryParse(_grindClicks.text.trim()),
       doseGrams: parseNumber(_dose.text),
@@ -511,7 +526,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('删除这条记录？'),
-        content: const Text('删除后无法恢复。已扣减的豆子余量不会自动回补。'),
+        content: const Text('删除后无法恢复。已扣减的豆子余量会自动回补。'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -624,6 +639,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       _methodLabel = copied.methodLabel;
       _resetPicks(copied);
       _grinderId = copied.grinderId;
+      _grinderZeroPoint = copied.grinderZeroPointSnapshot;
+      _grinderClicksPerRevolution = copied.grinderClicksPerRevolutionSnapshot;
       _preheatUpperChamber = copied.preheatUpperChamber;
       _rating = null;
       _isBest = false;
@@ -1010,17 +1027,12 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
               }
             },
           ),
-        // 自定义方法：浅色区分，长按可重命名 / 删除。
+        // 自定义方法：与内置**同一款式**（测评反馈：新增项颜色要和默认项一致）。
+        // 记录时归到「其他」那一档，见 [_save] 里的 method 取值。
         for (final String custom in customs)
           ChoiceChip(
             label: Text(custom),
             selected: _methodLabel == custom,
-            selectedColor: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest,
-            backgroundColor: Theme.of(context)
-                .colorScheme
-                .surfaceContainerHighest,
             onSelected: (bool selected) {
               if (selected) setState(() => _methodLabel = custom);
             },
@@ -1175,7 +1187,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        // 三个框居中对齐（名字/数量/单位）。
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           Expanded(
             flex: 4,
@@ -1201,24 +1214,43 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
             ),
           ),
           const SizedBox(width: 4),
-          // 单位：ml / g / 泵 / 份
-          DropdownButton<AddInUnit>(
-            key: Key('brew.addInUnit.$index'),
-            value: addIn.unit,
-            underline: const SizedBox.shrink(),
-            items: <DropdownMenuItem<AddInUnit>>[
-              for (final AddInUnit unit in AddInUnit.selectable)
-                DropdownMenuItem<AddInUnit>(
-                  value: unit,
-                  child: Text(unit.label),
+          // 单位：ml / g / 泵 / 份。
+          // 外面套 SizedBox 给个确定宽度：InputDecorator 在无界宽度下会断言失败；
+          // 顺带让它的边框与高度跟左边的名字/数量框对齐
+          // （测评反馈：两个框大小不一致，要对齐）。
+          SizedBox(
+            width: 84,
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                isDense: true,
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 8,
                 ),
-            ],
-            onChanged: _saving
-                ? null
-                : (AddInUnit? value) {
-                    if (value == null) return;
-                    setState(() => addIn.unit = value);
-                  },
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<AddInUnit>(
+                  key: Key('brew.addInUnit.$index'),
+                  value: addIn.unit,
+                  isDense: true,
+                  isExpanded: true,
+                  items: <DropdownMenuItem<AddInUnit>>[
+                    for (final AddInUnit unit in AddInUnit.selectable)
+                      DropdownMenuItem<AddInUnit>(
+                        value: unit,
+                        child: Text(unit.label),
+                      ),
+                  ],
+                  onChanged: _saving
+                      ? null
+                      : (AddInUnit? value) {
+                          if (value == null) return;
+                          setState(() => addIn.unit = value);
+                        },
+                ),
+              ),
+            ),
           ),
           IconButton(
             tooltip: '删掉这一项',
@@ -1494,7 +1526,15 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
             hintText: '选择磨豆机',
           ),
           items: items,
-          onChanged: (int? value) => setState(() => _grinderId = value),
+          onChanged: (int? value) => setState(() {
+            _grinderId = value;
+            // 换了磨豆机就换成新机器的零点（还没选机器时清空）。
+            final Grinder? picked = value == null
+                ? null
+                : grinders.where((Grinder g) => g.id == value).firstOrNull;
+            _grinderZeroPoint = picked?.zeroPoint;
+            _grinderClicksPerRevolution = picked?.clicksPerRevolution;
+          }),
         ),
         Align(
           alignment: Alignment.centerLeft,
@@ -1557,7 +1597,12 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
         .getAll();
     if (!mounted || grinders.isEmpty) return;
     final int newId = _newestId(grinders.map((Grinder g) => g.id));
-    setState(() => _grinderId = newId);
+    setState(() {
+      _grinderId = newId;
+      final Grinder picked = grinders.firstWhere((Grinder g) => g.id == newId);
+      _grinderZeroPoint = picked.zeroPoint;
+      _grinderClicksPerRevolution = picked.clicksPerRevolution;
+    });
   }
 
   String? _ratioHint() {

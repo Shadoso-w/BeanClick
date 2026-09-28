@@ -75,7 +75,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('删除这条记录？'),
-        content: const Text('删除后无法恢复。已扣减的豆子余量不会自动回补。'),
+        content: const Text('删除后无法恢复。已扣减的豆子余量会自动回补。'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),

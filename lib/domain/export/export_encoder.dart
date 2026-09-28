@@ -11,6 +11,7 @@ library;
 import 'dart:convert';
 
 import 'package:beanclick/domain/entities.dart';
+import 'package:beanclick/domain/enums.dart';
 
 /// 导出文件的类型。
 enum ExportFormat {
@@ -220,7 +221,7 @@ abstract final class ExportEncoder {
           bean.name,
           bean.origin ?? '',
           bean.farm ?? '',
-          bean.process?.label ?? '',
+          bean.processes.map((ProcessMethod m) => m.label).join('、'),
           bean.flavorTags.join('、'),
           bean.isFavorite ? '是' : '',
           bean.notes ?? '',

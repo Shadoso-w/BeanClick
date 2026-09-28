@@ -221,9 +221,28 @@ class BrewLogRepository {
     });
   }
 
-  /// 硬删除。按手册 §6.2，**不回补余量**。
+  /// 删除一条记录，并把之前扣掉的余量**回补**回去。
+  ///
+  /// 测评反馈要求「删除后扣减的豆量自动回补」，所以这里与早期版本不同：
+  /// - 按各支豆子当时的粉量原路退回（`adjustStock` 收负数 = 回补）
+  /// - 批次还在就退回那一袋；批次被删过则退回自动挑到的那一袋
+  /// - 豆子已被删除的用量行跳过（豆子都没了，无处可退）
+  ///
+  /// 整个操作在一个事务里：要么记录删掉且余量回来了，要么都不动。
   Future<void> delete(int id) async {
-    await (_db.delete(_db.brewLogs)..where((t) => t.id.equals(id))).go();
+    await _db.transaction(() async {
+      final usages = await _usagesOf(id);
+      await (_db.delete(_db.brewLogs)..where((t) => t.id.equals(id))).go();
+      for (final BeanUsage usage in usages) {
+        final int? beanId = usage.beanId;
+        if (beanId == null || usage.doseGrams <= 0) continue;
+        await _beans.adjustStock(
+          beanId,
+          -usage.doseGrams,
+          batchId: usage.batchId,
+        );
+      }
+    });
   }
 
   /// 收藏 / 取消收藏一套参数。

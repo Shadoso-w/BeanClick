@@ -111,7 +111,7 @@ void main() {
     await harness.finish(tester);
   });
 
-  testWidgets('左滑删除：先确认再删，且不回补余量', (tester) async {
+  testWidgets('左滑删除：先确认再删，并把扣掉的余量回补', (tester) async {
     final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
     await harness.container
         .read(brewLogRepositoryProvider)
@@ -133,8 +133,8 @@ void main() {
               .read(beanRepositoryProvider)
               .getBatch(a.batchId))!
           .remainingGrams,
-      185,
-      reason: '删记录不回补余量（手册 §6.2）',
+      200,
+      reason: '删记录要把当时扣的 15g 退回原来那一袋',
     );
     expect(find.text('已删除这条记录'), findsOneWidget);
 

@@ -168,6 +168,23 @@ class BeanRepository {
     );
   }
 
+  /// 实时监听**全部**批次（按豆分组交给调用方）。
+  ///
+  /// 豆库列表要显示「总余量」，而余量在批次上：冲一杯扣了余量、加了新的一袋，
+  /// 都只会动 `bean_batches` 而不会动 `coffee_beans`。
+  /// 所以这里必须监听批次表本身，否则列表上的总余量是**旧的**
+  /// （原来用的是 FutureProvider + 依赖豆子列表，扣余量时不会刷新）。
+  Stream<List<BeanBatch>> watchAllBatches() {
+    final query = _db.select(_db.beanBatches)
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.roastDate, mode: OrderingMode.desc),
+        (t) => OrderingTerm(expression: t.createdAt, mode: OrderingMode.desc),
+      ]);
+    return query.watch().map(
+      (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
+    );
+  }
+
   /// 新增或更新豆子；`id == null` 为新增，返回实际写入的 id。
   Future<int> save(CoffeeBean bean) async {
     final companion = bean.copyWith(updatedAt: DateTime.now()).toCompanion();

@@ -11,7 +11,7 @@ void main() {
       final bean = CoffeeBean(
         name: '耶加雪菲',
         origin: '埃塞俄比亚',
-        process: ProcessMethod.washed,
+        processes: const <ProcessMethod>[ProcessMethod.washed],
         createdAt: DateTime(2026, 1, 1),
         updatedAt: DateTime(2026, 1, 1),
       );
@@ -274,7 +274,7 @@ void main() {
         name: '耶加雪菲',
         origin: '埃塞俄比亚',
         farm: '科契尔',
-        process: ProcessMethod.washed,
+        processes: const <ProcessMethod>[ProcessMethod.washed],
         flavorTags: const ['柑橘', '花香'],
         isFavorite: true,
         notes: '手冲首选',

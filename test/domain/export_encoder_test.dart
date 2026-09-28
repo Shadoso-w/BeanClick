@@ -377,7 +377,7 @@ ExportDocument _sampleDocument({String? note}) {
         name: '花魁',
         origin: '埃塞俄比亚',
         farm: '科契尔',
-        process: ProcessMethod.washed,
+        processes: const <ProcessMethod>[ProcessMethod.washed],
         flavorTags: const <String>['草莓', '奶油'],
         isFavorite: true,
         notes: note,

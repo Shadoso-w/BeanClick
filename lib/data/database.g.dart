@@ -54,14 +54,14 @@ class $CoffeeBeansTable extends CoffeeBeans
     requiredDuringInsert: false,
   );
   @override
-  late final GeneratedColumnWithTypeConverter<ProcessMethod?, String> process =
-      GeneratedColumn<String>(
-        'process',
-        aliasedName,
-        true,
-        type: DriftSqlType.string,
-        requiredDuringInsert: false,
-      ).withConverter<ProcessMethod?>($CoffeeBeansTable.$converterprocess);
+  late final GeneratedColumnWithTypeConverter<List<ProcessMethod>, String>
+  process = GeneratedColumn<String>(
+    'process',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  ).withConverter<List<ProcessMethod>>($CoffeeBeansTable.$converterprocess);
   @override
   late final GeneratedColumnWithTypeConverter<List<String>, String> flavorTags =
       GeneratedColumn<String>(
@@ -275,8 +275,8 @@ class $CoffeeBeansTable extends CoffeeBeans
     return $CoffeeBeansTable(attachedDatabase, alias);
   }
 
-  static TypeConverter<ProcessMethod?, String?> $converterprocess =
-      const TolerantEnumConverter<ProcessMethod>(ProcessMethod.values);
+  static TypeConverter<List<ProcessMethod>, String?> $converterprocess =
+      const ProcessListConverter();
   static TypeConverter<List<String>, String> $converterflavorTags =
       const StringListConverter();
 }
@@ -287,8 +287,12 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
   final String? origin;
   final String? farm;
 
-  /// 处理法，存枚举 name。
-  final ProcessMethod? process;
+  /// 处理法，JSON 数组（**可多选**，如「水洗 + 厌氧」）；NULL / `[]` = 没填。
+  ///
+  /// 保持可空、不加 SQL 默认值：v6 → v7 只要把老值改写成数组，**不用重建表** ——
+  /// 重建会 DROP `coffee_beans`，而它被批次/用量用外键引用着，会触发级联删除
+  /// （v1 → v4 那段注释里记过这个坑）。
+  final List<ProcessMethod> process;
 
   /// 风味标签，JSON 数组。属于「这款豆子」而不是某个批次。
   final List<String> flavorTags;
@@ -304,7 +308,7 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     required this.name,
     this.origin,
     this.farm,
-    this.process,
+    required this.process,
     required this.flavorTags,
     required this.isFavorite,
     this.photoPath,
@@ -323,7 +327,7 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     if (!nullToAbsent || farm != null) {
       map['farm'] = Variable<String>(farm);
     }
-    if (!nullToAbsent || process != null) {
+    {
       map['process'] = Variable<String>(
         $CoffeeBeansTable.$converterprocess.toSql(process),
       );
@@ -353,9 +357,7 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
           ? const Value.absent()
           : Value(origin),
       farm: farm == null && nullToAbsent ? const Value.absent() : Value(farm),
-      process: process == null && nullToAbsent
-          ? const Value.absent()
-          : Value(process),
+      process: Value(process),
       flavorTags: Value(flavorTags),
       isFavorite: Value(isFavorite),
       photoPath: photoPath == null && nullToAbsent
@@ -379,7 +381,7 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
       name: serializer.fromJson<String>(json['name']),
       origin: serializer.fromJson<String?>(json['origin']),
       farm: serializer.fromJson<String?>(json['farm']),
-      process: serializer.fromJson<ProcessMethod?>(json['process']),
+      process: serializer.fromJson<List<ProcessMethod>>(json['process']),
       flavorTags: serializer.fromJson<List<String>>(json['flavorTags']),
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
       photoPath: serializer.fromJson<String?>(json['photoPath']),
@@ -396,7 +398,7 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
       'name': serializer.toJson<String>(name),
       'origin': serializer.toJson<String?>(origin),
       'farm': serializer.toJson<String?>(farm),
-      'process': serializer.toJson<ProcessMethod?>(process),
+      'process': serializer.toJson<List<ProcessMethod>>(process),
       'flavorTags': serializer.toJson<List<String>>(flavorTags),
       'isFavorite': serializer.toJson<bool>(isFavorite),
       'photoPath': serializer.toJson<String?>(photoPath),
@@ -411,7 +413,7 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     String? name,
     Value<String?> origin = const Value.absent(),
     Value<String?> farm = const Value.absent(),
-    Value<ProcessMethod?> process = const Value.absent(),
+    List<ProcessMethod>? process,
     List<String>? flavorTags,
     bool? isFavorite,
     Value<String?> photoPath = const Value.absent(),
@@ -423,7 +425,7 @@ class CoffeeBeanRow extends DataClass implements Insertable<CoffeeBeanRow> {
     name: name ?? this.name,
     origin: origin.present ? origin.value : this.origin,
     farm: farm.present ? farm.value : this.farm,
-    process: process.present ? process.value : this.process,
+    process: process ?? this.process,
     flavorTags: flavorTags ?? this.flavorTags,
     isFavorite: isFavorite ?? this.isFavorite,
     photoPath: photoPath.present ? photoPath.value : this.photoPath,
@@ -505,7 +507,7 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
   final Value<String> name;
   final Value<String?> origin;
   final Value<String?> farm;
-  final Value<ProcessMethod?> process;
+  final Value<List<ProcessMethod>> process;
   final Value<List<String>> flavorTags;
   final Value<bool> isFavorite;
   final Value<String?> photoPath;
@@ -571,7 +573,7 @@ class CoffeeBeansCompanion extends UpdateCompanion<CoffeeBeanRow> {
     Value<String>? name,
     Value<String?>? origin,
     Value<String?>? farm,
-    Value<ProcessMethod?>? process,
+    Value<List<ProcessMethod>>? process,
     Value<List<String>>? flavorTags,
     Value<bool>? isFavorite,
     Value<String?>? photoPath,
@@ -1359,6 +1361,17 @@ class $GrindersTable extends Grinders
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _micronsPerClickMeta = const VerificationMeta(
+    'micronsPerClick',
+  );
+  @override
+  late final GeneratedColumn<double> micronsPerClick = GeneratedColumn<double>(
+    'microns_per_click',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _calibrationNoteMeta = const VerificationMeta(
     'calibrationNote',
   );
@@ -1412,6 +1425,7 @@ class $GrindersTable extends Grinders
     scaleUnit,
     zeroPoint,
     clicksPerRevolution,
+    micronsPerClick,
     calibrationNote,
     notes,
     createdAt,
@@ -1466,6 +1480,15 @@ class $GrindersTable extends Grinders
         clicksPerRevolution.isAcceptableOrUnknown(
           data['clicks_per_revolution']!,
           _clicksPerRevolutionMeta,
+        ),
+      );
+    }
+    if (data.containsKey('microns_per_click')) {
+      context.handle(
+        _micronsPerClickMeta,
+        micronsPerClick.isAcceptableOrUnknown(
+          data['microns_per_click']!,
+          _micronsPerClickMeta,
         ),
       );
     }
@@ -1535,6 +1558,10 @@ class $GrindersTable extends Grinders
         DriftSqlType.int,
         data['${effectivePrefix}clicks_per_revolution'],
       ),
+      micronsPerClick: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}microns_per_click'],
+      ),
       calibrationNote: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}calibration_note'],
@@ -1573,6 +1600,11 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
   final GrindScaleUnit? scaleUnit;
   final double? zeroPoint;
   final int? clicksPerRevolution;
+
+  /// 每 click 约等于多少微米（刀盘每格的位移量）。
+  ///
+  /// 用来把「调粗/调细了几格」换算成实际间隙变化，方便跨磨豆机对比。
+  final double? micronsPerClick;
   final String? calibrationNote;
   final String? notes;
   final DateTime createdAt;
@@ -1585,6 +1617,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     this.scaleUnit,
     this.zeroPoint,
     this.clicksPerRevolution,
+    this.micronsPerClick,
     this.calibrationNote,
     this.notes,
     required this.createdAt,
@@ -1609,6 +1642,9 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     }
     if (!nullToAbsent || clicksPerRevolution != null) {
       map['clicks_per_revolution'] = Variable<int>(clicksPerRevolution);
+    }
+    if (!nullToAbsent || micronsPerClick != null) {
+      map['microns_per_click'] = Variable<double>(micronsPerClick);
     }
     if (!nullToAbsent || calibrationNote != null) {
       map['calibration_note'] = Variable<String>(calibrationNote);
@@ -1638,6 +1674,9 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
       clicksPerRevolution: clicksPerRevolution == null && nullToAbsent
           ? const Value.absent()
           : Value(clicksPerRevolution),
+      micronsPerClick: micronsPerClick == null && nullToAbsent
+          ? const Value.absent()
+          : Value(micronsPerClick),
       calibrationNote: calibrationNote == null && nullToAbsent
           ? const Value.absent()
           : Value(calibrationNote),
@@ -1664,6 +1703,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
       clicksPerRevolution: serializer.fromJson<int?>(
         json['clicksPerRevolution'],
       ),
+      micronsPerClick: serializer.fromJson<double?>(json['micronsPerClick']),
       calibrationNote: serializer.fromJson<String?>(json['calibrationNote']),
       notes: serializer.fromJson<String?>(json['notes']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -1681,6 +1721,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
       'scaleUnit': serializer.toJson<GrindScaleUnit?>(scaleUnit),
       'zeroPoint': serializer.toJson<double?>(zeroPoint),
       'clicksPerRevolution': serializer.toJson<int?>(clicksPerRevolution),
+      'micronsPerClick': serializer.toJson<double?>(micronsPerClick),
       'calibrationNote': serializer.toJson<String?>(calibrationNote),
       'notes': serializer.toJson<String?>(notes),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -1696,6 +1737,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     Value<GrindScaleUnit?> scaleUnit = const Value.absent(),
     Value<double?> zeroPoint = const Value.absent(),
     Value<int?> clicksPerRevolution = const Value.absent(),
+    Value<double?> micronsPerClick = const Value.absent(),
     Value<String?> calibrationNote = const Value.absent(),
     Value<String?> notes = const Value.absent(),
     DateTime? createdAt,
@@ -1710,6 +1752,9 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     clicksPerRevolution: clicksPerRevolution.present
         ? clicksPerRevolution.value
         : this.clicksPerRevolution,
+    micronsPerClick: micronsPerClick.present
+        ? micronsPerClick.value
+        : this.micronsPerClick,
     calibrationNote: calibrationNote.present
         ? calibrationNote.value
         : this.calibrationNote,
@@ -1728,6 +1773,9 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
       clicksPerRevolution: data.clicksPerRevolution.present
           ? data.clicksPerRevolution.value
           : this.clicksPerRevolution,
+      micronsPerClick: data.micronsPerClick.present
+          ? data.micronsPerClick.value
+          : this.micronsPerClick,
       calibrationNote: data.calibrationNote.present
           ? data.calibrationNote.value
           : this.calibrationNote,
@@ -1747,6 +1795,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
           ..write('scaleUnit: $scaleUnit, ')
           ..write('zeroPoint: $zeroPoint, ')
           ..write('clicksPerRevolution: $clicksPerRevolution, ')
+          ..write('micronsPerClick: $micronsPerClick, ')
           ..write('calibrationNote: $calibrationNote, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
@@ -1764,6 +1813,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
     scaleUnit,
     zeroPoint,
     clicksPerRevolution,
+    micronsPerClick,
     calibrationNote,
     notes,
     createdAt,
@@ -1780,6 +1830,7 @@ class GrinderRow extends DataClass implements Insertable<GrinderRow> {
           other.scaleUnit == this.scaleUnit &&
           other.zeroPoint == this.zeroPoint &&
           other.clicksPerRevolution == this.clicksPerRevolution &&
+          other.micronsPerClick == this.micronsPerClick &&
           other.calibrationNote == this.calibrationNote &&
           other.notes == this.notes &&
           other.createdAt == this.createdAt &&
@@ -1794,6 +1845,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
   final Value<GrindScaleUnit?> scaleUnit;
   final Value<double?> zeroPoint;
   final Value<int?> clicksPerRevolution;
+  final Value<double?> micronsPerClick;
   final Value<String?> calibrationNote;
   final Value<String?> notes;
   final Value<DateTime> createdAt;
@@ -1806,6 +1858,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
     this.scaleUnit = const Value.absent(),
     this.zeroPoint = const Value.absent(),
     this.clicksPerRevolution = const Value.absent(),
+    this.micronsPerClick = const Value.absent(),
     this.calibrationNote = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -1819,6 +1872,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
     this.scaleUnit = const Value.absent(),
     this.zeroPoint = const Value.absent(),
     this.clicksPerRevolution = const Value.absent(),
+    this.micronsPerClick = const Value.absent(),
     this.calibrationNote = const Value.absent(),
     this.notes = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -1833,6 +1887,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
     Expression<String>? scaleUnit,
     Expression<double>? zeroPoint,
     Expression<int>? clicksPerRevolution,
+    Expression<double>? micronsPerClick,
     Expression<String>? calibrationNote,
     Expression<String>? notes,
     Expression<DateTime>? createdAt,
@@ -1847,6 +1902,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
       if (zeroPoint != null) 'zero_point': zeroPoint,
       if (clicksPerRevolution != null)
         'clicks_per_revolution': clicksPerRevolution,
+      if (micronsPerClick != null) 'microns_per_click': micronsPerClick,
       if (calibrationNote != null) 'calibration_note': calibrationNote,
       if (notes != null) 'notes': notes,
       if (createdAt != null) 'created_at': createdAt,
@@ -1862,6 +1918,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
     Value<GrindScaleUnit?>? scaleUnit,
     Value<double?>? zeroPoint,
     Value<int?>? clicksPerRevolution,
+    Value<double?>? micronsPerClick,
     Value<String?>? calibrationNote,
     Value<String?>? notes,
     Value<DateTime>? createdAt,
@@ -1875,6 +1932,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
       scaleUnit: scaleUnit ?? this.scaleUnit,
       zeroPoint: zeroPoint ?? this.zeroPoint,
       clicksPerRevolution: clicksPerRevolution ?? this.clicksPerRevolution,
+      micronsPerClick: micronsPerClick ?? this.micronsPerClick,
       calibrationNote: calibrationNote ?? this.calibrationNote,
       notes: notes ?? this.notes,
       createdAt: createdAt ?? this.createdAt,
@@ -1908,6 +1966,9 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
     if (clicksPerRevolution.present) {
       map['clicks_per_revolution'] = Variable<int>(clicksPerRevolution.value);
     }
+    if (micronsPerClick.present) {
+      map['microns_per_click'] = Variable<double>(micronsPerClick.value);
+    }
     if (calibrationNote.present) {
       map['calibration_note'] = Variable<String>(calibrationNote.value);
     }
@@ -1933,6 +1994,7 @@ class GrindersCompanion extends UpdateCompanion<GrinderRow> {
           ..write('scaleUnit: $scaleUnit, ')
           ..write('zeroPoint: $zeroPoint, ')
           ..write('clicksPerRevolution: $clicksPerRevolution, ')
+          ..write('micronsPerClick: $micronsPerClick, ')
           ..write('calibrationNote: $calibrationNote, ')
           ..write('notes: $notes, ')
           ..write('createdAt: $createdAt, ')
@@ -2810,6 +2872,28 @@ class $BrewLogsTable extends BrewLogs
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _grinderZeroPointSnapshotMeta =
+      const VerificationMeta('grinderZeroPointSnapshot');
+  @override
+  late final GeneratedColumn<double> grinderZeroPointSnapshot =
+      GeneratedColumn<double>(
+        'grinder_zero_point_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _grinderClicksPerRevolutionSnapshotMeta =
+      const VerificationMeta('grinderClicksPerRevolutionSnapshot');
+  @override
+  late final GeneratedColumn<int> grinderClicksPerRevolutionSnapshot =
+      GeneratedColumn<int>(
+        'grinder_clicks_per_revolution_snapshot',
+        aliasedName,
+        true,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+      );
   static const VerificationMeta _doseGramsMeta = const VerificationMeta(
     'doseGrams',
   );
@@ -3127,6 +3211,8 @@ class $BrewLogsTable extends BrewLogs
     methodLabel,
     grindSetting,
     grindClicks,
+    grinderZeroPointSnapshot,
+    grinderClicksPerRevolutionSnapshot,
     doseGrams,
     waterGrams,
     ratio,
@@ -3213,6 +3299,24 @@ class $BrewLogsTable extends BrewLogs
         grindClicks.isAcceptableOrUnknown(
           data['grind_clicks']!,
           _grindClicksMeta,
+        ),
+      );
+    }
+    if (data.containsKey('grinder_zero_point_snapshot')) {
+      context.handle(
+        _grinderZeroPointSnapshotMeta,
+        grinderZeroPointSnapshot.isAcceptableOrUnknown(
+          data['grinder_zero_point_snapshot']!,
+          _grinderZeroPointSnapshotMeta,
+        ),
+      );
+    }
+    if (data.containsKey('grinder_clicks_per_revolution_snapshot')) {
+      context.handle(
+        _grinderClicksPerRevolutionSnapshotMeta,
+        grinderClicksPerRevolutionSnapshot.isAcceptableOrUnknown(
+          data['grinder_clicks_per_revolution_snapshot']!,
+          _grinderClicksPerRevolutionSnapshotMeta,
         ),
       );
     }
@@ -3427,6 +3531,14 @@ class $BrewLogsTable extends BrewLogs
         DriftSqlType.int,
         data['${effectivePrefix}grind_clicks'],
       ),
+      grinderZeroPointSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}grinder_zero_point_snapshot'],
+      ),
+      grinderClicksPerRevolutionSnapshot: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}grinder_clicks_per_revolution_snapshot'],
+      ),
       doseGrams: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}dose_grams'],
@@ -3580,6 +3692,15 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
   final double? grindSetting;
   final int? grindClicks;
 
+  /// 当时的磨豆机零点（快照）。
+  ///
+  /// 「老研磨度关联老记录」：换了刻度或重新校准零点之后，
+  /// 老记录仍然按**当时**的零点解释，不会被新零点重新换算。
+  final double? grinderZeroPointSnapshot;
+
+  /// 当时的「每圈 click」（快照），同上。
+  final int? grinderClicksPerRevolutionSnapshot;
+
   /// 总粉量（拼配时是各支豆子之和）。
   final double? doseGrams;
   final double? waterGrams;
@@ -3636,6 +3757,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     this.methodLabel,
     this.grindSetting,
     this.grindClicks,
+    this.grinderZeroPointSnapshot,
+    this.grinderClicksPerRevolutionSnapshot,
     this.doseGrams,
     this.waterGrams,
     this.ratio,
@@ -3691,6 +3814,16 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     }
     if (!nullToAbsent || grindClicks != null) {
       map['grind_clicks'] = Variable<int>(grindClicks);
+    }
+    if (!nullToAbsent || grinderZeroPointSnapshot != null) {
+      map['grinder_zero_point_snapshot'] = Variable<double>(
+        grinderZeroPointSnapshot,
+      );
+    }
+    if (!nullToAbsent || grinderClicksPerRevolutionSnapshot != null) {
+      map['grinder_clicks_per_revolution_snapshot'] = Variable<int>(
+        grinderClicksPerRevolutionSnapshot,
+      );
     }
     if (!nullToAbsent || doseGrams != null) {
       map['dose_grams'] = Variable<double>(doseGrams);
@@ -3799,6 +3932,13 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       grindClicks: grindClicks == null && nullToAbsent
           ? const Value.absent()
           : Value(grindClicks),
+      grinderZeroPointSnapshot: grinderZeroPointSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(grinderZeroPointSnapshot),
+      grinderClicksPerRevolutionSnapshot:
+          grinderClicksPerRevolutionSnapshot == null && nullToAbsent
+          ? const Value.absent()
+          : Value(grinderClicksPerRevolutionSnapshot),
       doseGrams: doseGrams == null && nullToAbsent
           ? const Value.absent()
           : Value(doseGrams),
@@ -3886,6 +4026,12 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       methodLabel: serializer.fromJson<String?>(json['methodLabel']),
       grindSetting: serializer.fromJson<double?>(json['grindSetting']),
       grindClicks: serializer.fromJson<int?>(json['grindClicks']),
+      grinderZeroPointSnapshot: serializer.fromJson<double?>(
+        json['grinderZeroPointSnapshot'],
+      ),
+      grinderClicksPerRevolutionSnapshot: serializer.fromJson<int?>(
+        json['grinderClicksPerRevolutionSnapshot'],
+      ),
       doseGrams: serializer.fromJson<double?>(json['doseGrams']),
       waterGrams: serializer.fromJson<double?>(json['waterGrams']),
       ratio: serializer.fromJson<double?>(json['ratio']),
@@ -3930,6 +4076,12 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       'methodLabel': serializer.toJson<String?>(methodLabel),
       'grindSetting': serializer.toJson<double?>(grindSetting),
       'grindClicks': serializer.toJson<int?>(grindClicks),
+      'grinderZeroPointSnapshot': serializer.toJson<double?>(
+        grinderZeroPointSnapshot,
+      ),
+      'grinderClicksPerRevolutionSnapshot': serializer.toJson<int?>(
+        grinderClicksPerRevolutionSnapshot,
+      ),
       'doseGrams': serializer.toJson<double?>(doseGrams),
       'waterGrams': serializer.toJson<double?>(waterGrams),
       'ratio': serializer.toJson<double?>(ratio),
@@ -3970,6 +4122,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     Value<String?> methodLabel = const Value.absent(),
     Value<double?> grindSetting = const Value.absent(),
     Value<int?> grindClicks = const Value.absent(),
+    Value<double?> grinderZeroPointSnapshot = const Value.absent(),
+    Value<int?> grinderClicksPerRevolutionSnapshot = const Value.absent(),
     Value<double?> doseGrams = const Value.absent(),
     Value<double?> waterGrams = const Value.absent(),
     Value<double?> ratio = const Value.absent(),
@@ -4007,6 +4161,13 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     methodLabel: methodLabel.present ? methodLabel.value : this.methodLabel,
     grindSetting: grindSetting.present ? grindSetting.value : this.grindSetting,
     grindClicks: grindClicks.present ? grindClicks.value : this.grindClicks,
+    grinderZeroPointSnapshot: grinderZeroPointSnapshot.present
+        ? grinderZeroPointSnapshot.value
+        : this.grinderZeroPointSnapshot,
+    grinderClicksPerRevolutionSnapshot:
+        grinderClicksPerRevolutionSnapshot.present
+        ? grinderClicksPerRevolutionSnapshot.value
+        : this.grinderClicksPerRevolutionSnapshot,
     doseGrams: doseGrams.present ? doseGrams.value : this.doseGrams,
     waterGrams: waterGrams.present ? waterGrams.value : this.waterGrams,
     ratio: ratio.present ? ratio.value : this.ratio,
@@ -4064,6 +4225,13 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
       grindClicks: data.grindClicks.present
           ? data.grindClicks.value
           : this.grindClicks,
+      grinderZeroPointSnapshot: data.grinderZeroPointSnapshot.present
+          ? data.grinderZeroPointSnapshot.value
+          : this.grinderZeroPointSnapshot,
+      grinderClicksPerRevolutionSnapshot:
+          data.grinderClicksPerRevolutionSnapshot.present
+          ? data.grinderClicksPerRevolutionSnapshot.value
+          : this.grinderClicksPerRevolutionSnapshot,
       doseGrams: data.doseGrams.present ? data.doseGrams.value : this.doseGrams,
       waterGrams: data.waterGrams.present
           ? data.waterGrams.value
@@ -4130,6 +4298,10 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           ..write('methodLabel: $methodLabel, ')
           ..write('grindSetting: $grindSetting, ')
           ..write('grindClicks: $grindClicks, ')
+          ..write('grinderZeroPointSnapshot: $grinderZeroPointSnapshot, ')
+          ..write(
+            'grinderClicksPerRevolutionSnapshot: $grinderClicksPerRevolutionSnapshot, ',
+          )
           ..write('doseGrams: $doseGrams, ')
           ..write('waterGrams: $waterGrams, ')
           ..write('ratio: $ratio, ')
@@ -4172,6 +4344,8 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
     methodLabel,
     grindSetting,
     grindClicks,
+    grinderZeroPointSnapshot,
+    grinderClicksPerRevolutionSnapshot,
     doseGrams,
     waterGrams,
     ratio,
@@ -4213,6 +4387,9 @@ class BrewLogRow extends DataClass implements Insertable<BrewLogRow> {
           other.methodLabel == this.methodLabel &&
           other.grindSetting == this.grindSetting &&
           other.grindClicks == this.grindClicks &&
+          other.grinderZeroPointSnapshot == this.grinderZeroPointSnapshot &&
+          other.grinderClicksPerRevolutionSnapshot ==
+              this.grinderClicksPerRevolutionSnapshot &&
           other.doseGrams == this.doseGrams &&
           other.waterGrams == this.waterGrams &&
           other.ratio == this.ratio &&
@@ -4252,6 +4429,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
   final Value<String?> methodLabel;
   final Value<double?> grindSetting;
   final Value<int?> grindClicks;
+  final Value<double?> grinderZeroPointSnapshot;
+  final Value<int?> grinderClicksPerRevolutionSnapshot;
   final Value<double?> doseGrams;
   final Value<double?> waterGrams;
   final Value<double?> ratio;
@@ -4289,6 +4468,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     this.methodLabel = const Value.absent(),
     this.grindSetting = const Value.absent(),
     this.grindClicks = const Value.absent(),
+    this.grinderZeroPointSnapshot = const Value.absent(),
+    this.grinderClicksPerRevolutionSnapshot = const Value.absent(),
     this.doseGrams = const Value.absent(),
     this.waterGrams = const Value.absent(),
     this.ratio = const Value.absent(),
@@ -4327,6 +4508,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     this.methodLabel = const Value.absent(),
     this.grindSetting = const Value.absent(),
     this.grindClicks = const Value.absent(),
+    this.grinderZeroPointSnapshot = const Value.absent(),
+    this.grinderClicksPerRevolutionSnapshot = const Value.absent(),
     this.doseGrams = const Value.absent(),
     this.waterGrams = const Value.absent(),
     this.ratio = const Value.absent(),
@@ -4365,6 +4548,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Expression<String>? methodLabel,
     Expression<double>? grindSetting,
     Expression<int>? grindClicks,
+    Expression<double>? grinderZeroPointSnapshot,
+    Expression<int>? grinderClicksPerRevolutionSnapshot,
     Expression<double>? doseGrams,
     Expression<double>? waterGrams,
     Expression<double>? ratio,
@@ -4403,6 +4588,11 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       if (methodLabel != null) 'method_label': methodLabel,
       if (grindSetting != null) 'grind_setting': grindSetting,
       if (grindClicks != null) 'grind_clicks': grindClicks,
+      if (grinderZeroPointSnapshot != null)
+        'grinder_zero_point_snapshot': grinderZeroPointSnapshot,
+      if (grinderClicksPerRevolutionSnapshot != null)
+        'grinder_clicks_per_revolution_snapshot':
+            grinderClicksPerRevolutionSnapshot,
       if (doseGrams != null) 'dose_grams': doseGrams,
       if (waterGrams != null) 'water_grams': waterGrams,
       if (ratio != null) 'ratio': ratio,
@@ -4444,6 +4634,8 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     Value<String?>? methodLabel,
     Value<double?>? grindSetting,
     Value<int?>? grindClicks,
+    Value<double?>? grinderZeroPointSnapshot,
+    Value<int?>? grinderClicksPerRevolutionSnapshot,
     Value<double?>? doseGrams,
     Value<double?>? waterGrams,
     Value<double?>? ratio,
@@ -4482,6 +4674,11 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
       methodLabel: methodLabel ?? this.methodLabel,
       grindSetting: grindSetting ?? this.grindSetting,
       grindClicks: grindClicks ?? this.grindClicks,
+      grinderZeroPointSnapshot:
+          grinderZeroPointSnapshot ?? this.grinderZeroPointSnapshot,
+      grinderClicksPerRevolutionSnapshot:
+          grinderClicksPerRevolutionSnapshot ??
+          this.grinderClicksPerRevolutionSnapshot,
       doseGrams: doseGrams ?? this.doseGrams,
       waterGrams: waterGrams ?? this.waterGrams,
       ratio: ratio ?? this.ratio,
@@ -4541,6 +4738,16 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
     }
     if (grindClicks.present) {
       map['grind_clicks'] = Variable<int>(grindClicks.value);
+    }
+    if (grinderZeroPointSnapshot.present) {
+      map['grinder_zero_point_snapshot'] = Variable<double>(
+        grinderZeroPointSnapshot.value,
+      );
+    }
+    if (grinderClicksPerRevolutionSnapshot.present) {
+      map['grinder_clicks_per_revolution_snapshot'] = Variable<int>(
+        grinderClicksPerRevolutionSnapshot.value,
+      );
     }
     if (doseGrams.present) {
       map['dose_grams'] = Variable<double>(doseGrams.value);
@@ -4646,6 +4853,10 @@ class BrewLogsCompanion extends UpdateCompanion<BrewLogRow> {
           ..write('methodLabel: $methodLabel, ')
           ..write('grindSetting: $grindSetting, ')
           ..write('grindClicks: $grindClicks, ')
+          ..write('grinderZeroPointSnapshot: $grinderZeroPointSnapshot, ')
+          ..write(
+            'grinderClicksPerRevolutionSnapshot: $grinderClicksPerRevolutionSnapshot, ',
+          )
           ..write('doseGrams: $doseGrams, ')
           ..write('waterGrams: $waterGrams, ')
           ..write('ratio: $ratio, ')
@@ -6655,7 +6866,7 @@ typedef $$CoffeeBeansTableCreateCompanionBuilder =
       required String name,
       Value<String?> origin,
       Value<String?> farm,
-      Value<ProcessMethod?> process,
+      Value<List<ProcessMethod>> process,
       Value<List<String>> flavorTags,
       Value<bool> isFavorite,
       Value<String?> photoPath,
@@ -6669,7 +6880,7 @@ typedef $$CoffeeBeansTableUpdateCompanionBuilder =
       Value<String> name,
       Value<String?> origin,
       Value<String?> farm,
-      Value<ProcessMethod?> process,
+      Value<List<ProcessMethod>> process,
       Value<List<String>> flavorTags,
       Value<bool> isFavorite,
       Value<String?> photoPath,
@@ -6766,7 +6977,11 @@ class $$CoffeeBeansTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnWithTypeConverterFilters<ProcessMethod?, ProcessMethod, String>
+  ColumnWithTypeConverterFilters<
+    List<ProcessMethod>,
+    List<ProcessMethod>,
+    String
+  >
   get process => $composableBuilder(
     column: $table.process,
     builder: (column) => ColumnWithTypeConverterFilters(column),
@@ -6965,7 +7180,7 @@ class $$CoffeeBeansTableAnnotationComposer
   GeneratedColumn<String> get farm =>
       $composableBuilder(column: $table.farm, builder: (column) => column);
 
-  GeneratedColumnWithTypeConverter<ProcessMethod?, String> get process =>
+  GeneratedColumnWithTypeConverter<List<ProcessMethod>, String> get process =>
       $composableBuilder(column: $table.process, builder: (column) => column);
 
   GeneratedColumnWithTypeConverter<List<String>, String> get flavorTags =>
@@ -7103,7 +7318,7 @@ class $$CoffeeBeansTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<String?> origin = const Value.absent(),
                 Value<String?> farm = const Value.absent(),
-                Value<ProcessMethod?> process = const Value.absent(),
+                Value<List<ProcessMethod>> process = const Value.absent(),
                 Value<List<String>> flavorTags = const Value.absent(),
                 Value<bool> isFavorite = const Value.absent(),
                 Value<String?> photoPath = const Value.absent(),
@@ -7129,7 +7344,7 @@ class $$CoffeeBeansTableTableManager
                 required String name,
                 Value<String?> origin = const Value.absent(),
                 Value<String?> farm = const Value.absent(),
-                Value<ProcessMethod?> process = const Value.absent(),
+                Value<List<ProcessMethod>> process = const Value.absent(),
                 Value<List<String>> flavorTags = const Value.absent(),
                 Value<bool> isFavorite = const Value.absent(),
                 Value<String?> photoPath = const Value.absent(),
@@ -7770,6 +7985,7 @@ typedef $$GrindersTableCreateCompanionBuilder = GrindersCompanion Function({
   Value<GrindScaleUnit?> scaleUnit,
   Value<double?> zeroPoint,
   Value<int?> clicksPerRevolution,
+  Value<double?> micronsPerClick,
   Value<String?> calibrationNote,
   Value<String?> notes,
   Value<DateTime> createdAt,
@@ -7783,6 +7999,7 @@ typedef $$GrindersTableUpdateCompanionBuilder = GrindersCompanion Function({
   Value<GrindScaleUnit?> scaleUnit,
   Value<double?> zeroPoint,
   Value<int?> clicksPerRevolution,
+  Value<double?> micronsPerClick,
   Value<String?> calibrationNote,
   Value<String?> notes,
   Value<DateTime> createdAt,
@@ -7854,6 +8071,11 @@ class $$GrindersTableFilterComposer
 
   ColumnFilters<int> get clicksPerRevolution => $composableBuilder(
     column: $table.clicksPerRevolution,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get micronsPerClick => $composableBuilder(
+    column: $table.micronsPerClick,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7947,6 +8169,11 @@ class $$GrindersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get micronsPerClick => $composableBuilder(
+    column: $table.micronsPerClick,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get calibrationNote => $composableBuilder(
     column: $table.calibrationNote,
     builder: (column) => ColumnOrderings(column),
@@ -7997,6 +8224,11 @@ class $$GrindersTableAnnotationComposer
 
   GeneratedColumn<int> get clicksPerRevolution => $composableBuilder(
     column: $table.clicksPerRevolution,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get micronsPerClick => $composableBuilder(
+    column: $table.micronsPerClick,
     builder: (column) => column,
   );
 
@@ -8075,6 +8307,7 @@ class $$GrindersTableTableManager
                 Value<GrindScaleUnit?> scaleUnit = const Value.absent(),
                 Value<double?> zeroPoint = const Value.absent(),
                 Value<int?> clicksPerRevolution = const Value.absent(),
+                Value<double?> micronsPerClick = const Value.absent(),
                 Value<String?> calibrationNote = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -8087,6 +8320,7 @@ class $$GrindersTableTableManager
                 scaleUnit: scaleUnit,
                 zeroPoint: zeroPoint,
                 clicksPerRevolution: clicksPerRevolution,
+                micronsPerClick: micronsPerClick,
                 calibrationNote: calibrationNote,
                 notes: notes,
                 createdAt: createdAt,
@@ -8101,6 +8335,7 @@ class $$GrindersTableTableManager
                 Value<GrindScaleUnit?> scaleUnit = const Value.absent(),
                 Value<double?> zeroPoint = const Value.absent(),
                 Value<int?> clicksPerRevolution = const Value.absent(),
+                Value<double?> micronsPerClick = const Value.absent(),
                 Value<String?> calibrationNote = const Value.absent(),
                 Value<String?> notes = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -8113,6 +8348,7 @@ class $$GrindersTableTableManager
                 scaleUnit: scaleUnit,
                 zeroPoint: zeroPoint,
                 clicksPerRevolution: clicksPerRevolution,
+                micronsPerClick: micronsPerClick,
                 calibrationNote: calibrationNote,
                 notes: notes,
                 createdAt: createdAt,
@@ -8631,6 +8867,8 @@ typedef $$BrewLogsTableCreateCompanionBuilder = BrewLogsCompanion Function({
   Value<String?> methodLabel,
   Value<double?> grindSetting,
   Value<int?> grindClicks,
+  Value<double?> grinderZeroPointSnapshot,
+  Value<int?> grinderClicksPerRevolutionSnapshot,
   Value<double?> doseGrams,
   Value<double?> waterGrams,
   Value<double?> ratio,
@@ -8669,6 +8907,8 @@ typedef $$BrewLogsTableUpdateCompanionBuilder = BrewLogsCompanion Function({
   Value<String?> methodLabel,
   Value<double?> grindSetting,
   Value<int?> grindClicks,
+  Value<double?> grinderZeroPointSnapshot,
+  Value<int?> grinderClicksPerRevolutionSnapshot,
   Value<double?> doseGrams,
   Value<double?> waterGrams,
   Value<double?> ratio,
@@ -8825,6 +9065,17 @@ class $$BrewLogsTableFilterComposer
     column: $table.grindClicks,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<double> get grinderZeroPointSnapshot => $composableBuilder(
+    column: $table.grinderZeroPointSnapshot,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get grinderClicksPerRevolutionSnapshot =>
+      $composableBuilder(
+        column: $table.grinderClicksPerRevolutionSnapshot,
+        builder: (column) => ColumnFilters(column),
+      );
 
   ColumnFilters<double> get doseGrams => $composableBuilder(
     column: $table.doseGrams,
@@ -9123,6 +9374,17 @@ class $$BrewLogsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get grinderZeroPointSnapshot => $composableBuilder(
+    column: $table.grinderZeroPointSnapshot,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get grinderClicksPerRevolutionSnapshot =>
+      $composableBuilder(
+        column: $table.grinderClicksPerRevolutionSnapshot,
+        builder: (column) => ColumnOrderings(column),
+      );
+
   ColumnOrderings<double> get doseGrams => $composableBuilder(
     column: $table.doseGrams,
     builder: (column) => ColumnOrderings(column),
@@ -9362,6 +9624,17 @@ class $$BrewLogsTableAnnotationComposer
     column: $table.grindClicks,
     builder: (column) => column,
   );
+
+  GeneratedColumn<double> get grinderZeroPointSnapshot => $composableBuilder(
+    column: $table.grinderZeroPointSnapshot,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get grinderClicksPerRevolutionSnapshot =>
+      $composableBuilder(
+        column: $table.grinderClicksPerRevolutionSnapshot,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<double> get doseGrams =>
       $composableBuilder(column: $table.doseGrams, builder: (column) => column);
@@ -9636,6 +9909,9 @@ class $$BrewLogsTableTableManager
                 Value<String?> methodLabel = const Value.absent(),
                 Value<double?> grindSetting = const Value.absent(),
                 Value<int?> grindClicks = const Value.absent(),
+                Value<double?> grinderZeroPointSnapshot = const Value.absent(),
+                Value<int?> grinderClicksPerRevolutionSnapshot =
+                    const Value.absent(),
                 Value<double?> doseGrams = const Value.absent(),
                 Value<double?> waterGrams = const Value.absent(),
                 Value<double?> ratio = const Value.absent(),
@@ -9673,6 +9949,9 @@ class $$BrewLogsTableTableManager
                 methodLabel: methodLabel,
                 grindSetting: grindSetting,
                 grindClicks: grindClicks,
+                grinderZeroPointSnapshot: grinderZeroPointSnapshot,
+                grinderClicksPerRevolutionSnapshot:
+                    grinderClicksPerRevolutionSnapshot,
                 doseGrams: doseGrams,
                 waterGrams: waterGrams,
                 ratio: ratio,
@@ -9712,6 +9991,9 @@ class $$BrewLogsTableTableManager
                 Value<String?> methodLabel = const Value.absent(),
                 Value<double?> grindSetting = const Value.absent(),
                 Value<int?> grindClicks = const Value.absent(),
+                Value<double?> grinderZeroPointSnapshot = const Value.absent(),
+                Value<int?> grinderClicksPerRevolutionSnapshot =
+                    const Value.absent(),
                 Value<double?> doseGrams = const Value.absent(),
                 Value<double?> waterGrams = const Value.absent(),
                 Value<double?> ratio = const Value.absent(),
@@ -9749,6 +10031,9 @@ class $$BrewLogsTableTableManager
                 methodLabel: methodLabel,
                 grindSetting: grindSetting,
                 grindClicks: grindClicks,
+                grinderZeroPointSnapshot: grinderZeroPointSnapshot,
+                grinderClicksPerRevolutionSnapshot:
+                    grinderClicksPerRevolutionSnapshot,
                 doseGrams: doseGrams,
                 waterGrams: waterGrams,
                 ratio: ratio,
