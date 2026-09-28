@@ -182,6 +182,7 @@ class IntField extends StatelessWidget {
     this.hintText,
     this.suffixText,
     this.validator,
+    this.onChanged,
     this.textInputAction = TextInputAction.next,
   });
 
@@ -189,6 +190,9 @@ class IntField extends StatelessWidget {
   final String? hintText;
   final String? suffixText;
   final String? Function(String?)? validator;
+
+  /// 只要文本变了就回调，用来刷新依赖这个值的提示行。
+  final ValueChanged<int?>? onChanged;
   final TextInputAction textInputAction;
 
   @override
@@ -201,6 +205,7 @@ class IntField extends StatelessWidget {
         FilteringTextInputFormatter.digitsOnly,
       ],
       validator: validator,
+      onChanged: (String value) => onChanged?.call(int.tryParse(value.trim())),
       decoration: InputDecoration(
         hintText: hintText,
         suffixText: suffixText,
