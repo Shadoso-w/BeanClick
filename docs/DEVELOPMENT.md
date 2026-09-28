@@ -166,6 +166,81 @@ _db.delete(_db.brewLogs);
 
 `AppSettings` 用 `key` 作主键，写入走 `insertOnConflictUpdate` 实现 upsert。
 
+### 7.4 数据库迁移（改表结构时必读）
+
+`schemaVersion` 目前是 **7**。历史是 `1 → 4 → 5 → 6 → 7`（v2 / v3 从未存在过，
+`git log -L` 可以确认）。迁移按版本逐段写在 `lib/data/database.dart` 的
+`_upgradeToV4` / `_upgradeToV5` / `_upgradeToV6` / `_upgradeToV7` 里。
+
+**M2.6（v4）及以后的数据，任何升级都必须保住。** 这件事由工具锁住，不靠记性：
+
+| 文件 | 作用 |
+|---|---|
+| `test/drift/schemas/drift_schema_v4.json` … `_v7.json` | 每个版本的**冻结快照** |
+| `test/drift/generated/` | 配套校验代码（由快照生成） |
+| `test/data/schema_snapshot_test.dart` | 两个守门用例（见下） |
+
+```powershell
+# 改完表结构后重新生成快照与校验代码（两个命令都要跑）
+dart run drift_dev schema dump lib/data/database.dart test/drift/schemas
+dart run drift_dev schema generate test/drift/schemas test/drift/generated
+```
+
+两个守门用例分别挡住两类事故：
+
+1. **改了表却忘了 dump 新快照** → `migrateAndValidate(db, 当前版本)` 逐列比对
+   （类型、NOT NULL、DEFAULT、外键、索引都算），失败信息会直接点名
+   `Contains the following unexpected entries: xxx_column`。
+2. **改了表却没写迁移** → 每个历史版本各有一个数据夹具（`_fixtures`，键就是
+   `schemaVersion`）：拿那个版本的快照灌入真实数据（两支豆子 / 两袋 /
+   一条拼配记录 + 用量行 / 一条扩展属性 / 两个改过的设置项 / 处理法 / 辅料），
+   用当前代码打开（**真的跑 `onUpgrade`**），再断言数据一条不少、值没变、
+   迁移后余量扣减照常工作。`GeneratedHelper.versions` 列出所有 dump 过的版本，
+   所以**新 dump 一个快照就必须补一份夹具**，否则用例会直接点名要你补。
+
+   `newVersion` 取的是 `AppDatabase.schemaVersion`，所以版本一升就被覆盖到；
+   升级链条 `1 → 4 → 5 → 6 → 7` 的逐段行为另由
+   `test/data/migration_v1_to_v4_test.dart` 从 v1 库整体跑一遍（含
+   `PRAGMA table_info` / `foreign_key_list` 的结构比对与「迁移只跑一次」）。
+
+三条硬规矩：
+
+1. **`onUpgrade` 必须是逐列迁移**，不能删表重建。用户的数据只有这一份。
+2. **搬迁顺序不能变**：先建新表 → 搬数据到新表 → 最后才删旧列。
+   旧列一删，数据就没有第二个来源了。
+3. **改表必须配一个「旧库升上来」的测试**。逐版本路径见
+   `test/data/schema_snapshot_test.dart`（每个版本一份夹具）；
+   v1 → v4 那次的写法见 `test/data/migration_v1_to_v4_test.dart`：
+   造一个旧版本库（建表语句从旧提交 dump 出来）、跑迁移、断言数据没丢
+   **且结构与全新建库完全一致**（`PRAGMA table_info` / `foreign_key_list` /
+   `sqlite_master` 对比）。只比列名不够，`NOT NULL`、`DEFAULT`、漏建索引都要能测出来。
+
+> 写新迁移时可以先用 `dart run drift_dev schema steps test/drift/schemas lib/data/migrations.dart`
+> 生成 `stepByStep` 辅助代码，逐版本搬运更省事。
+
+**为什么这里一律用 `addColumn` / `dropColumn` + 改写值，而不是 `alterTable` 重建表**：
+重建要 DROP 掉父表，而 `coffee_beans` 被 `bean_batches` / `brew_log_beans` /
+`brew_logs` 用外键引用着，删父表会触发级联删除，把刚搬好的数据一起删掉。
+`ALTER TABLE ... ADD/DROP COLUMN` 不动表本身，没有这个风险
+（要求 SQLite ≥ 3.35；本项目通过 `sqlite3_flutter_libs` 自带较新的 SQLite，
+不受 Android 系统版本限制）。v4 → v5 → v6 → v7 全部是这类纯新增 / 改写值，
+没有一次重建表。同理，改**枚举的存储编码**时（例如 v7 把 `process` 从单个
+名字改写成 JSON 数组），要配一个能容忍新旧两种写法的转换器
+（`ProcessListConverter`），否则读到一半的库会直接抛异常。
+
+**造旧库来测迁移**：不要手抄旧建表语句。用 `git worktree` 把旧提交检出到另一个目录，
+写个临时的 test 打印 `sqlite_master`：
+
+```dart
+final rows = await db.customSelect(
+  "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL "
+  "AND name NOT LIKE 'sqlite_%' ORDER BY type, name").get();
+```
+
+> 工作树里跑 `dart run` 会要求重新下载 sqlite3 原生库（GitHub 直连会超时）。
+> 把主仓库的 `.dart_tool\hooks_runner\shared`（以及根目录的 `sqlite3.dll`，
+> 它是 gitignore 的）拷过去，然后用 `flutter test`（不是 `dart run`）执行那个临时脚本。
+
 ---
 
 ## 8. 测试注意事项
@@ -229,6 +304,21 @@ await tester.ensureVisible(field);
 `find.text('15')` 找不到它。本项目给关键字段加了 `Key`（`brew.dose`、`bean.name`、
 `grinder.brand` 等），测试用 `find.byKey` 定位，比按 hint 文字或按下标更稳。
 
+**`scrollUntilVisible` 只朝一个方向滚。** 它（内部是 `dragUntilVisible`）固定把列表
+往下推，所以目标在**上方**时永远滚不到：滚满 50 次后抛 `Bad state: No element`
+（不是「找不到控件」那种友好报错）。典型触发场景：先填下面的「粉量」，再回头点上面
+豆子那一栏的按钮。
+
+因此 `test/helpers/widget_harness.dart` 给 `WidgetTester` 加了扩展
+（`scrollTo` / `fillField` / `readField` / `tapKey` / `tapTextScrolled` /
+`tapSaveButton`）：先看控件在不在树里，不在就**先拉回顶部**再往下找，两个方向都能到。
+
+```dart
+await tester.fillField('brew.dose', '20');
+await tester.tapKey('brew.addPick');     // 这个按钮在上方，也不会失败
+await tester.tapSaveButton();
+```
+
 ### 8.4 内存库测试
 
 仓储测试统一用 `AppDatabase.memory()`（SQLite 内存库），
@@ -258,6 +348,33 @@ flutter_test 里**先注册的 setUp 先执行**。`setUpWidgetTest()` 在 `main
 （容器里还是旧实例）。
 
 因此 `WidgetTestHarness.useOverrides()` 除了存下构造器，还会**立刻重建容器**。
+
+### 8.7 批次模型下的夹具
+
+批次模型（schema v4）之后，「余量 / 购入总重 / 价格 / 烘焙日期」都在**批次**上，
+不在豆子上。测试里不要再手写 `CoffeeBean(remainingGrams: ...)`——那个构造函数
+已经没有这些参数了。两个脚手架都提供了组合夹具：
+
+```dart
+final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
+// a.beanId / a.batchId
+await harness.addBrewLog(beanId: a.beanId, batchId: a.batchId, doseGrams: 15);
+```
+
+断言余量时要落到批次：
+
+```dart
+final BeanBatch batch = (await beanRepo.getBatch(a.batchId))!;
+expect(batch.remainingGrams, 185);
+```
+
+反过来，**UI 保存后要顺手断言批次**。踩过一次：`brew_log_form_page` 一度只写
+`brew_logs.doseGrams`、不同步 `brew_log_beans.doseGrams`，于是「编辑粉量」把
+`doseGrams` 改了、余量却一分没动，而只断言 `log.doseGrams` 的测试全绿。
+现在的做法是表单在 `_save` 里用 `_syncUsages()` 把豆子选择与粉量对齐成用量行。
+
+`tapText` 这类按文字点的辅助函数要先滚动再点：视口外的控件**根本不存在**，
+`ensureVisible` 会抛 `Bad state: No element`（不是"找到了但不可见"）。
 
 ---
 
@@ -302,14 +419,21 @@ keytool -genkeypair -v `
 
 ## 10. 应用图标
 
-图标是**代码画出来的**（`System.Drawing`），没有外部素材，也没有引图标生成器。
-几何比例、配色与重新生成方法见 [`tool/README.md`](../tool/README.md)。
+图标是**用户提供的成品图**（米白圆角方块 + 深棕圆环 + 咖啡豆 + 一圈刻度点）：
 
-改动 `mipmap-*` 后必须重新构建 APK 才生效（编译期资源）。
+- 原图留档 `assets/icon/app_icon_source.png`
+- 生成脚本 `tool/make_app_icons.ps1`（把原图切成传统图标 / 自适应前景，
+  按亮度抠掉白色页面与米白背景），详细说明见 [`tool/README.md`](../tool/README.md)
+- 自适应图标的 XML 在 `res/mipmap-anydpi-v26/`，背景色 `#F3EBDC` 在 `res/values/colors.xml`
+- **自适应前景按 `$foregroundKeep`（当前 0.88）缩小后居中**：系统只显示画布中间
+  67%（圆形）～78%（MIUI 圆角方形），原图铺满时圆环几乎贴到遮罩边缘。
+  改这一个数字即可调松紧，用 `tool/icon_review_sheet.ps1 -Keep <值>` 出对照表复核
 
-> 生成脚本本身没有留在仓库里：Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，
+改动 `mipmap-*` 后必须重新构建 APK 才生效（编译期资源）；
+桌面可能缓存旧图标，重装后若还是旧的，重启桌面或卸载重装。
+
+> 脚本本身只有英文注释：Windows PowerShell 5.1 会把无 BOM 的 UTF-8 当 ANSI 读，
 > 中文注释被解码坏以后会连带把语法解析搞崩（报 `Unexpected token '}'`）。
-> `tool/README.md` 里记录了全部参数，需要时重建即可。
 
 ---
 
@@ -321,16 +445,48 @@ keytool -genkeypair -v `
 |---|---|
 | `flutter doctor` | Flutter / Android toolchain / 设备全部通过（Chrome 与 VS 缺失，与安卓无关） |
 | `flutter analyze` | `No issues found!`，退出码 0 |
-| `flutter test` | 117 个测试全部通过，退出码 0 |
-| `flutter build apk --release --split-per-abi` | 成功，约 2.3 分钟 |
+| `dart format --output=none --set-exit-if-changed .` | 0 处改动，退出码 0（CI 同款检查） |
+| `dart run build_runner build --delete-conflicting-outputs` | 成功；生成物与仓库里的 `database.g.dart` 完全一致（无 diff） |
+| `flutter test` | **292 个测试全部通过**，退出码 0（M2.9：测评反馈 11 条） |
+| `flutter build apk --release --split-per-abi` | 成功，**1.25 分钟**（M2.8 第二批，release 签名） |
 
 包体（验收清单要求 < 30MB）：
 
-| ABI | M1 | M2 | M2.5 |
-|---|---|---|---|
-| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB |
-| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB |
-| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB |
+| ABI | M1 | M2 | M2.5 | M2.6 | M2.7 | M2.8 | M2.9 |
+|---|---|---|---|---|---|---|---|
+| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB | 17.46 MB | 17.46 MB | 18.68 MB | **18.71 MB** |
+| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB | 19.93 MB | 19.93 MB | 21.04 MB | **21.04 MB** |
+| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB | 21.32 MB | 21.32 MB | 22.36 MB | **22.36 MB** |
+
+> M2.8 比 M2.7 大了约 **1.1 MB**：其中 ~0.8 MB 来自 `flutter_localizations`
+> （日期/时间选择器的中文本地化数据），其余是新表/新界面。
+> 换来的是弹窗不再是英文的「September / OK / Cancel」。仍在 30MB 以内。
+>
+> M2.9 与 M2.8 基本持平（arm64 差 < 20 KB）：加的是列 / 一张小表 / 表单逻辑，
+> 没有引入新的原生依赖或资源。
+
+真机（小米 11 / Android 14，`M2011K2C`）：M2.8 两批都覆盖安装并启动过，
+logcat 无异常 —— 真机上跑通了 v4 → v5（加列）与 v5 → v6（加列 + 建表）两次迁移。
+M2.9 的 **v6 → v7 迁移也已上真机验证**（`firstInstallTime` 9-27 15:15，
+`lastUpdateTime` 9-28 22:54，即覆盖安装而非全新安装）：
+
+- 安装一度被 MIUI 挡下（`INSTALL_FAILED_USER_RESTRICTED`）——解决方法是在
+  开发者选项里打开「USB 安装」（可能还要登录小米账号），`adb install -r` 即可通过
+  （`Performing Streamed Install / Success`）。
+- 启动后进程存活、`mCurrentFocus` 是 `MainActivity`，logcat 里没有 Flutter
+  异常、没有 drift / SQLite 报错；**旧数据原样在**（9-27 那两条记录仍在列表里，
+  自定义方法 chip「拿铁」「意式浓缩」还在 —— 那是 `methodLabel`，说明
+  v5 → v6 → v7 的数据都被正确保留）。
+- 两个已知边界：release 包 `debuggable=false`，`run-as` 用不了，
+  所以设备上的 `PRAGMA user_version` 无法直接读（结论来自「不崩 + 数据在」）；
+  MIUI 还禁掉了 `adb shell input tap`（`INJECT_EVENTS`），
+  没法用 adb 驱动界面，只能人眼确认或读首屏。
+
+M2.6 的 APK 实测（`apksigner verify` / `aapt2 dump badging`）：
+
+- 签名：`CN=BeanClick`，SHA-256 `d967a4c0…6d51`（内测密钥，与 M2.5 同一把，
+  可以直接覆盖安装以验证迁移）
+- `versionName 0.1.0`、`versionCode 2001`、`minSdk 24`、`targetSdk 36`、应用名 `豆刻`
 
 ### 构建相关的两个坑
 
@@ -392,4 +548,91 @@ kotlin.incremental=false
 | `Keystore file ... not found for signing config 'release'` | 见 §9，`storeFile` 要用 `rootProject.file(...)` 解析 |
 | 构建突然变得极慢（小时级） | 见 §11「构建相关的两个坑」，清残留 java 进程 |
 | `Could not close incremental caches ... compileReleaseKotlin` | 已在 `android/gradle.properties` 关掉 Kotlin 增量编译，见 §11 |
+| 用 PowerShell 改源码后 `flutter test` 报 `Failed to decode data using encoding 'utf-8'` | 见 §13，**别用 PowerShell 的文本 cmdlet 碰源码** |
+| CI 的 Build APK 偶发失败：`Building assets for package:sqlite3 failed` / `SocketException: Connection reset by peer`（连 `release-assets.githubusercontent.com`） | `sqlite3` 的构建钩子要从 GitHub 下预编译库，网络抖动就会失败。**不是代码问题**：`gh run rerun <id> --failed` 重跑即可（实测一次就过）。本地因为库已缓存所以看不到 |
+| `adb install -r` 报 `INSTALL_FAILED_USER_RESTRICTED: Install canceled by user` | MIUI 默认拦 USB 安装：设置 → 更多设置 → 开发者选项 → 打开「USB 安装」（可能要先登录小米账号并插卡）。开好后再跑一次即可，手机会弹一次确认框 |
+| `adb shell input tap` 报 `SecurityException: ... requires the INJECT_EVENTS permission` | MIUI 不允许 adb 注入触摸事件，**不要试图用 adb 驱动界面**：装完只能 `adb exec-out screencap` 看首屏，或让用户自己点 |
+| `run-as <包名>` 报 `package not debuggable` | release 包本来就不能 `run-as`，没法直接读设备上的数据库。验证迁移只能靠「启动不崩 + 旧数据还在」，或另打一个 `--debuggable` 的包 |
+
+---
+
+## 13. 协作约定
+
+### 13.1 UI 改动：先出设计稿，确认后再写代码
+
+**规则（用户明确要求）：任何 UI 改动，先给设计稿讨论定稿，再动代码。**
+
+不要看到「把 A 挪到 B」「加个按钮」就直接改，因为：
+
+- 布局是牵一发动全身的（比如把悬浮 FAB 并进 dock，会连带改列表底部内边距、
+  空状态文案、以及所有断言 FAB 的测试）
+- 同一个词常常有两种理解（「收藏」是收藏豆子还是收藏这套参数？
+  「右滑」是滑开后停住，还是滑走即删除？），实现完再改成本高得多
+- 用户改主意的成本远低于你改代码的成本
+
+#### 什么必须先发稿，什么可以直接做
+
+| 直接做，做完在汇报里说明 | **必须先发稿等确认** |
+|---|---|
+| 纯文案措辞、错别字 | 布局结构调整（增删栏位、换位置、改层级） |
+| 图标替换成等价图标 | 交互行为（手势、长按、滑动、双击） |
+| 颜色 / 间距的微调（不改变结构） | 新增或删除控件、新的页面/弹层 |
+| 不触碰测试断言的内部整理 | 导航结构、dock / 标题栏的组成 |
+| | 新增状态或空态、改变既有空态含意 |
+| | 任何会让现有测试断言失效的改动 |
+
+拿不准就按「先发稿」处理。
+
+#### 设计稿必须包含的五项
+
+| 项 | 说明 |
+|---|---|
+| **目标** | 这次要解决什么、用户原话是什么 |
+| **布局示意** | 线框图（ASCII 即可），标出各元素位置与相对关系 |
+| **尺寸与状态** | 关键尺寸（高度 / 圆角 / 图标大小）、空态 / 有数据 / 滑开 / 长按等状态 |
+| **与现状的差异** | 删了什么、加了什么、哪些地方会连带变化（含受影响的测试） |
+| **待确认项** | 我拿不准的 2~3 个点，列成选项让用户挑，而不是自己拍板 |
+
+#### 呈现形式：先线框图，定稿前再渲染一张 PNG（用户选定的默认）
+
+1. **第一步：聊天里的线框图 + 标注** —— 结构、层级、文案、状态用线框图快速对齐，
+   尺寸和「与现状的差异」写在图下面。这一步要来回改到结构没争议为止。
+2. **第二步：真实渲染的 PNG** —— 结构确认后，用真实的主题、字体、控件把这一屏
+   渲染成图给用户看最终观感（配色、字重、间距），他点头才算定稿。
+
+渲染脚手架放 `tool/design_preview/`，用 `flutter test tool/design_preview/xxx.dart
+--update-goldens` 之类的方式单独跑：
+
+- **不要**放进 `test/`，否则会被 CI 当 golden 比对，跨平台字体差异会导致假红
+- 渲染用的数据要覆盖空态 / 有数据两条路径，别只画「有数据」那版
+
+只有纯文案这种一句话的改动才跳过这两步（见上面的表格）。
+
+#### 定稿之后
+
+改代码 → 补测试 → `dart analyze` / `dart format` / `flutter test` 全绿 →
+文档同步 → 提交推送 → CI 绿 → 需要的话重新出包给用户装机看。
+
+
+### 13.2 别用 PowerShell 的文本 cmdlet 改源码
+
+踩过两次，都是真损坏（不是显示问题）：
+
+```powershell
+# ❌ 这样会把 UTF-8 中文按 GBK 解码再写回，文件直接坏掉
+(Get-Content foo.dart -Raw) -replace 'a', 'b' | Set-Content -NoNewline foo.dart
+```
+
+报错是 `Failed to decode data using encoding 'utf-8'`（`flutter test` 直接跑不起来），
+而 `dart analyze` 可能还是干净的，很容易误判。要改源码就用编辑器/补丁工具，
+或者在 Dart 侧改。已经写坏了就 `git checkout -- <file>` 重来。
+
+> 确实要用脚本批量改时，**不要**用 `Get-Content` / `Set-Content`，
+> 改用 .NET 的显式编码读写（它不看控制台代码页）：
+>
+> ```powershell
+> $c = [System.IO.File]::ReadAllText($f)
+> $c = $c.Replace('旧', '新')
+> [System.IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding($false)))
+> ```
 

@@ -41,6 +41,7 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
   late final TextEditingController _burrType;
   late final TextEditingController _zeroPoint;
   late final TextEditingController _clicksPerRevolution;
+  late final TextEditingController _micronsPerClick;
   late final TextEditingController _calibrationNote;
   late final TextEditingController _notes;
 
@@ -60,6 +61,9 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
     _clicksPerRevolution = TextEditingController(
       text: grinder?.clicksPerRevolution?.toString() ?? '',
     );
+    _micronsPerClick = TextEditingController(
+      text: numberToText(grinder?.micronsPerClick),
+    );
     _calibrationNote = TextEditingController(
       text: grinder?.calibrationNote ?? '',
     );
@@ -74,6 +78,7 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
     _burrType.dispose();
     _zeroPoint.dispose();
     _clicksPerRevolution.dispose();
+    _micronsPerClick.dispose();
     _calibrationNote.dispose();
     _notes.dispose();
     super.dispose();
@@ -94,6 +99,7 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
       scaleUnit: _scaleUnit,
       zeroPoint: parseNumber(_zeroPoint.text),
       clicksPerRevolution: int.tryParse(_clicksPerRevolution.text.trim()),
+      micronsPerClick: parseNumber(_micronsPerClick.text),
       calibrationNote: _calibrationNote.text.trim().isEmpty
           ? null
           : _calibrationNote.text.trim(),
@@ -268,6 +274,16 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
                     controller: _clicksPerRevolution,
                     hintText: '选填，例如：30',
                     suffixText: 'click',
+                  ),
+                ),
+                LabeledField(
+                  label: '每 click 位移',
+                  helper: '一格刻度大约改变多少刀盘间隙，用来对比不同磨豆机的粗细变化',
+                  child: NumberField(
+                    key: const Key('grinder.micronsPerClick'),
+                    controller: _micronsPerClick,
+                    hintText: '选填，例如：30',
+                    suffixText: 'µm',
                   ),
                 ),
               ],

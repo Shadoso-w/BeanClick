@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../../core/icons.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../data/providers.dart';
 import '../../domain/entities.dart';
+import '../../domain/enums.dart';
 import 'bean_form_page.dart';
 import 'grinder_form_page.dart';
 
@@ -67,7 +69,9 @@ class _BeansPageState extends State<BeansPage> {
 ///
 /// 中栏已被「新加一杯」占用，所以豆库的新增入口单独放这里；
 /// 动作跟随当前分段：咖啡豆段新增豆子，磨豆机段新增磨豆机。
-/// 用 [Align] 定位而不是 Scaffold 的 FAB 槽位，避免和外壳那个大 + 号冲突。
+///
+/// 图标统一用**圆圈加号**：全 App 里「新增一支豆子 / 一台磨豆机」的入口
+/// 都长这样（见 `lib/core/icons.dart`）。
 class _AddFab extends StatelessWidget {
   const _AddFab({required this.label, required this.onPressed});
 
@@ -84,7 +88,7 @@ class _AddFab extends StatelessWidget {
           heroTag: 'beans.add',
           onPressed: onPressed,
           tooltip: '新增$label',
-          child: const Icon(Icons.add),
+          child: const Icon(addCircleIcon),
         ),
       ),
     );
@@ -117,15 +121,23 @@ class _BeanList extends ConsumerWidget {
               );
             }
 
+            final Map<int, List<BeanBatch>> batchesByBean =
+                ref.watch(batchesByBeanProvider).value ??
+                const <int, List<BeanBatch>>{};
+
             return ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 96),
               itemCount: beans.length,
               separatorBuilder: (BuildContext context, int index) =>
                   const SizedBox(height: 12),
-              itemBuilder: (BuildContext context, int index) => _BeanCard(
-                bean: beans[index],
-                onTap: () => BeanFormPage.show(context, bean: beans[index]),
-              ),
+              itemBuilder: (BuildContext context, int index) {
+                final CoffeeBean bean = beans[index];
+                return _BeanCard(
+                  bean: bean,
+                  batches: batchesByBean[bean.id] ?? const <BeanBatch>[],
+                  onTap: () => BeanFormPage.show(context, bean: bean),
+                );
+              },
             );
           },
         );
@@ -181,11 +193,21 @@ class _GrinderList extends ConsumerWidget {
   }
 }
 
-/// 咖啡豆卡片：名称、产地、烘焙度、余量、烘焙距今天数。
+/// 咖啡豆卡片。
+///
+/// 余量、烘焙日期、烘焙度都在批次上，所以这里展示的是**聚合结果**：
+/// 总余量、批次数、最近一次烘焙距今天数。
 class _BeanCard extends StatelessWidget {
-  const _BeanCard({required this.bean, required this.onTap});
+  const _BeanCard({
+    required this.bean,
+    required this.batches,
+    required this.onTap,
+  });
 
   final CoffeeBean bean;
+
+  /// 这支豆子的全部批次（可能为空）。
+  final List<BeanBatch> batches;
   final VoidCallback onTap;
 
   @override
@@ -196,13 +218,18 @@ class _BeanCard extends StatelessWidget {
       color: colors.onSurfaceVariant,
     );
 
-    final List<String> originParts = <String>[
+    final List<String> metaParts = <String>[
       if (bean.origin != null && bean.origin!.isNotEmpty) bean.origin!,
-      if (bean.process != null) bean.process!.label,
-      if (bean.roastLevel != null) bean.roastLevel!.label,
+      if (bean.farm != null && bean.farm!.isNotEmpty) bean.farm!,
+      ...bean.processes.map((ProcessMethod m) => m.label),
     ];
-    final String roastText = _roastAgeText(bean);
-    final bool outOfStock = bean.remainingGrams <= 0;
+
+    final double total = batches.fold<double>(
+      0,
+      (sum, b) => sum + b.remainingGrams,
+    );
+    final bool outOfStock = total <= 0;
+    final int? roastAge = _latestRoastAge(batches);
     final List<String> flavors = bean.flavorTags;
 
     return Card(
@@ -216,6 +243,10 @@ class _BeanCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
+                  if (bean.isFavorite) ...<Widget>[
+                    Icon(Icons.star_rounded, size: 18, color: colors.primary),
+                    const SizedBox(width: 4),
+                  ],
                   Expanded(
                     child: Text(
                       bean.name,
@@ -228,7 +259,7 @@ class _BeanCard extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   Text(
-                    '余量 ${_formatNumber(bean.remainingGrams)} g',
+                    '余量 ${_formatNumber(total)} g',
                     style: theme.textTheme.titleSmall?.copyWith(
                       color: outOfStock ? colors.error : colors.primary,
                     ),
@@ -237,7 +268,7 @@ class _BeanCard extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                originParts.isEmpty ? '暂无产地与烘焙信息' : originParts.join(' · '),
+                metaParts.isEmpty ? '暂无产地与处理信息' : metaParts.join(' · '),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colors.onSurfaceVariant,
                 ),
@@ -246,16 +277,16 @@ class _BeanCard extends StatelessWidget {
               Row(
                 children: <Widget>[
                   Icon(
-                    Icons.local_fire_department_outlined,
+                    Icons.inventory_2_outlined,
                     size: 14,
                     color: colors.onSurfaceVariant,
                   ),
                   const SizedBox(width: 4),
-                  Text(roastText, style: mutedStyle),
+                  Text(_batchText(batches.length, roastAge), style: mutedStyle),
                   if (outOfStock) ...<Widget>[
                     const SizedBox(width: 10),
                     Text(
-                      '余量不足',
+                      '已用完',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.error,
                         fontWeight: FontWeight.w600,
@@ -279,9 +310,29 @@ class _BeanCard extends StatelessWidget {
       ),
     );
   }
+
+  /// `2 个批次 · 最近烘焙 5 天前`。
+  static String _batchText(int count, int? roastAge) {
+    if (count == 0) return '还没有批次';
+    final parts = <String>['$count 个批次'];
+    if (roastAge != null) {
+      if (roastAge < 0) {
+        parts.add('烘焙日期在未来');
+      } else if (roastAge == 0) {
+        parts.add('今天烘焙');
+      } else {
+        parts.add('最近烘焙 $roastAge 天前');
+      }
+    }
+    return parts.join(' · ');
+  }
 }
 
-/// 磨豆机卡片：手册 §7 展示格式 `C40 / 22 click / 零点 0`。
+/// 磨豆机卡片（手册 §7）。
+///
+/// 第一行是 `型号 / 零点 0`（M2.9：当前刻度不再混进标题），
+/// 第二行拼 `刀盘 · 每圈 N click · 每 click X µm · 最近使用 yyyy-MM-dd`，
+/// 没填的项不占位。
 class _GrinderCard extends StatelessWidget {
   const _GrinderCard({
     required this.grinder,
@@ -306,6 +357,8 @@ class _GrinderCard extends StatelessWidget {
         grinder.burrType!,
       if (grinder.clicksPerRevolution != null)
         '每圈 ${grinder.clicksPerRevolution} click',
+      if (grinder.micronsPerClick != null)
+        '每 click ${_formatNumber(grinder.micronsPerClick!)} µm',
       if (latest == null)
         '还没有冲煮记录'
       else
@@ -321,10 +374,8 @@ class _GrinderCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                grinder.displayName(
-                  grindSetting: latest?.grindSetting,
-                  clicks: latest?.grindClicks,
-                ),
+                // 第一栏：名称 / 零点（测评反馈）。
+                grinder.displayName(showCurrentSetting: false),
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -368,14 +419,17 @@ Map<int?, BrewLog> _latestLogByGrinder(List<BrewLog> logs) {
   return latest;
 }
 
-/// 烘焙日期距今天数（实体自带 `ageInDays`，无烘焙日期时返回 null）。
-String _roastAgeText(CoffeeBean bean) {
-  final int? days = bean.ageInDays();
-  if (days == null) return '未记录烘焙日期';
-  if (days < 0) return '烘焙日期在未来';
-  if (days == 0) return '今天烘焙';
-  if (days == 1) return '昨天烘焙';
-  return '烘焙 $days 天前';
+/// 最近一个批次的烘焙日期距今天数；没有烘焙日期时返回 null。
+///
+/// 烘焙日期在批次上，所以要从批次列表里取最新的那个。
+int? _latestRoastAge(List<BeanBatch> batches) {
+  final List<DateTime> dates = batches
+      .map((b) => b.roastDate)
+      .whereType<DateTime>()
+      .toList(growable: false);
+  if (dates.isEmpty) return null;
+  dates.sort((a, b) => b.compareTo(a));
+  return DateTime.now().difference(dates.first).inDays;
 }
 
 /// 整数不显示小数点，其余保留一位。

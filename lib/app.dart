@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'data/providers.dart';
@@ -29,20 +30,36 @@ class BeanClickApp extends ConsumerWidget {
     return MaterialApp(
       title: '豆刻 BeanClick',
       debugShowCheckedModeBanner: false,
-      theme: _buildTheme(Brightness.light),
-      darkTheme: _buildTheme(Brightness.dark),
+      theme: buildAppTheme(Brightness.light),
+      darkTheme: buildAppTheme(Brightness.dark),
       themeMode: themeMode,
+      // 界面语言锁中文：日期/时间选择器的月份、星期、按钮文案都由
+      // Material 的本地化提供，不配这些就永远是英文的「September / OK」。
+      locale: appLocale,
+      supportedLocales: const <Locale>[appLocale],
+      localizationsDelegates: const <LocalizationsDelegate<Object>>[
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
       home: const HomeShell(),
     );
   }
 }
+
+/// 界面语言：目前只有中文，直接锁死而不是跟随系统，
+/// 免得系统是英文时界面变成「中英混排」。
+const Locale appLocale = Locale('zh', 'CN');
 
 /// 棕黑为主、灰度较低的简约主题（手册 §9）。
 ///
 /// 浅色用米白背景、深色用深棕黑背景，并显式给出一组暖调 surface 层级；
 /// `fidelity` 变体保留种子色的暖调，避免默认变体把咖啡棕冲淡成灰调。
 /// 字体一律使用系统默认，不额外指定 fontFamily。
-ThemeData _buildTheme(Brightness brightness) {
+///
+/// 公开出来是给 `tool/design_preview/` 的设计稿渲染用：设计稿必须用**真主题**
+/// 渲染，否则配色和间距会和实际界面不一致。
+ThemeData buildAppTheme(Brightness brightness) {
   final bool isLight = brightness == Brightness.light;
   final ColorScheme scheme = ColorScheme.fromSeed(
     seedColor: _seedColor,
