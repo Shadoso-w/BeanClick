@@ -732,13 +732,10 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                   child: _buildGrinderSelector(grinders),
                 ),
                 LabeledField(
-                  label: '研磨刻度',
-                  helper: selectedGrinder == null
-                      ? '选择磨豆机后会显示手册 §7 的展示格式'
-                      : selectedGrinder.displayName(
-                          grindSetting: parseNumber(_grindSetting.text),
-                          clicks: int.tryParse(_grindClicks.text.trim()),
-                        ),
+                  // 知道「每圈几 click」时，第一个框就是**圈数**（x圈xclick），
+                  // 否则退回原来的「刻度」语义（电动磨这类没有圈的概念）。
+                  label: _usesTurns(selectedGrinder) ? '圈' : '研磨刻度',
+                  helper: _grindHelper(selectedGrinder),
                   child: Row(
                     children: <Widget>[
                       Expanded(
@@ -746,7 +743,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                         child: NumberField(
                           key: const Key('brew.grindSetting'),
                           controller: _grindSetting,
-                          hintText: selectedGrinder?.scaleUnit.label ?? '刻度',
+                          hintText: _usesTurns(selectedGrinder)
+                              ? '例如：1.5'
+                              : (selectedGrinder?.scaleUnit.label ?? '刻度'),
                           onChanged: (_) => setState(() {}),
                         ),
                       ),
@@ -757,6 +756,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                           key: const Key('brew.grindClicks'),
                           controller: _grindClicks,
                           hintText: 'click',
+                          onChanged: (_) => setState(() {}),
                           textInputAction: TextInputAction.next,
                         ),
                       ),
@@ -1318,6 +1318,45 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     );
     if (name == null || !mounted) return;
     setState(() => _addIns[index].name = name);
+  }
+
+  /// 这台磨豆机能不能用「圈」表达刻度（知道每圈几 click 才行）。
+  static bool _usesTurns(Grinder? grinder) =>
+      grinder?.clicksPerRevolution != null && grinder!.clicksPerRevolution! > 0;
+
+  /// 研磨刻度的提示行：**给绝对刻度**，不给相对读数。
+  ///
+  /// 绝对刻度 = 零点 + 圈 × 每圈 click + click（测评反馈要的就是这个换算；
+  /// 零点用记录里的快照，所以老记录不会被后来改的零点重新换算）。
+  String _grindHelper(Grinder? grinder) {
+    if (grinder == null) {
+      return '选择磨豆机后可自动换算绝对刻度';
+    }
+    if (!_usesTurns(grinder)) {
+      // 没有「每圈几 click」的磨豆机：退回手册 §7 的展示格式。
+      return grinder.displayName(
+        grindSetting: parseNumber(_grindSetting.text),
+        clicks: int.tryParse(_grindClicks.text.trim()),
+      );
+    }
+
+    final double turns = parseNumber(_grindSetting.text) ?? 0;
+    final int clicks = int.tryParse(_grindClicks.text.trim()) ?? 0;
+    final double zero = _grinderZeroPoint ?? 0;
+    final double absolute =
+        zero + turns * grinder.clicksPerRevolution! + clicks;
+
+    final StringBuffer buffer = StringBuffer()
+      ..write('绝对刻度 ${formatNumber(absolute)}')
+      ..write(
+        '（零点 ${formatNumber(zero)}'
+        ' + ${formatNumber(turns)} 圈 × ${grinder.clicksPerRevolution}'
+        ' + $clicks click）',
+      );
+    if (_grinderZeroPoint == null) {
+      buffer.write('　未填零点，按 0 算');
+    }
+    return buffer.toString();
   }
 
   /// 豆子选择（含拼配）。
