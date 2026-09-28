@@ -18,6 +18,14 @@ $resDir = Join-Path $root 'android\app\src\main\res'
 if (-not (Test-Path $srcPath)) { throw "source icon not found: $srcPath" }
 $src = New-Object System.Drawing.Bitmap($srcPath)
 
+# How much of the 108dp adaptive canvas the source should fill.
+#
+# 1.00 makes the dark ring reach ~85% of the canvas, but the launcher only shows
+# the middle 72/108 (a circle) to 78/108 (MIUI's squircle) of it -- the ring ends
+# up touching the mask edge. 0.88 pulls the ring back to ~75% and leaves the
+# margin the launcher masks expect. Preview: tool/icon_review_sheet.ps1
+$foregroundKeep = 0.88
+
 # Legacy sizes per density (mdpi 48 ... xxxhdpi 192); adaptive foreground is 2.25x.
 $densities = @(
   @{ name = 'mdpi';    size = 48 },
@@ -50,19 +58,26 @@ function Render-Legacy([int]$size) {
 # Adaptive foreground: key out near-white AND the cream background, keeping only
 # the dark ring, the bean and the brown ticks. The system paints the background
 # color behind it, so the icon still looks like the source.
-function Render-Foreground([int]$size) {
+# The source is scaled to $keep of the canvas and centred, which shrinks the
+# motif and grows the transparent margin around it.
+function Render-Foreground([int]$size, [double]$keep) {
   $bmp = New-TransparentBitmap $size
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.Clear([System.Drawing.Color]::Transparent)
   $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
   $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-  $g.DrawImage($src, 0, 0, $size, $size)
+  $inner = [int]($size * $keep)
+  $off = [int](($size - $inner) / 2)
+  $g.DrawImage($src, $off, $off, $inner, $inner)
   $g.Dispose()
   Key-OutPixels $bmp 215 185
   return $bmp
 }
 
 # alpha = 0 for luminance >= $keepBelowHi, 255 for <= $keepBelowLo, linear between.
+# Pixels that are already fully transparent are left alone: a cleared 32bppArgb
+# pixel is (0,0,0,0), whose luminance is 0, so keying it would make it OPAQUE
+# BLACK -- and any margin the source did not paint would turn into a black square.
 function Key-OutPixels($bmp, [int]$hi, [int]$lo) {
   $w = $bmp.Width
   $h = $bmp.Height
@@ -74,6 +89,7 @@ function Key-OutPixels($bmp, [int]$hi, [int]$lo) {
     $row = $y * $data.Stride
     for ($x = 0; $x -lt $w; $x++) {
       $i = $row + $x * 4
+      if ($bytes[$i + 3] -eq 0) { continue }
       $b = $bytes[$i]; $g = $bytes[$i + 1]; $r = $bytes[$i + 2]
       $lum = 0.299 * $r + 0.587 * $g + 0.114 * $b
       if ($lum -ge $hi) {
@@ -98,7 +114,7 @@ foreach ($d in $densities) {
   $legacy.Dispose()
 
   $fgSize = [int]($d.size * 2.25)
-  $fg = Render-Foreground $fgSize
+  $fg = Render-Foreground $fgSize $foregroundKeep
   $fg.Save((Join-Path $dir 'ic_launcher_foreground.png'), [System.Drawing.Imaging.ImageFormat]::Png)
   $fg.Dispose()
 }
@@ -123,8 +139,8 @@ for ($y = 0; $y -lt 260; $y += 13) {
   }
 }
 $legacy192 = Render-Legacy 192
-$fg432 = Render-Foreground 432
-$fg192 = Render-Foreground 192
+$fg432 = Render-Foreground 432 $foregroundKeep
+$fg192 = Render-Foreground 192 $foregroundKeep
 
 $sg.DrawImage($legacy192, 30, 34, 192, 192)
 

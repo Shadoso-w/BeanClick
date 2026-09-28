@@ -425,6 +425,9 @@ keytool -genkeypair -v `
 - 生成脚本 `tool/make_app_icons.ps1`（把原图切成传统图标 / 自适应前景，
   按亮度抠掉白色页面与米白背景），详细说明见 [`tool/README.md`](../tool/README.md)
 - 自适应图标的 XML 在 `res/mipmap-anydpi-v26/`，背景色 `#F3EBDC` 在 `res/values/colors.xml`
+- **自适应前景按 `$foregroundKeep`（当前 0.88）缩小后居中**：系统只显示画布中间
+  67%（圆形）～78%（MIUI 圆角方形），原图铺满时圆环几乎贴到遮罩边缘。
+  改这一个数字即可调松紧，用 `tool/icon_review_sheet.ps1 -Keep <值>` 出对照表复核
 
 改动 `mipmap-*` 后必须重新构建 APK 才生效（编译期资源）；
 桌面可能缓存旧图标，重装后若还是旧的，重启桌面或卸载重装。
