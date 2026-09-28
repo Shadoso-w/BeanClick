@@ -168,14 +168,15 @@ _db.delete(_db.brewLogs);
 
 ### 7.4 数据库迁移（改表结构时必读）
 
-`schemaVersion` 目前是 **4**。历史只有 `1 → 4` 一次变化（v2 / v3 从未存在过，
-`git log -L` 可以确认）。迁移写在 `lib/data/database.dart` 的 `_upgradeToV4`。
+`schemaVersion` 目前是 **7**。历史是 `1 → 4 → 5 → 6 → 7`（v2 / v3 从未存在过，
+`git log -L` 可以确认）。迁移按版本逐段写在 `lib/data/database.dart` 的
+`_upgradeToV4` / `_upgradeToV5` / `_upgradeToV6` / `_upgradeToV7` 里。
 
 **M2.6（v4）及以后的数据，任何升级都必须保住。** 这件事由工具锁住，不靠记性：
 
 | 文件 | 作用 |
 |---|---|
-| `test/drift/schemas/drift_schema_v4.json` | v4 的**冻结快照** |
+| `test/drift/schemas/drift_schema_v4.json` … `_v7.json` | 每个版本的**冻结快照** |
 | `test/drift/generated/` | 配套校验代码（由快照生成） |
 | `test/data/schema_snapshot_test.dart` | 两个守门用例（见下） |
 
@@ -190,34 +191,42 @@ dart run drift_dev schema generate test/drift/schemas test/drift/generated
 1. **改了表却忘了 dump 新快照** → `migrateAndValidate(db, 当前版本)` 逐列比对
    （类型、NOT NULL、DEFAULT、外键、索引都算），失败信息会直接点名
    `Contains the following unexpected entries: xxx_column`。
-2. **改了表却没写迁移** → 第二个用例拿 v4 快照灌入真实数据（两支豆子 / 两袋 /
-   一条拼配记录 + 用量行 / 一条扩展属性 / 两个改过的设置项），用当前代码打开
-   （**真的跑 `onUpgrade`**），再断言数据一条不少、值没变、迁移后余量扣减照常工作。
+2. **改了表却没写迁移** → 每个历史版本各有一个数据夹具（`_fixtures`，键就是
+   `schemaVersion`）：拿那个版本的快照灌入真实数据（两支豆子 / 两袋 /
+   一条拼配记录 + 用量行 / 一条扩展属性 / 两个改过的设置项 / 处理法 / 辅料），
+   用当前代码打开（**真的跑 `onUpgrade`**），再断言数据一条不少、值没变、
+   迁移后余量扣减照常工作。`GeneratedHelper.versions` 列出所有 dump 过的版本，
+   所以**新 dump 一个快照就必须补一份夹具**，否则用例会直接点名要你补。
 
-  它的 `oldVersion` 永远钉在 `4`：以后每次升 `schemaVersion`，这个用例**自动变成
-   「v4 → 新版本」的数据保活测试**，不需要改代码。`newVersion` 取的是
-   `AppDatabase.schemaVersion`，所以版本一升就会被覆盖到。
+   `newVersion` 取的是 `AppDatabase.schemaVersion`，所以版本一升就被覆盖到；
+   升级链条 `1 → 4 → 5 → 6 → 7` 的逐段行为另由
+   `test/data/migration_v1_to_v4_test.dart` 从 v1 库整体跑一遍（含
+   `PRAGMA table_info` / `foreign_key_list` 的结构比对与「迁移只跑一次」）。
 
 三条硬规矩：
 
 1. **`onUpgrade` 必须是逐列迁移**，不能删表重建。用户的数据只有这一份。
 2. **搬迁顺序不能变**：先建新表 → 搬数据到新表 → 最后才删旧列。
    旧列一删，数据就没有第二个来源了。
-3. **改表必须配一个「旧库升上来」的测试**。v1 → v4 那次的写法见
-   `test/data/migration_v1_to_v4_test.dart`：造一个旧版本库（建表语句从旧提交
-   dump 出来）、跑迁移、断言数据没丢 **且结构与全新建库完全一致**
-   （`PRAGMA table_info` / `foreign_key_list` / `sqlite_master` 对比）。
-   只比列名不够，`NOT NULL`、`DEFAULT`、漏建索引都要能测出来。
+3. **改表必须配一个「旧库升上来」的测试**。逐版本路径见
+   `test/data/schema_snapshot_test.dart`（每个版本一份夹具）；
+   v1 → v4 那次的写法见 `test/data/migration_v1_to_v4_test.dart`：
+   造一个旧版本库（建表语句从旧提交 dump 出来）、跑迁移、断言数据没丢
+   **且结构与全新建库完全一致**（`PRAGMA table_info` / `foreign_key_list` /
+   `sqlite_master` 对比）。只比列名不够，`NOT NULL`、`DEFAULT`、漏建索引都要能测出来。
 
 > 写新迁移时可以先用 `dart run drift_dev schema steps test/drift/schemas lib/data/migrations.dart`
 > 生成 `stepByStep` 辅助代码，逐版本搬运更省事。
 
-**为什么 v1 → v4 用 `dropColumn` 而不是 `alterTable` 重建表**：
+**为什么这里一律用 `addColumn` / `dropColumn` + 改写值，而不是 `alterTable` 重建表**：
 重建要 DROP 掉父表，而 `coffee_beans` 被 `bean_batches` / `brew_log_beans` /
 `brew_logs` 用外键引用着，删父表会触发级联删除，把刚搬好的数据一起删掉。
-`ALTER TABLE ... DROP COLUMN` 不动表本身，没有这个风险
+`ALTER TABLE ... ADD/DROP COLUMN` 不动表本身，没有这个风险
 （要求 SQLite ≥ 3.35；本项目通过 `sqlite3_flutter_libs` 自带较新的 SQLite，
-不受 Android 系统版本限制）。
+不受 Android 系统版本限制）。v4 → v5 → v6 → v7 全部是这类纯新增 / 改写值，
+没有一次重建表。同理，改**枚举的存储编码**时（例如 v7 把 `process` 从单个
+名字改写成 JSON 数组），要配一个能容忍新旧两种写法的转换器
+（`ProcessListConverter`），否则读到一半的库会直接抛异常。
 
 **造旧库来测迁移**：不要手抄旧建表语句。用 `git worktree` 把旧提交检出到另一个目录，
 写个临时的 test 打印 `sqlite_master`：
@@ -435,23 +444,29 @@ keytool -genkeypair -v `
 | `flutter analyze` | `No issues found!`，退出码 0 |
 | `dart format --output=none --set-exit-if-changed .` | 0 处改动，退出码 0（CI 同款检查） |
 | `dart run build_runner build --delete-conflicting-outputs` | 成功；生成物与仓库里的 `database.g.dart` 完全一致（无 diff） |
-| `flutter test` | **285 个测试全部通过**，退出码 0（M2.8 两批：记录交互 + 自定义方法/辅料） |
+| `flutter test` | **292 个测试全部通过**，退出码 0（M2.9：测评反馈 11 条） |
 | `flutter build apk --release --split-per-abi` | 成功，**1.25 分钟**（M2.8 第二批，release 签名） |
 
 包体（验收清单要求 < 30MB）：
 
-| ABI | M1 | M2 | M2.5 | M2.6 | M2.7 | M2.8 |
-|---|---|---|---|---|---|---|
-| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB | 17.46 MB | 17.46 MB | **18.68 MB** |
-| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB | 19.93 MB | 19.93 MB | **21.04 MB** |
-| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB | 21.32 MB | 21.32 MB | **22.36 MB** |
+| ABI | M1 | M2 | M2.5 | M2.6 | M2.7 | M2.8 | M2.9 |
+|---|---|---|---|---|---|---|---|
+| `app-armeabi-v7a-release.apk` | 16.24 MB | 16.99 MB | 17.21 MB | 17.46 MB | 17.46 MB | 18.68 MB | **18.71 MB** |
+| `app-arm64-v8a-release.apk` | 18.84 MB | 19.46 MB | 19.67 MB | 19.93 MB | 19.93 MB | 21.04 MB | **21.04 MB** |
+| `app-x86_64-release.apk` | 20.16 MB | 20.85 MB | 21.12 MB | 21.32 MB | 21.32 MB | 22.36 MB | **22.36 MB** |
 
 > M2.8 比 M2.7 大了约 **1.1 MB**：其中 ~0.8 MB 来自 `flutter_localizations`
 > （日期/时间选择器的中文本地化数据），其余是新表/新界面。
 > 换来的是弹窗不再是英文的「September / OK / Cancel」。仍在 30MB 以内。
+>
+> M2.9 与 M2.8 基本持平（arm64 差 < 20 KB）：加的是列 / 一张小表 / 表单逻辑，
+> 没有引入新的原生依赖或资源。
 
 真机（小米 11 / Android 14，`M2011K2C`）：M2.8 两批都覆盖安装并启动过，
 logcat 无异常 —— 真机上跑通了 v4 → v5（加列）与 v5 → v6（加列 + 建表）两次迁移。
+M2.9 的 **v6 → v7 迁移尚未上真机**：`adb install -r` 被 MIUI 挡下
+（`INSTALL_FAILED_USER_RESTRICTED`，需要在开发者选项里打开「USB 安装」并在手机上点确认），
+目前只有单测覆盖（`test/data/migration_v1_to_v4_test.dart` 的逐版本路径 + 快照测试）。
 
 M2.6 的 APK 实测（`apksigner verify` / `aapt2 dump badging`）：
 

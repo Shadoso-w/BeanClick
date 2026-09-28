@@ -27,14 +27,29 @@
 - **自定义方法归到「其他」**：记录时 `method = other` + `methodLabel = 原文`
   （原来落在「手冲」上，按方法统计/筛选会串味）；chip 配色与内置项**完全一致**
 - **辅料单位框对齐**：单位下拉用 `InputDecorator` 包起来，边框与高度和名字/数量框一致
+- **研磨刻度改成「圈 + click」**：知道「每圈几 click」的磨豆机，第一个框就是**圈数**，
+  提示行自动算出**绝对刻度**（`零点 + 圈 × 每圈 click + click`），不用自己心算；
+  零点取记录里的**快照**，所以后来改零点不会把老记录的读数重新解释。
+  没有这个字段的电动磨退回原来的「研磨刻度」相对展示
 
 ### 修复
 
 - **豆库「总余量」实时更新**：原来 `batchesByBeanProvider` 是 FutureProvider 且只依赖
   豆子列表 —— 冲一杯扣余量、加一袋复购都只动批次表，列表上的总余量会停在旧值。
   改成订阅批次表的 StreamProvider
+- **`IntField` 输入不刷新提示行**：它只有 `controller`、没有 `onChanged`，
+  在 click 框里打字不会 `setState`，于是「绝对刻度」停在改之前的值
+  （填 1.5 圈时还显示 0 click）。补上可选 `onChanged` 并在研磨行接线
 
 ### 变更
+
+**M2.9 — 测评反馈（schema v7）**
+
+- **`schemaVersion` 7**：`coffee_beans.process` 从单值文本改写为 JSON 数组，
+  新增 `grinders.micronsPerClick`、`brew_logs.grinderZeroPointSnapshot`、
+  `brew_logs.grinderClicksPerRevolutionSnapshot`。四步都是加列 / 改写值，
+  **没有重建表**（重建会触发外键级联，把子表数据带走）
+- 测试 285 → **292** 个用例
 
 **M2.8 — 第二批：自定义冲煮方法 / 辅料（schema v6）**
 
