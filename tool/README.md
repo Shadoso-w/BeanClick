@@ -31,14 +31,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\make_app_icons.ps1
 `res/values/colors.xml` 里的 `ic_launcher_background` 取原图的米白 `#F3EBDC`，
 所以自适应图标裁切后的观感和传统图标一致。
 
-### 前景为什么要缩小（`$foregroundKeep = 0.88`）
+### 前景为什么要缩小（`$foregroundKeep = 0.82`）
 
 自适应图标画在 108dp 画布上，但**系统只显示中间一块**：圆形遮罩只有 72/108 ≈ 67%，
 MIUI 的圆角方形大约 78%。原图铺满整个画布时，深棕圆环会占画布的 ~85%，
 裁切之后几乎贴到遮罩边缘（四周只剩 2～5%），看起来就是「图标太大了」。
 
-`$foregroundKeep` 把原图缩到画布的 88% 再居中，圆环回到画布的 ~75%，
-四周留出 10% 左右的余量。传统图标不动（它本来就是整块圆角方块）。
+`$foregroundKeep` 把原图缩到画布的 82% 再居中，圆环回到画布的 ~70%，
+四周留出 10% 以上的余量。传统图标不动（它本来就是整块圆角方块）。
 想换档位就在脚本里改这一个数字，然后用下面的预览脚本看效果。
 
 ### 图标预览脚本（决策用，不进构建）
@@ -46,10 +46,10 @@ MIUI 的圆角方形大约 78%。原图铺满整个画布时，深棕圆环会�
 | 脚本 | 输出 | 用途 |
 |---|---|---|
 | `tool/icon_scale_preview.ps1` | `tool/out/icon_scale_candidates.png` | 一次排开 5 个候选缩放比，每个给「原样 / 圆形遮罩 / 圆角方形遮罩」三视图 |
-| `tool/icon_review_sheet.ps1 -Keep 0.88` | `tool/out/icon_review_keep88.png` | 选定一个缩放比，按真实遮罩形状（方形 / 圆形 / 圆角方形）＋传统图标出对照表 |
+| `tool/icon_review_sheet.ps1 -Keep 0.82` | `tool/out/icon_review_keep82.png` | 选定一个缩放比，按真实遮罩形状（方形 / 圆形 / 圆角方形）＋传统图标出对照表 |
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\icon_review_sheet.ps1 -Keep 0.88
+powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\icon_review_sheet.ps1 -Keep 0.82
 ```
 
 > 这两个脚本里的 `Key-OutPixels` 必须**保留已有透明像素**（`if ($bytes[$i+3] -eq 0) { continue }`）。

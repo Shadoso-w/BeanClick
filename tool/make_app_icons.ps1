@@ -22,9 +22,9 @@ $src = New-Object System.Drawing.Bitmap($srcPath)
 #
 # 1.00 makes the dark ring reach ~85% of the canvas, but the launcher only shows
 # the middle 72/108 (a circle) to 78/108 (MIUI's squircle) of it -- the ring ends
-# up touching the mask edge. 0.88 pulls the ring back to ~75% and leaves the
+# up touching the mask edge. 0.82 pulls the ring back to ~70% and leaves the
 # margin the launcher masks expect. Preview: tool/icon_review_sheet.ps1
-$foregroundKeep = 0.88
+$foregroundKeep = 0.82
 
 # Legacy sizes per density (mdpi 48 ... xxxhdpi 192); adaptive foreground is 2.25x.
 $densities = @(
