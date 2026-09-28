@@ -284,7 +284,7 @@ void main() {
 
       final loaded = await harness.beans.getById(bean.beanId);
       expect(loaded, isNotNull, reason: '未知枚举值不应导致读取失败');
-      expect(loaded!.process, isNull, reason: '无法识别时回退为 null');
+      expect(loaded!.processes, isEmpty, reason: '无法识别的处理法会被丢掉');
       expect(loaded.name, '耶加雪菲');
     });
   });

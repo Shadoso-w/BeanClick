@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../data/providers.dart';
-import '../../domain/entities.dart';
 import '../beans/beans_page.dart';
 import '../record/brew_log_form_page.dart';
 import '../record/record_page.dart';
@@ -33,19 +31,13 @@ class _HomeShellState extends ConsumerState<HomeShell> {
 
   int _currentIndex = 0;
 
-  /// 快速记录（手册 §8）：默认复制上次参数，直接进表单。
+  /// 快速记录：点 dock 正中的加号**开一张空表单**（归零页）。
   ///
-  /// 表单关闭后不切换 tab —— 中间那个 + 号只是动作入口。
+  /// 不再预填「上次」的参数 —— 测评反馈要求「进入后从默认页面开始，
+  /// 而非上一次记录」。想复用上次的参数，表单右上角的复制按钮单击即可
+  /// （长按还能从收藏过的参数里挑）。
   Future<void> _onAddCupPressed() async {
-    final BrewLog? latest = await ref
-        .read(brewLogRepositoryProvider)
-        .getLatest();
-    if (!mounted) return;
-
-    await BrewLogFormPage.show(
-      context,
-      prefill: latest == null ? null : BrewLogFormPage.copyFrom(latest),
-    );
+    await BrewLogFormPage.show(context);
   }
 
   /// 「我的」：设置与导出，从右上角进入。

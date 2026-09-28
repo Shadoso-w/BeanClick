@@ -22,9 +22,9 @@ void main() {
   // 决策 1：加外键索引
   // -------------------------------------------------------------------------
   group('决策 1：外键索引', () {
-    test('schemaVersion 为 6', () {
+    test('schemaVersion 为 7', () {
       // v4 = 批次 + 多豆 + 扩展属性；v5 = 记录收藏；v6 = 自定义方法 + 辅料。
-      expect(harness.db.schemaVersion, 6);
+      expect(harness.db.schemaVersion, 7);
     });
 
     test('4 个索引都建上了', () async {

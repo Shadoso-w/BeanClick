@@ -369,16 +369,53 @@ void main() {
       expect((await harness.logs.getById(logId))!.pourStages, isNull);
     });
 
-    test('删除记录不会回补余量（手册 §6.2）', () async {
+    test('删除记录会把扣掉的余量回补（测评反馈改的规则）', () async {
       final a = await harness.addBeanWithBatch(remainingGrams: 200);
       final int logId = (await harness.logs.save(
         makeLog(beanId: a.beanId, batchId: a.batchId, doseGrams: 15),
       )).brewLogId;
+      expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 185);
 
       await harness.logs.delete(logId);
 
-      expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 185);
+      expect(
+        (await harness.beans.getBatch(a.batchId))!.remainingGrams,
+        200,
+        reason: '删记录要把当时扣的 15g 退回原来那一袋',
+      );
       expect(await harness.logs.getById(logId), isNull);
+    });
+
+    test('删除拼配记录：两支豆子各自回补', () async {
+      final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
+      final b = await harness.addBeanWithBatch(
+        name: '曼特宁',
+        remainingGrams: 100,
+      );
+      final int logId = (await harness.logs.save(
+        makeLog(
+          doseGrams: 20,
+          beanUsages: <BeanUsage>[
+            BeanUsage(
+              beanId: a.beanId,
+              batchId: a.batchId,
+              doseGrams: 14,
+              position: 0,
+            ),
+            BeanUsage(
+              beanId: b.beanId,
+              batchId: b.batchId,
+              doseGrams: 6,
+              position: 1,
+            ),
+          ],
+        ),
+      )).brewLogId;
+
+      await harness.logs.delete(logId);
+
+      expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 200);
+      expect((await harness.beans.getBatch(b.batchId))!.remainingGrams, 100);
     });
 
     test('没有关联豆子时不报错', () async {

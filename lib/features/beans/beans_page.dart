@@ -6,6 +6,7 @@ import '../../core/icons.dart';
 import '../../core/widgets/empty_state.dart';
 import '../../data/providers.dart';
 import '../../domain/entities.dart';
+import '../../domain/enums.dart';
 import 'bean_form_page.dart';
 import 'grinder_form_page.dart';
 
@@ -220,7 +221,7 @@ class _BeanCard extends StatelessWidget {
     final List<String> metaParts = <String>[
       if (bean.origin != null && bean.origin!.isNotEmpty) bean.origin!,
       if (bean.farm != null && bean.farm!.isNotEmpty) bean.farm!,
-      if (bean.process != null) bean.process!.label,
+      ...bean.processes.map((ProcessMethod m) => m.label),
     ];
 
     final double total = batches.fold<double>(
@@ -352,6 +353,8 @@ class _GrinderCard extends StatelessWidget {
         grinder.burrType!,
       if (grinder.clicksPerRevolution != null)
         '每圈 ${grinder.clicksPerRevolution} click',
+      if (grinder.micronsPerClick != null)
+        '每 click ${_formatNumber(grinder.micronsPerClick!)} µm',
       if (latest == null)
         '还没有冲煮记录'
       else
@@ -367,10 +370,8 @@ class _GrinderCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                grinder.displayName(
-                  grindSetting: latest?.grindSetting,
-                  clicks: latest?.grindClicks,
-                ),
+                // 第一栏：名称 / 零点（测评反馈）。
+                grinder.displayName(showCurrentSetting: false),
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),

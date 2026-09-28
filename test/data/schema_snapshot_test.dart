@@ -100,7 +100,29 @@ final Map<int, _VersionFixture> _fixtures = <int, _VersionFixture>{
     insert: _insertV6Fixture,
     validate: _validateV6Fixture,
   ),
+  7: const _VersionFixture(
+    insert: _insertV7Fixture,
+    validate: _validateV7Fixture,
+  ),
 };
+
+/// v7 = v6 那份数据 + 处理法多选 + 磨豆机微米 + 记录上的磨豆机零点快照。
+void _insertV7Fixture(Batch batch, GeneratedDatabase db) {
+  _insertV6Fixture(batch, db);
+  // v7：处理法可以多选（v6 及更早只存一条裸名字，迁移时会包成数组）。
+  batch.customStatement(
+    "UPDATE coffee_beans SET process = '[\"washed\",\"anaerobic\"]' WHERE id = 1",
+  );
+  // v7：磨豆机每 click 位移。
+  batch.customStatement(
+    'UPDATE grinders SET microns_per_click = 30 WHERE id = 1',
+  );
+  // v7：记录上的磨豆机零点快照。
+  batch.customStatement(
+    'UPDATE brew_logs SET grinder_zero_point_snapshot = 0, '
+    'grinder_clicks_per_revolution_snapshot = 30 WHERE id = 1',
+  );
+}
 
 /// v6 的写入 = v5 那份数据 + 自定义方法 + 两条辅料。
 ///
@@ -218,6 +240,10 @@ Future<void> _validateV5Fixture(AppDatabase db) =>
 
 /// v6 升上来后：收藏 + 自定义方法 + 辅料都要在。
 Future<void> _validateV6Fixture(AppDatabase db) =>
+    _validateFixture(db, expectFavorite: true, expectAddIns: true);
+
+/// v7 升上来后：再多校验处理法多选与磨豆机微米/零点快照。
+Future<void> _validateV7Fixture(AppDatabase db) =>
     _validateFixture(db, expectFavorite: true, expectAddIns: true);
 
 /// 升到当前版本后逐项校验上面的数据。

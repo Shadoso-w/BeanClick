@@ -73,7 +73,7 @@ void main() {
         .getAll();
     expect(logs.single.methodLabel, '拿铁');
     expect(logs.single.methodDisplay, '拿铁');
-    expect(logs.single.method, BrewMethod.pourOver, reason: '内置列保持默认');
+    expect(logs.single.method, BrewMethod.other, reason: '自定义方法统一归到「其他」那一档');
 
     await harness.finish(tester);
   });

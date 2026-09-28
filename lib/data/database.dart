@@ -92,8 +92,43 @@ class JsonValueConverter extends TypeConverter<Object?, String?> {
   }
 }
 
-/// 容忍未知值的枚举转换器。
+/// `List<ProcessMethod>` ↔ JSON 数组（处理法可以多选）。
 ///
+/// 两种历史形态都认：
+/// - v6 及更早：一个裸枚举名（`washed`）→ 当成单元素列表
+/// - v7 起：JSON 数组（`["washed","anaerobic"]`）
+///
+/// 认不出的枚举名会被丢掉（而不是抛异常），空列表写回 NULL。
+class ProcessListConverter extends TypeConverter<List<ProcessMethod>, String?> {
+  const ProcessListConverter();
+
+  @override
+  List<ProcessMethod> fromSql(String? fromDb) {
+    if (fromDb == null || fromDb.isEmpty) return const <ProcessMethod>[];
+    final String raw = fromDb.trim();
+    // 老数据：裸名字，不是 JSON。
+    if (!raw.startsWith('[')) {
+      final ProcessMethod? single = ProcessMethod.fromName(raw);
+      return single == null ? const <ProcessMethod>[] : <ProcessMethod>[single];
+    }
+    final Object? decoded = jsonDecode(raw);
+    if (decoded is! List) return const <ProcessMethod>[];
+    return decoded
+        .map((Object? e) => ProcessMethod.fromName(e?.toString()))
+        .whereType<ProcessMethod>()
+        .toList(growable: false);
+  }
+
+  @override
+  String? toSql(List<ProcessMethod> value) {
+    if (value.isEmpty) return null;
+    return jsonEncode(
+      value.map((ProcessMethod method) => method.name).toList(growable: false),
+    );
+  }
+}
+
+/// 容忍未知值的枚举转换器。///
 /// Drift 自带的 `textEnum<T>()` 用 `values.byName(...)` 解码，
 /// **遇到不认识的字符串会抛 `ArgumentError`**。这在前向兼容上是致命的：
 /// 将来新版本加了「某种冲煮方法」，旧版本读到那条记录会直接崩。
@@ -142,10 +177,13 @@ class CoffeeBeans extends Table {
 
   TextColumn get farm => text().nullable()();
 
-  /// 处理法，存枚举 name。
-  TextColumn get process => text()
-      .map(const TolerantEnumConverter<ProcessMethod>(ProcessMethod.values))
-      .nullable()();
+  /// 处理法，JSON 数组（**可多选**，如「水洗 + 厌氧」）；NULL / `[]` = 没填。
+  ///
+  /// 保持可空、不加 SQL 默认值：v6 → v7 只要把老值改写成数组，**不用重建表** ——
+  /// 重建会 DROP `coffee_beans`，而它被批次/用量用外键引用着，会触发级联删除
+  /// （v1 → v4 那段注释里记过这个坑）。
+  TextColumn get process =>
+      text().nullable().map(const ProcessListConverter())();
 
   /// 风味标签，JSON 数组。属于「这款豆子」而不是某个批次。
   TextColumn get flavorTags => text()
@@ -220,6 +258,11 @@ class Grinders extends Table {
 
   IntColumn get clicksPerRevolution => integer().nullable()();
 
+  /// 每 click 约等于多少微米（刀盘每格的位移量）。
+  ///
+  /// 用来把「调粗/调细了几格」换算成实际间隙变化，方便跨磨豆机对比。
+  RealColumn get micronsPerClick => real().nullable()();
+
   TextColumn get calibrationNote => text().nullable()();
 
   TextColumn get notes => text().nullable()();
@@ -272,6 +315,15 @@ class BrewLogs extends Table {
   RealColumn get grindSetting => real().nullable()();
 
   IntColumn get grindClicks => integer().nullable()();
+
+  /// 当时的磨豆机零点（快照）。
+  ///
+  /// 「老研磨度关联老记录」：换了刻度或重新校准零点之后，
+  /// 老记录仍然按**当时**的零点解释，不会被新零点重新换算。
+  RealColumn get grinderZeroPointSnapshot => real().nullable()();
+
+  /// 当时的「每圈 click」（快照），同上。
+  IntColumn get grinderClicksPerRevolutionSnapshot => integer().nullable()();
 
   /// 总粉量（拼配时是各支豆子之和）。
   RealColumn get doseGrams => real().nullable()();
@@ -565,17 +617,19 @@ class AppDatabase extends _$AppDatabase {
   /// 打开指定文件的数据库。
   AppDatabase.file(File file) : super(NativeDatabase(file));
 
-  /// v6：`brew_logs.methodLabel`（自定义冲煮方法）+ `brew_log_addins`（辅料）。
+  /// v7：处理法改多选、磨豆机加「每 click 微米」、记录存磨豆机零点快照。
   ///
   /// 版本历史（**真实情况**，代码里出现过的版本号）：
-  /// - v1：M1 的 5 张表，烘焙日期/烘焙度/余量/购入总重/价格都在 `coffee_beans` 上
-  /// - v4：批次 + 多豆 + 扩展属性，烘焙信息与余量下移到批次
+  /// - v1：M1 的 5 张表
+  /// - v4：批次 + 多豆 + 扩展属性
   /// - v5：`brew_logs.is_favorite`
   /// - v6：`brew_logs.methodLabel`、`brew_log_addins`
+  /// - v7：`coffee_beans.process` 改多选、`grinders.micronsPerClick`、
+  ///   `brew_logs.grinderZeroPointSnapshot` / `grinderClicksPerRevolutionSnapshot`
   ///
-  /// ⚠️ v2 / v3 从未出现过（`git log -L` 里 schemaVersion 是 1 → 4 → 5 → 6）。
+  /// ⚠️ v2 / v3 从未出现过（`git log -L` 里是 1 → 4 → 5 → 6 → 7）。
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -593,6 +647,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 6) {
         await _upgradeToV6(m);
+      }
+      if (from < 7) {
+        await _upgradeToV7(m);
       }
       // 索引与默认设置都是幂等的，迁移后统一兜一次：
       // 旧库没有索引（v1 一个都没建），而少了索引会让查批次、拉时间线全表扫描。
@@ -612,6 +669,32 @@ class AppDatabase extends _$AppDatabase {
   Future<void> _upgradeToV6(Migrator m) async {
     await m.addColumn(brewLogs, brewLogs.methodLabel);
     await m.createTable(brewLogAddins);
+  }
+
+  /// v6 → v7：处理法改多选、磨豆机加微米、记录加零点快照。
+  ///
+  /// 三步都是「加列 / 改值」，没有一步需要重建表：
+  /// 1. 处理法列的类型没变（还是 TEXT），只是**值的形态**从裸名字变成 JSON 数组，
+  ///    所以用一句 UPDATE 改写老数据即可；
+  /// 2. 新列都可空，旧记录自动为 NULL（= 没填微米 / 用磨豆机当前的零点）；
+  /// 3. 快照列只影响之后新写的记录 —— 这正合「老研磨度关联老记录」的语义。
+  Future<void> _upgradeToV7(Migrator m) async {
+    // 1) 处理法：'washed' → '["washed"]'。
+    //    只在「有值且不是数组」时改写，重复跑也安全（幂等）。
+    await customStatement('''
+      UPDATE coffee_beans
+      SET process = '["' || process || '"]'
+      WHERE process IS NOT NULL
+        AND process != ''
+        AND process NOT LIKE '[%'
+    ''');
+
+    // 2) 磨豆机：每 click 约等于多少微米。
+    await m.addColumn(grinders, grinders.micronsPerClick);
+
+    // 3) 记录：磨豆机零点与每圈 click 的快照。
+    await m.addColumn(brewLogs, brewLogs.grinderZeroPointSnapshot);
+    await m.addColumn(brewLogs, brewLogs.grinderClicksPerRevolutionSnapshot);
   }
 
   /// v4 → v5：给冲煮记录加「收藏」。

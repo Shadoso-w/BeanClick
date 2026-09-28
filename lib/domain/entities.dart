@@ -87,7 +87,7 @@ class CoffeeBean {
     required this.name,
     this.origin,
     this.farm,
-    this.process,
+    this.processes = const [],
     this.flavorTags = const [],
     this.isFavorite = false,
     this.photoPath,
@@ -101,7 +101,9 @@ class CoffeeBean {
   final String name;
   final String? origin;
   final String? farm;
-  final ProcessMethod? process;
+
+  /// 处理法，**可以多选**（如「水洗 + 厌氧」）。空列表 = 没填。
+  final List<ProcessMethod> processes;
 
   /// 风味标签，属于这款豆子。
   final List<String> flavorTags;
@@ -122,7 +124,7 @@ class CoffeeBean {
   String? get originLabel {
     final parts = <String>[
       if (origin != null && origin!.isNotEmpty) origin!,
-      if (process != null) process!.label,
+      ...processes.map((ProcessMethod method) => method.label),
     ];
     return parts.isEmpty ? null : parts.join(' · ');
   }
@@ -132,7 +134,9 @@ class CoffeeBean {
     'name': name,
     'origin': origin,
     'farm': farm,
-    'process': process?.name,
+    'processes': processes
+        .map((ProcessMethod method) => method.name)
+        .toList(growable: false),
     'flavorTags': flavorTags,
     'isFavorite': isFavorite,
     'photoPath': photoPath,
@@ -146,7 +150,15 @@ class CoffeeBean {
     name: json['name'] as String,
     origin: json['origin'] as String?,
     farm: json['farm'] as String?,
-    process: ProcessMethod.fromName(json['process'] as String?),
+    // `processes` 是 v7 起的数组；兼容老备份里的单值 `process`。
+    processes: <ProcessMethod>[
+      ...(json['processes'] as List<Object?>? ?? const <Object?>[])
+          .map((Object? e) => ProcessMethod.fromName(e?.toString()))
+          .whereType<ProcessMethod>(),
+      if (json['processes'] == null) ...<ProcessMethod>[
+        ?ProcessMethod.fromName(json['process'] as String?),
+      ],
+    ],
     flavorTags: (json['flavorTags'] as List<Object?>? ?? const [])
         .map((e) => e as String)
         .toList(growable: false),
@@ -162,7 +174,7 @@ class CoffeeBean {
     String? name,
     String? origin,
     String? farm,
-    ProcessMethod? process,
+    List<ProcessMethod>? processes,
     List<String>? flavorTags,
     bool? isFavorite,
     String? photoPath,
@@ -172,7 +184,6 @@ class CoffeeBean {
     DateTime? updatedAt,
     bool clearOrigin = false,
     bool clearFarm = false,
-    bool clearProcess = false,
     bool clearPhotoPath = false,
     bool clearNotes = false,
   }) => CoffeeBean(
@@ -180,7 +191,7 @@ class CoffeeBean {
     name: name ?? this.name,
     origin: clearOrigin ? null : (origin ?? this.origin),
     farm: clearFarm ? null : (farm ?? this.farm),
-    process: clearProcess ? null : (process ?? this.process),
+    processes: processes ?? this.processes,
     flavorTags: flavorTags ?? this.flavorTags,
     isFavorite: isFavorite ?? this.isFavorite,
     photoPath: clearPhotoPath ? null : (photoPath ?? this.photoPath),
@@ -198,7 +209,7 @@ class CoffeeBean {
           other.name == name &&
           other.origin == origin &&
           other.farm == farm &&
-          other.process == process &&
+          _listEquals(other.processes, processes) &&
           _listEquals(other.flavorTags, flavorTags) &&
           other.isFavorite == isFavorite &&
           other.photoPath == photoPath &&
@@ -213,7 +224,7 @@ class CoffeeBean {
     name,
     origin,
     farm,
-    process,
+    Object.hashAll(processes),
     Object.hashAll(flavorTags),
     isFavorite,
     photoPath,
@@ -376,6 +387,7 @@ class Grinder {
     this.scaleUnit = GrindScaleUnit.click,
     this.zeroPoint = 0,
     this.clicksPerRevolution,
+    this.micronsPerClick,
     this.calibrationNote,
     this.notes,
     required this.createdAt,
@@ -389,15 +401,25 @@ class Grinder {
   final GrindScaleUnit scaleUnit;
   final double? zeroPoint;
   final int? clicksPerRevolution;
+
+  /// 每 click 约等于多少微米（刀盘每格的位移量）。可空 = 没量过。
+  final double? micronsPerClick;
   final String? calibrationNote;
   final String? notes;
   final DateTime createdAt;
   final DateTime updatedAt;
 
   /// 手册 §7 的展示格式：`C40 / 22 click / 零点 0`。
-  String displayName({double? grindSetting, int? clicks}) {
+  ///
+  /// [showCurrentSetting] 为 false 时只给「名称 / 零点」——
+  /// 豆库卡片第一栏要的就是这两项（测评反馈），当前刻度放在别处展示。
+  String displayName({
+    double? grindSetting,
+    int? clicks,
+    bool showCurrentSetting = true,
+  }) {
     final parts = <String>['$brand $model'];
-    if (grindSetting != null) {
+    if (showCurrentSetting && grindSetting != null) {
       final setting = grindSetting == grindSetting.roundToDouble()
           ? grindSetting.toInt().toString()
           : grindSetting.toString();
@@ -424,6 +446,7 @@ class Grinder {
     'scaleUnit': scaleUnit.name,
     'zeroPoint': zeroPoint,
     'clicksPerRevolution': clicksPerRevolution,
+    'micronsPerClick': micronsPerClick,
     'calibrationNote': calibrationNote,
     'notes': notes,
     'createdAt': createdAt.toIso8601String(),
@@ -438,6 +461,7 @@ class Grinder {
     scaleUnit: GrindScaleUnit.fromName(json['scaleUnit'] as String?),
     zeroPoint: (json['zeroPoint'] as num?)?.toDouble(),
     clicksPerRevolution: (json['clicksPerRevolution'] as num?)?.toInt(),
+    micronsPerClick: (json['micronsPerClick'] as num?)?.toDouble(),
     calibrationNote: json['calibrationNote'] as String?,
     notes: json['notes'] as String?,
     createdAt: _date(json['createdAt']) ?? DateTime.now(),
@@ -452,6 +476,7 @@ class Grinder {
     GrindScaleUnit? scaleUnit,
     double? zeroPoint,
     int? clicksPerRevolution,
+    double? micronsPerClick,
     String? calibrationNote,
     String? notes,
     DateTime? createdAt,
@@ -459,6 +484,7 @@ class Grinder {
     bool clearBurrType = false,
     bool clearZeroPoint = false,
     bool clearClicksPerRevolution = false,
+    bool clearMicronsPerClick = false,
     bool clearCalibrationNote = false,
     bool clearNotes = false,
   }) => Grinder(
@@ -471,6 +497,9 @@ class Grinder {
     clicksPerRevolution: clearClicksPerRevolution
         ? null
         : (clicksPerRevolution ?? this.clicksPerRevolution),
+    micronsPerClick: clearMicronsPerClick
+        ? null
+        : (micronsPerClick ?? this.micronsPerClick),
     calibrationNote: clearCalibrationNote
         ? null
         : (calibrationNote ?? this.calibrationNote),
@@ -490,6 +519,7 @@ class Grinder {
           other.scaleUnit == scaleUnit &&
           other.zeroPoint == zeroPoint &&
           other.clicksPerRevolution == clicksPerRevolution &&
+          other.micronsPerClick == micronsPerClick &&
           other.calibrationNote == calibrationNote &&
           other.notes == notes &&
           other.createdAt == createdAt &&
@@ -504,6 +534,7 @@ class Grinder {
     scaleUnit,
     zeroPoint,
     clicksPerRevolution,
+    micronsPerClick,
     calibrationNote,
     notes,
     createdAt,
@@ -690,6 +721,8 @@ class BrewLog {
     this.method = BrewMethod.pourOver,
     this.grindSetting,
     this.grindClicks,
+    this.grinderZeroPointSnapshot,
+    this.grinderClicksPerRevolutionSnapshot,
     this.doseGrams,
     this.waterGrams,
     this.ratio,
@@ -733,6 +766,10 @@ class BrewLog {
   final BrewMethod method;
   final double? grindSetting;
   final int? grindClicks;
+
+  /// 写入时的磨豆机零点 / 每圈 click 快照（Grinder 之后改校准也不影响历史）。
+  final double? grinderZeroPointSnapshot;
+  final int? grinderClicksPerRevolutionSnapshot;
 
   /// 总粉量（拼配时是各支之和）。
   final double? doseGrams;
@@ -837,6 +874,8 @@ class BrewLog {
     'method': method.name,
     'grindSetting': grindSetting,
     'grindClicks': grindClicks,
+    'grinderZeroPointSnapshot': grinderZeroPointSnapshot,
+    'grinderClicksPerRevolutionSnapshot': grinderClicksPerRevolutionSnapshot,
     'doseGrams': doseGrams,
     'waterGrams': waterGrams,
     'ratio': ratio,
@@ -879,6 +918,10 @@ class BrewLog {
         BrewMethod.fromName(json['method'] as String?) ?? BrewMethod.pourOver,
     grindSetting: (json['grindSetting'] as num?)?.toDouble(),
     grindClicks: (json['grindClicks'] as num?)?.toInt(),
+    grinderZeroPointSnapshot: (json['grinderZeroPointSnapshot'] as num?)
+        ?.toDouble(),
+    grinderClicksPerRevolutionSnapshot:
+        (json['grinderClicksPerRevolutionSnapshot'] as num?)?.toInt(),
     doseGrams: (json['doseGrams'] as num?)?.toDouble(),
     waterGrams: (json['waterGrams'] as num?)?.toDouble(),
     ratio: (json['ratio'] as num?)?.toDouble(),
@@ -928,6 +971,8 @@ class BrewLog {
     BrewMethod? method,
     double? grindSetting,
     int? grindClicks,
+    double? grinderZeroPointSnapshot,
+    int? grinderClicksPerRevolutionSnapshot,
     double? doseGrams,
     double? waterGrams,
     double? ratio,
@@ -997,6 +1042,11 @@ class BrewLog {
         ? null
         : (grindSetting ?? this.grindSetting),
     grindClicks: clearGrindClicks ? null : (grindClicks ?? this.grindClicks),
+    grinderZeroPointSnapshot:
+        grinderZeroPointSnapshot ?? this.grinderZeroPointSnapshot,
+    grinderClicksPerRevolutionSnapshot:
+        grinderClicksPerRevolutionSnapshot ??
+        this.grinderClicksPerRevolutionSnapshot,
     doseGrams: clearDoseGrams ? null : (doseGrams ?? this.doseGrams),
     waterGrams: clearWaterGrams ? null : (waterGrams ?? this.waterGrams),
     ratio: clearRatio ? null : (ratio ?? this.ratio),
@@ -1053,6 +1103,9 @@ class BrewLog {
           other.method == method &&
           other.grindSetting == grindSetting &&
           other.grindClicks == grindClicks &&
+          other.grinderZeroPointSnapshot == grinderZeroPointSnapshot &&
+          other.grinderClicksPerRevolutionSnapshot ==
+              grinderClicksPerRevolutionSnapshot &&
           other.doseGrams == doseGrams &&
           other.waterGrams == waterGrams &&
           other.ratio == ratio &&

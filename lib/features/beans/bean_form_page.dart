@@ -51,7 +51,7 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
   late final TextEditingController _farm;
   late final TextEditingController _flavors;
 
-  ProcessMethod? _process;
+  final Set<ProcessMethod> _processes = <ProcessMethod>{};
   bool _isFavorite = false;
 
   // --- 新增时的首个批次 ---
@@ -79,7 +79,7 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     _origin = TextEditingController(text: bean?.origin ?? '');
     _farm = TextEditingController(text: bean?.farm ?? '');
     _flavors = TextEditingController(text: bean?.flavorTags.join('、') ?? '');
-    _process = bean?.process;
+    _processes.addAll(bean?.processes ?? const <ProcessMethod>[]);
     _isFavorite = bean?.isFavorite ?? false;
 
     // 首个批次默认值：刚买回来通常是满袋。
@@ -138,13 +138,12 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
       name: _name.text.trim(),
       origin: _origin.text.trim().isEmpty ? null : _origin.text.trim(),
       farm: _farm.text.trim().isEmpty ? null : _farm.text.trim(),
-      process: _process,
+      processes: _processes.toList(growable: false),
       flavorTags: parseTags(_flavors.text),
       isFavorite: _isFavorite,
       updatedAt: now,
       clearOrigin: _origin.text.trim().isEmpty,
       clearFarm: _farm.text.trim().isEmpty,
-      clearProcess: _process == null,
     );
 
     try {
@@ -302,14 +301,26 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                 ),
                 LabeledField(
                   label: '处理法',
-                  helper: '再次点击已选中的项可取消',
-                  child: EnumSelector<ProcessMethod>(
-                    values: ProcessMethod.selectable,
-                    selected: _process,
-                    allowDeselect: true,
-                    labelOf: (ProcessMethod value) => value.label,
-                    onSelected: (ProcessMethod? value) =>
-                        setState(() => _process = value),
+                  helper: '可以多选（例如「水洗 + 厌氧」）；再点一次取消',
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      for (final ProcessMethod method
+                          in ProcessMethod.selectable)
+                        FilterChip(
+                          key: Key('bean.process.${method.name}'),
+                          label: Text(method.label),
+                          selected: _processes.contains(method),
+                          onSelected: (bool selected) => setState(() {
+                            if (selected) {
+                              _processes.add(method);
+                            } else {
+                              _processes.remove(method);
+                            }
+                          }),
+                        ),
+                    ],
                   ),
                 ),
                 LabeledField(

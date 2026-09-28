@@ -76,22 +76,22 @@ final customBrewMethodsProvider = StreamProvider<List<String>>(
   (ref) => ref.watch(settingsRepositoryProvider).watchCustomBrewMethods(),
 );
 
-/// 全部批次，按豆子分组。
+/// 全部批次，按豆子分组（**实时**）。
 ///
 /// 豆库列表需要「总余量 / 批次数 / 最近烘焙日」，这些都在批次上。
-/// 一次取回全部再在内存里分组，避免每支豆子各查一次（N+1）。
-final batchesByBeanProvider = FutureProvider<Map<int, List<BeanBatch>>>((
-  ref,
-) async {
-  // 依赖豆子列表，豆子变动时一起刷新。
-  final List<CoffeeBean> beans = await ref.watch(beanListProvider.future);
-  final Map<int, List<BeanBatch>> grouped = <int, List<BeanBatch>>{};
-  for (final CoffeeBean bean in beans) {
-    final int? id = bean.id;
-    if (id == null) continue;
-    grouped[id] = await ref.watch(beanRepositoryProvider).batchesOf(id);
-  }
-  return grouped;
+/// 一次订阅整张批次表再在内存里分组，避免每支豆子各查一次（N+1）；
+/// 而且必须订阅批次表：冲一杯扣余量、加一袋复购，都只动 `bean_batches`，
+/// 豆子表本身没变 —— 用 FutureProvider 的话列表上的总余量会停在旧值。
+final batchesByBeanProvider = StreamProvider<Map<int, List<BeanBatch>>>((ref) {
+  return ref.watch(beanRepositoryProvider).watchAllBatches().map((
+    List<BeanBatch> batches,
+  ) {
+    final Map<int, List<BeanBatch>> grouped = <int, List<BeanBatch>>{};
+    for (final BeanBatch batch in batches) {
+      grouped.putIfAbsent(batch.beanId, () => <BeanBatch>[]).add(batch);
+    }
+    return grouped;
+  });
 });
 
 /// 全部磨豆机（按添加时间正序）。

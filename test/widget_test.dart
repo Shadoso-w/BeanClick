@@ -227,7 +227,33 @@ void main() {
       await harness.finish(tester);
     });
 
-    testWidgets('复制上次：预填参数但不继承评分与备注', (tester) async {
+    testWidgets('加号开的是空表单（不再预填上次）', (tester) async {
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
+            BrewLog(
+              method: BrewMethod.mokaPot,
+              doseGrams: 18,
+              waterGrams: 100,
+              brewedAt: DateTime(2026, 1, 1, 8),
+              createdAt: DateTime(2026, 1, 1, 8),
+              updatedAt: DateTime(2026, 1, 1, 8),
+            ),
+          );
+
+      await tester.pumpWidget(harness.app(const BeanClickApp()));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
+      await tester.pumpAndSettle();
+
+      // 测评反馈：进入后从默认（归零）页面开始，不带上一次的参数。
+      expect(await fieldText(tester, 'brew.dose'), '');
+      expect(await fieldText(tester, 'brew.water'), '');
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('复制按钮：单击才预填上次，且不继承评分与备注', (tester) async {
       await harness.container
           .read(brewLogRepositoryProvider)
           .save(
@@ -249,6 +275,10 @@ void main() {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
       await tester.tap(find.byKey(const Key('dock.addCup')));
+      await tester.pumpAndSettle();
+
+      // 空表单 → 点右上角复制按钮，参数才被填进来。
+      await tester.tap(find.byKey(const Key('brew.copyLast')));
       await tester.pumpAndSettle();
 
       // 参数被复制过来（值在输入框里，不是 Text）。
@@ -508,7 +538,7 @@ void main() {
       await harness.finish(tester);
     });
 
-    testWidgets('编辑页可以删除记录，余量不回补', (tester) async {
+    testWidgets('编辑页可以删除记录，余量自动回补', (tester) async {
       final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
       await harness.addBrewLog(
         beanId: a.beanId,
@@ -532,7 +562,7 @@ void main() {
       final BeanBatch batch = (await harness.container
           .read(beanRepositoryProvider)
           .getBatch(a.batchId))!;
-      expect(batch.remainingGrams, 185, reason: '删记录不回补余量');
+      expect(batch.remainingGrams, 200, reason: '删记录会把扣掉的 15g 回补');
 
       await harness.finish(tester);
     });
