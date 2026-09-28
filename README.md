@@ -10,7 +10,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%207%2B-3DDC84?logo=android)](https://developer.android.com)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-> 当前状态：**M2.5**（P0 仅剩独立搜索页）。已出内测 APK，见 [RELEASING.md](RELEASING.md)。
+> 当前状态：**0.1.0**（= M0–M2.9，schema v7，292 个测试）。内测 APK 见 [Releases](https://github.com/Shadoso-w/BeanClick/releases) 与 [RELEASING.md](RELEASING.md)。
 
 ---
 
@@ -77,6 +77,8 @@ flutter run
 - [x] **M1** 数据模型与应用外壳
 - [x] **M2** P0 表单（新增 / 编辑 / 删除 + 复制上次）
 - [x] **M2.5** P0 导出（JSON 备份 / CSV 表格）
+- [x] **M2.6–M2.9** 批次模型 / 多豆冲煮 / 扩展属性 / 自定义方法与辅料 / 测评反馈
+      （schema 升到 v7，见 [CHANGELOG](docs/CHANGELOG.md)）
 - [ ] **M3** Android 内测
 - [ ] **M5** P1 计时器、统计、图片分享、同步
 - [ ] **M6** P2 智能推荐、社区、设备连接
@@ -104,9 +106,18 @@ flutter run
 | 摩卡壶专属 | 火力、出液量、上壶预热（选摩卡壶时才出现） |
 | 专业字段折叠 | TDS、萃取率、水质 ppm、环境温湿度、豆温、压力 |
 | 余量联动 | 保存时按设置自动扣减；改动粉量按差值补扣；换豆回补旧豆；余量不足则扣至 0 并提示 |
-| 删除一致性 | 删除豆子 / 磨豆机时历史记录保留、外键置空；删除记录不回补余量（手册 §6.2） |
+| 删除一致性 | 删除豆子 / 磨豆机时历史记录保留、外键置空；删除记录**自动回补**余量（M2.9 改了手册 §6.2 的规则） |
 
 M2 尚未做：**独立搜索页**（记录页已有内存过滤）。导出已在 M2.5 完成。
+
+### M2.6–M2.9 已完成的内容
+
+| 版本 | 内容 |
+|---|---|
+| M2.6 | 批次模型（一支豆子多袋，各记烘焙日期 / 余量）+ 多豆冲煮（拼配）+ 扩展属性；schema v4 |
+| M2.7 | dock 改两栏 + 中间固定加号；记录卡片刻度；收藏 / 删除改左滑；schema v5 |
+| M2.8 | 日期时间弹窗中文化、时间可选到时分；记录卡片第一行 = 豆名 + 方法 + 评分；自定义冲煮方法；辅料；schema v6 |
+| M2.9 | 处理法多选、每 click µm、研磨刻度「圈 + click」与绝对刻度提示、零点快照、删除回补、新增一杯从归零页开始；schema v7 |
 
 ### M2.5 已完成的内容
 
