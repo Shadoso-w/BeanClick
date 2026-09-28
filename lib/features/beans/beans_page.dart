@@ -328,7 +328,11 @@ class _BeanCard extends StatelessWidget {
   }
 }
 
-/// 磨豆机卡片：手册 §7 展示格式 `C40 / 22 click / 零点 0`。
+/// 磨豆机卡片（手册 §7）。
+///
+/// 第一行是 `型号 / 零点 0`（M2.9：当前刻度不再混进标题），
+/// 第二行拼 `刀盘 · 每圈 N click · 每 click X µm · 最近使用 yyyy-MM-dd`，
+/// 没填的项不占位。
 class _GrinderCard extends StatelessWidget {
   const _GrinderCard({
     required this.grinder,
