@@ -464,9 +464,20 @@ keytool -genkeypair -v `
 
 真机（小米 11 / Android 14，`M2011K2C`）：M2.8 两批都覆盖安装并启动过，
 logcat 无异常 —— 真机上跑通了 v4 → v5（加列）与 v5 → v6（加列 + 建表）两次迁移。
-M2.9 的 **v6 → v7 迁移尚未上真机**：`adb install -r` 被 MIUI 挡下
-（`INSTALL_FAILED_USER_RESTRICTED`，需要在开发者选项里打开「USB 安装」并在手机上点确认），
-目前只有单测覆盖（`test/data/migration_v1_to_v4_test.dart` 的逐版本路径 + 快照测试）。
+M2.9 的 **v6 → v7 迁移也已上真机验证**（`firstInstallTime` 9-27 15:15，
+`lastUpdateTime` 9-28 22:54，即覆盖安装而非全新安装）：
+
+- 安装一度被 MIUI 挡下（`INSTALL_FAILED_USER_RESTRICTED`）——解决方法是在
+  开发者选项里打开「USB 安装」（可能还要登录小米账号），`adb install -r` 即可通过
+  （`Performing Streamed Install / Success`）。
+- 启动后进程存活、`mCurrentFocus` 是 `MainActivity`，logcat 里没有 Flutter
+  异常、没有 drift / SQLite 报错；**旧数据原样在**（9-27 那两条记录仍在列表里，
+  自定义方法 chip「拿铁」「意式浓缩」还在 —— 那是 `methodLabel`，说明
+  v5 → v6 → v7 的数据都被正确保留）。
+- 两个已知边界：release 包 `debuggable=false`，`run-as` 用不了，
+  所以设备上的 `PRAGMA user_version` 无法直接读（结论来自「不崩 + 数据在」）；
+  MIUI 还禁掉了 `adb shell input tap`（`INJECT_EVENTS`），
+  没法用 adb 驱动界面，只能人眼确认或读首屏。
 
 M2.6 的 APK 实测（`apksigner verify` / `aapt2 dump badging`）：
 
@@ -536,6 +547,9 @@ kotlin.incremental=false
 | `Could not close incremental caches ... compileReleaseKotlin` | 已在 `android/gradle.properties` 关掉 Kotlin 增量编译，见 §11 |
 | 用 PowerShell 改源码后 `flutter test` 报 `Failed to decode data using encoding 'utf-8'` | 见 §13，**别用 PowerShell 的文本 cmdlet 碰源码** |
 | CI 的 Build APK 偶发失败：`Building assets for package:sqlite3 failed` / `SocketException: Connection reset by peer`（连 `release-assets.githubusercontent.com`） | `sqlite3` 的构建钩子要从 GitHub 下预编译库，网络抖动就会失败。**不是代码问题**：`gh run rerun <id> --failed` 重跑即可（实测一次就过）。本地因为库已缓存所以看不到 |
+| `adb install -r` 报 `INSTALL_FAILED_USER_RESTRICTED: Install canceled by user` | MIUI 默认拦 USB 安装：设置 → 更多设置 → 开发者选项 → 打开「USB 安装」（可能要先登录小米账号并插卡）。开好后再跑一次即可，手机会弹一次确认框 |
+| `adb shell input tap` 报 `SecurityException: ... requires the INJECT_EVENTS permission` | MIUI 不允许 adb 注入触摸事件，**不要试图用 adb 驱动界面**：装完只能 `adb exec-out screencap` 看首屏，或让用户自己点 |
+| `run-as <包名>` 报 `package not debuggable` | release 包本来就不能 `run-as`，没法直接读设备上的数据库。验证迁移只能靠「启动不崩 + 旧数据还在」，或另打一个 `--debuggable` 的包 |
 
 ---
 
