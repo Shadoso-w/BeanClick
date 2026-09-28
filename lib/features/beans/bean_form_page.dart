@@ -2,14 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/icons.dart';
+import '../../core/widgets/extra_attribute_fields.dart';
 import '../../core/widgets/form_fields.dart';
 import '../../data/providers.dart';
+import '../../data/repositories/extra_attribute_repository.dart';
 import '../../domain/entities.dart';
 import '../../domain/enums.dart';
+import '../../domain/extra_attributes.dart';
+import 'batch_form_page.dart';
 
-/// 咖啡豆新增 / 编辑表单（手册 §7「咖啡豆」标准字段）。
+/// 咖啡豆新增 / 编辑表单。
 ///
-/// 通过 [BeanFormPage.show] 打开，返回 `true` 表示已保存或删除。
+/// 表单分三块：
+///
+/// 1. **豆子的身份**（名称、产地、庄园、处理法、风味、收藏）——不随购买变化
+/// 2. **批次**（烘焙日期、烘焙度、余量、价格）——每次购买都会不同
+///    - 新增豆子时强制填第一个批次
+///    - 编辑时展示已有批次列表，可增删改（复购就是再加一袋）
+/// 3. **更多信息**（扩展属性）——加属性只需改注册表，不用改这个文件
 class BeanFormPage extends ConsumerStatefulWidget {
   const BeanFormPage({super.key, this.bean});
 
@@ -34,18 +45,28 @@ class BeanFormPage extends ConsumerStatefulWidget {
 class _BeanFormPageState extends ConsumerState<BeanFormPage> {
   final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
+  // --- 身份 ---
   late final TextEditingController _name;
   late final TextEditingController _origin;
   late final TextEditingController _farm;
+  late final TextEditingController _flavors;
+
+  final Set<ProcessMethod> _processes = <ProcessMethod>{};
+  bool _isFavorite = false;
+
+  // --- 新增时的首个批次 ---
   late final TextEditingController _remaining;
   late final TextEditingController _initial;
   late final TextEditingController _price;
-  late final TextEditingController _flavors;
-  late final TextEditingController _notes;
-
-  ProcessMethod? _process;
-  RoastLevel? _roastLevel;
   DateTime? _roastDate;
+  RoastLevel? _roastLevel;
+
+  // --- 扩展属性 ---
+  List<ExtraAttribute> _extra = const <ExtraAttribute>[];
+
+  // --- 编辑时的批次列表 ---
+  List<BeanBatch> _batches = const <BeanBatch>[];
+
   bool _saving = false;
 
   bool get _isEditing => widget.bean != null;
@@ -57,16 +78,40 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     _name = TextEditingController(text: bean?.name ?? '');
     _origin = TextEditingController(text: bean?.origin ?? '');
     _farm = TextEditingController(text: bean?.farm ?? '');
-    _remaining = TextEditingController(
-      text: bean == null ? '' : numberToText(bean.remainingGrams),
-    );
-    _initial = TextEditingController(text: numberToText(bean?.initialGrams));
-    _price = TextEditingController(text: numberToText(bean?.price));
     _flavors = TextEditingController(text: bean?.flavorTags.join('、') ?? '');
-    _notes = TextEditingController(text: bean?.notes ?? '');
-    _process = bean?.process;
-    _roastLevel = bean?.roastLevel;
-    _roastDate = bean?.roastDate;
+    _processes.addAll(bean?.processes ?? const <ProcessMethod>[]);
+    _isFavorite = bean?.isFavorite ?? false;
+
+    // 首个批次默认值：刚买回来通常是满袋。
+    _remaining = TextEditingController(text: '200');
+    _initial = TextEditingController(text: '200');
+    _price = TextEditingController();
+    _roastDate = DateTime.now();
+    _roastLevel = RoastLevel.medium;
+
+    _loadExtras();
+    final int? id = bean?.id;
+    if (id != null) _loadBatches(id);
+  }
+
+  Future<void> _loadExtras() async {
+    final ExtraAttributeRepository repo = ref.read(
+      extraAttributeRepositoryProvider,
+    );
+    final int? id = widget.bean?.id;
+    final List<ExtraAttribute> loaded = id == null
+        ? repo.skeletonFor(ExtraOwnerType.bean)
+        : await repo.getForBean(id);
+    if (!mounted) return;
+    setState(() => _extra = loaded);
+  }
+
+  Future<void> _loadBatches(int beanId) async {
+    final List<BeanBatch> batches = await ref
+        .read(beanRepositoryProvider)
+        .batchesOf(beanId);
+    if (!mounted) return;
+    setState(() => _batches = batches);
   }
 
   @override
@@ -74,11 +119,10 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     _name.dispose();
     _origin.dispose();
     _farm.dispose();
+    _flavors.dispose();
     _remaining.dispose();
     _initial.dispose();
     _price.dispose();
-    _flavors.dispose();
-    _notes.dispose();
     super.dispose();
   }
 
@@ -89,29 +133,44 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     final DateTime now = DateTime.now();
     final CoffeeBean base =
         widget.bean ?? CoffeeBean(name: '', createdAt: now, updatedAt: now);
+
     final CoffeeBean bean = base.copyWith(
       name: _name.text.trim(),
       origin: _origin.text.trim().isEmpty ? null : _origin.text.trim(),
       farm: _farm.text.trim().isEmpty ? null : _farm.text.trim(),
-      process: _process,
-      roastLevel: _roastLevel,
-      roastDate: _roastDate,
+      processes: _processes.toList(growable: false),
       flavorTags: parseTags(_flavors.text),
-      remainingGrams: parseNumber(_remaining.text) ?? 0,
-      initialGrams: parseNumber(_initial.text),
-      price: parseNumber(_price.text),
-      notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+      isFavorite: _isFavorite,
       updatedAt: now,
-      clearProcess: _process == null,
-      clearRoastLevel: _roastLevel == null,
-      clearRoastDate: _roastDate == null,
-      clearInitialGrams: parseNumber(_initial.text) == null,
-      clearPrice: parseNumber(_price.text) == null,
-      clearNotes: _notes.text.trim().isEmpty,
+      clearOrigin: _origin.text.trim().isEmpty,
+      clearFarm: _farm.text.trim().isEmpty,
     );
 
     try {
-      await ref.read(beanRepositoryProvider).save(bean);
+      final int beanId = await ref.read(beanRepositoryProvider).save(bean);
+
+      // 新增豆子时强制写入第一个批次（决策 5）。
+      if (!_isEditing) {
+        await ref
+            .read(beanRepositoryProvider)
+            .saveBatch(
+              BeanBatch(
+                beanId: beanId,
+                roastDate: _roastDate,
+                roastLevel: _roastLevel,
+                remainingGrams: parseNumber(_remaining.text) ?? 0,
+                initialGrams: parseNumber(_initial.text),
+                price: parseNumber(_price.text),
+                createdAt: now,
+                updatedAt: now,
+              ),
+            );
+      }
+
+      await ref
+          .read(extraAttributeRepositoryProvider)
+          .saveForBean(beanId, _extra);
+
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -129,7 +188,7 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('删除这支豆子？'),
-        content: const Text('删除后无法恢复。已有的冲煮记录会保留，但不再关联这支豆子。'),
+        content: const Text('它的全部批次会一并删除。已有的冲煮记录会保留，但不再关联这支豆子。'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -145,13 +204,41 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     if (confirmed != true) return;
 
     try {
-      await ref.read(beanRepositoryProvider).delete(bean!.id!);
+      final int id = bean!.id!;
+      await ref.read(beanRepositoryProvider).delete(id);
+      await ref
+          .read(extraAttributeRepositoryProvider)
+          .deleteAllFor(ExtraOwnerType.bean, id);
       if (!mounted) return;
       Navigator.of(context).pop(true);
     } catch (error) {
       if (!mounted) return;
       _showMessage('删除失败：$error');
     }
+  }
+
+  /// 复购：加一袋。
+  Future<void> _addBatch() async {
+    final int? beanId = widget.bean?.id;
+    if (beanId == null) return;
+
+    final bool changed = await BatchFormPage.show(context, beanId: beanId);
+    if (!mounted || !changed) return;
+    await _loadBatches(beanId);
+    if (mounted) _showMessage('已添加批次');
+  }
+
+  Future<void> _editBatch(BeanBatch batch) async {
+    final int? beanId = widget.bean?.id;
+    if (beanId == null) return;
+
+    final bool changed = await BatchFormPage.show(
+      context,
+      beanId: beanId,
+      batch: batch,
+    );
+    if (!mounted || !changed) return;
+    await _loadBatches(beanId);
   }
 
   void _showMessage(String message) {
@@ -162,14 +249,6 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
 
   @override
   Widget build(BuildContext context) {
-    final double? remaining = parseNumber(_remaining.text);
-    final double? initial = parseNumber(_initial.text);
-    final String? ratioHint =
-        (initial != null && initial > 0 && remaining != null)
-        ? '已消耗 ${formatNumber((initial - remaining).clamp(0, initial))} g'
-              '（${((1 - remaining / initial) * 100).clamp(0, 100).toStringAsFixed(0)}%）'
-        : null;
-
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? '编辑咖啡豆' : '新增咖啡豆'),
@@ -213,7 +292,6 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                 ),
                 LabeledField(
                   label: '庄园 / 处理厂',
-                  // 选填字段统一标注，避免被当成必填（本来就是可选的）。
                   helper: '选填',
                   child: PlainTextField(
                     key: const Key('bean.farm'),
@@ -221,103 +299,30 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                     hintText: '例如：科契尔',
                   ),
                 ),
-              ],
-            ),
-            FormSection(
-              title: '烘焙与处理',
-              children: <Widget>[
                 LabeledField(
                   label: '处理法',
-                  helper: '再次点击已选中的项可取消',
-                  child: EnumSelector<ProcessMethod>(
-                    values: ProcessMethod.values,
-                    selected: _process,
-                    allowDeselect: true,
-                    labelOf: (ProcessMethod value) => value.label,
-                    onSelected: (ProcessMethod? value) =>
-                        setState(() => _process = value),
-                  ),
-                ),
-                LabeledField(
-                  label: '烘焙度',
-                  child: EnumSelector<RoastLevel>(
-                    values: RoastLevel.values,
-                    selected: _roastLevel,
-                    allowDeselect: true,
-                    labelOf: (RoastLevel value) => value.label,
-                    onSelected: (RoastLevel? value) =>
-                        setState(() => _roastLevel = value),
-                  ),
-                ),
-                LabeledField(
-                  label: '烘焙日期',
-                  child: DateField(
-                    value: _roastDate,
-                    lastDate: DateTime.now().add(const Duration(days: 1)),
-                    // 中文日期：2026年1月1日
-                    formatter: formatDateChinese,
-                    onPick: (DateTime value) =>
-                        setState(() => _roastDate = value),
-                    onClear: () => setState(() => _roastDate = null),
-                  ),
-                ),
-              ],
-            ),
-            FormSection(
-              title: '库存与价格',
-              children: <Widget>[
-                LabeledField(
-                  label: '剩余克数',
-                  helper: ratioHint ?? '冲煮保存时会按粉量自动扣减',
-                  child: NumberField(
-                    key: const Key('bean.remaining'),
-                    controller: _remaining,
-                    hintText: '0',
-                    suffixText: 'g',
-                    onChanged: (_) => setState(() {}),
-                    // 剩余不能超过购入总重（修：原来没有这条校验）。
-                    validator: (String? value) {
-                      final double? remaining = parseNumber(value);
-                      final double? initial = parseNumber(_initial.text);
-                      if (remaining != null &&
-                          initial != null &&
-                          remaining > initial) {
-                        return '剩余克数不能大于购入总重（${formatNumber(initial)} g）';
-                      }
-                      return null;
-                    },
-                  ),
-                ),
-                LabeledField(
-                  label: '购入总重',
-                  helper: '填写后可计算消耗比例',
-                  child: NumberField(
-                    key: const Key('bean.initial'),
-                    controller: _initial,
-                    hintText: '例如：200',
-                    suffixText: 'g',
-                    onChanged: (_) => setState(() {}),
-                  ),
-                ),
-                LabeledField(
-                  label: '价格',
-                  child: NumberField(
-                    key: const Key('bean.price'),
-                    controller: _price,
-                    hintText: '选填',
-                    suffixText: '元',
-                    textInputAction: TextInputAction.next,
-                    // 金额最多两位小数（修：原来没有限制）。
-                    extraFormatters: const <TextInputFormatter>[
-                      PriceInputFormatter(),
+                  helper: '可以多选（例如「水洗 + 厌氧」）；再点一次取消',
+                  child: Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      for (final ProcessMethod method
+                          in ProcessMethod.selectable)
+                        FilterChip(
+                          key: Key('bean.process.${method.name}'),
+                          label: Text(method.label),
+                          selected: _processes.contains(method),
+                          onSelected: (bool selected) => setState(() {
+                            if (selected) {
+                              _processes.add(method);
+                            } else {
+                              _processes.remove(method);
+                            }
+                          }),
+                        ),
                     ],
                   ),
                 ),
-              ],
-            ),
-            FormSection(
-              title: '风味与备注',
-              children: <Widget>[
                 LabeledField(
                   label: '风味标签',
                   helper: '用「、」或逗号分隔，例如：柑橘、花香、蜂蜜',
@@ -325,22 +330,46 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
                     key: const Key('bean.flavors'),
                     controller: _flavors,
                     hintText: '柑橘、花香',
-                    // 输入阶段就过滤掉表情与其他符号，只留文字、数字与分隔符。
                     inputFormatters: const <TextInputFormatter>[
                       FilteringTagFormatter(),
                     ],
                   ),
                 ),
-                LabeledField(
-                  label: '备注',
-                  child: PlainTextField(
-                    controller: _notes,
-                    hintText: '选填',
-                    maxLines: 3,
-                    textInputAction: TextInputAction.newline,
-                  ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('收藏'),
+                  subtitle: const Text('复购时可以先从收藏里挑'),
+                  value: _isFavorite,
+                  onChanged: (bool value) =>
+                      setState(() => _isFavorite = value),
                 ),
               ],
+            ),
+
+            if (_isEditing)
+              _BatchSection(
+                batches: _batches,
+                onAdd: _addBatch,
+                onEdit: _editBatch,
+              )
+            else
+              _FirstBatchSection(
+                roastDate: _roastDate,
+                roastLevel: _roastLevel,
+                remaining: _remaining,
+                initial: _initial,
+                price: _price,
+                onRoastDateChanged: (DateTime? value) =>
+                    setState(() => _roastDate = value),
+                onRoastLevelChanged: (RoastLevel? value) =>
+                    setState(() => _roastLevel = value),
+                onNumberChanged: () => setState(() {}),
+              ),
+
+            ExtraAttributesEditor(
+              attributes: _extra,
+              onChanged: (List<ExtraAttribute> next) =>
+                  setState(() => _extra = next),
             ),
           ],
         ),
@@ -351,5 +380,179 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
         onSave: _save,
       ),
     );
+  }
+}
+
+/// 新增豆子时的第一个批次（强制填写）。
+class _FirstBatchSection extends StatelessWidget {
+  const _FirstBatchSection({
+    required this.roastDate,
+    required this.roastLevel,
+    required this.remaining,
+    required this.initial,
+    required this.price,
+    required this.onRoastDateChanged,
+    required this.onRoastLevelChanged,
+    required this.onNumberChanged,
+  });
+
+  final DateTime? roastDate;
+  final RoastLevel? roastLevel;
+  final TextEditingController remaining;
+  final TextEditingController initial;
+  final TextEditingController price;
+  final ValueChanged<DateTime?> onRoastDateChanged;
+  final ValueChanged<RoastLevel?> onRoastLevelChanged;
+  final VoidCallback onNumberChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return FormSection(
+      title: '第一袋',
+      subtitle: '烘焙日期与余量记在批次上；以后复购再加一袋即可',
+      children: <Widget>[
+        LabeledField(
+          label: '烘焙日期',
+          child: DateField(
+            value: roastDate,
+            formatter: formatDateChinese,
+            lastDate: DateTime.now().add(const Duration(days: 1)),
+            onPick: (DateTime value) => onRoastDateChanged(value),
+            onClear: () => onRoastDateChanged(null),
+          ),
+        ),
+        LabeledField(
+          label: '烘焙度',
+          child: EnumSelector<RoastLevel>(
+            values: RoastLevel.selectable,
+            selected: roastLevel,
+            allowDeselect: true,
+            labelOf: (RoastLevel value) => value.label,
+            onSelected: onRoastLevelChanged,
+          ),
+        ),
+        LabeledField(
+          label: '剩余克数',
+          child: NumberField(
+            key: const Key('bean.remaining'),
+            controller: remaining,
+            hintText: '0',
+            suffixText: 'g',
+            onChanged: (_) => onNumberChanged(),
+            validator: (String? value) {
+              final double? r = parseNumber(value);
+              final double? i = parseNumber(initial.text);
+              if (r != null && i != null && r > i) {
+                return '剩余克数不能大于购入总重（${formatNumber(i)} g）';
+              }
+              return null;
+            },
+          ),
+        ),
+        LabeledField(
+          label: '购入总重',
+          child: NumberField(
+            key: const Key('bean.initial'),
+            controller: initial,
+            hintText: '例如：200',
+            suffixText: 'g',
+            onChanged: (_) => onNumberChanged(),
+          ),
+        ),
+        LabeledField(
+          label: '价格',
+          child: NumberField(
+            key: const Key('bean.price'),
+            controller: price,
+            hintText: '选填',
+            suffixText: '元',
+            textInputAction: TextInputAction.next,
+            extraFormatters: const <TextInputFormatter>[PriceInputFormatter()],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 编辑豆子时的批次列表。
+class _BatchSection extends StatelessWidget {
+  const _BatchSection({
+    required this.batches,
+    required this.onAdd,
+    required this.onEdit,
+  });
+
+  final List<BeanBatch> batches;
+  final VoidCallback onAdd;
+  final ValueChanged<BeanBatch> onEdit;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final double total = batches.fold<double>(
+      0,
+      (sum, b) => sum + b.remainingGrams,
+    );
+
+    return FormSection(
+      title: '批次（${batches.length}）',
+      subtitle: total > 0 ? '当前总余量 ${formatNumber(total)} g' : '所有批次都已用完',
+      children: <Widget>[
+        if (batches.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              '这支豆子还没有批次，余量无处记录',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          )
+        else
+          for (final BeanBatch batch in batches)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                batch.isEmpty
+                    ? Icons.remove_circle_outline
+                    : Icons.inventory_2_outlined,
+                color: batch.isEmpty
+                    ? theme.colorScheme.outline
+                    : theme.colorScheme.primary,
+              ),
+              title: Text(_batchTitle(batch)),
+              subtitle: Text(_batchSubtitle(batch)),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => onEdit(batch),
+            ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: onAdd,
+            icon: const Icon(addCircleIcon, size: 18),
+            label: const Text('再来一袋'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  static String _batchTitle(BeanBatch batch) {
+    final DateTime? date = batch.roastDate;
+    final String dateText = date == null ? '未记烘焙日期' : formatDateChinese(date);
+    return '$dateText · 余 ${formatNumber(batch.remainingGrams)} g';
+  }
+
+  static String _batchSubtitle(BeanBatch batch) {
+    final List<String> parts = <String>[];
+    if (batch.roastLevel != null) parts.add(batch.roastLevel!.label);
+    final int? age = batch.ageInDays();
+    if (age != null && age >= 0) parts.add('烘焙 $age 天');
+    final double? ratio = batch.consumedRatio();
+    if (ratio != null) parts.add('已用 ${(ratio * 100).round()}%');
+    final double? price = batch.price;
+    if (price != null) parts.add('${formatNumber(price)} 元');
+    return parts.isEmpty ? '点开可编辑' : parts.join(' · ');
   }
 }

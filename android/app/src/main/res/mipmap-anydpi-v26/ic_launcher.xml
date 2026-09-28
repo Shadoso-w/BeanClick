@@ -2,7 +2,8 @@
 <!--
   自适应图标（Android 8.0+）。
   系统会把前景按各厂商的形状（圆/方/水滴）裁切，所以前景实际内容只占中间约 2/3。
-  前景 PNG 由 `tool/README.md` 里记录的脚本生成，透明底 + 白色咖啡杯。
+  前景 PNG 由 `tool/make_app_icons.ps1` 从 `assets/icon/app_icon_source.png` 生成：
+  米白背景被抠成透明，只留下深棕圆环、咖啡豆与刻度点，背景色由下面的颜色补上。
 -->
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
     <background android:drawable="@color/ic_launcher_background" />

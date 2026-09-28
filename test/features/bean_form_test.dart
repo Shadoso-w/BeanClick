@@ -40,6 +40,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  /// 取这支豆子的唯一批次。
+  ///
+  /// 批次模型下余量/购入总重/价格都在批次上（见 `docs/M1-DATA-MODEL.md`），
+  /// 服务端断言因此要落到批次，而不是豆子实体。
+  Future<BeanBatch> onlyBatch(int beanId) async {
+    final List<BeanBatch> batches = await harness.container
+        .read(beanRepositoryProvider)
+        .batchesOf(beanId);
+    return batches.single;
+  }
+
+  Future<CoffeeBean> onlyBean() async {
+    final List<CoffeeBean> beans = await harness.container
+        .read(beanRepositoryProvider)
+        .getAll();
+    return beans.single;
+  }
+
   group('烘焙日期改中文', () {
     test('formatDateChinese 输出 2026年1月1日', () {
       expect(formatDateChinese(DateTime(2026, 1, 1)), '2026年1月1日');
@@ -51,17 +69,25 @@ void main() {
     });
 
     testWidgets('表单里烘焙日期以中文显示', (tester) async {
-      await pumpBeanForm(
-        tester,
-        bean: CoffeeBean(
-          name: '花魁',
-          roastDate: DateTime(2026, 1, 1),
-          createdAt: DateTime(2026, 1, 1),
-          updatedAt: DateTime(2026, 1, 1),
-        ),
+      // 烘焙日期在批次上：先落一支带批次的豆，再打开它的编辑页。
+      final a = await harness.addBeanWithBatch(
+        name: '花魁',
+        roastDate: DateTime(2026, 1, 1),
       );
+      final CoffeeBean bean = (await harness.container
+          .read(beanRepositoryProvider)
+          .getById(a.beanId))!;
 
-      expect(find.text('2026年1月1日'), findsOneWidget);
+      await pumpBeanForm(tester, bean: bean);
+
+      final Finder chinese = find.textContaining('2026年1月1日');
+      await tester.scrollUntilVisible(
+        chinese,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(chinese, findsWidgets);
       expect(find.text('2026-01-01'), findsNothing);
 
       await harness.finish(tester);
@@ -93,11 +119,8 @@ void main() {
       await fill(tester, 'bean.remaining', '200');
       await tapSave(tester);
 
-      final List<CoffeeBean> beans = await harness.container
-          .read(beanRepositoryProvider)
-          .getAll();
-      expect(beans, hasLength(1));
-      expect(beans.single.remainingGrams, 200);
+      final CoffeeBean bean = await onlyBean();
+      expect((await onlyBatch(bean.id!)).remainingGrams, 200);
 
       await harness.finish(tester);
     });
@@ -109,10 +132,8 @@ void main() {
       await fill(tester, 'bean.remaining', '120');
       await tapSave(tester);
 
-      final List<CoffeeBean> beans = await harness.container
-          .read(beanRepositoryProvider)
-          .getAll();
-      expect(beans.single.remainingGrams, 120);
+      final CoffeeBean bean = await onlyBean();
+      expect((await onlyBatch(bean.id!)).remainingGrams, 120);
 
       await harness.finish(tester);
     });
@@ -120,14 +141,15 @@ void main() {
     testWidgets('未填购入总重时不触发该校验', (tester) async {
       await pumpBeanForm(tester);
       await fill(tester, 'bean.name', '花魁');
+      // 表单默认预填 200，这里显式清空才算「没填购入总重」。
+      await fill(tester, 'bean.initial', '');
       await fill(tester, 'bean.remaining', '150');
       await tapSave(tester);
 
-      final List<CoffeeBean> beans = await harness.container
-          .read(beanRepositoryProvider)
-          .getAll();
-      expect(beans, hasLength(1));
-      expect(beans.single.remainingGrams, 150);
+      final CoffeeBean bean = await onlyBean();
+      final BeanBatch batch = await onlyBatch(bean.id!);
+      expect(batch.remainingGrams, 150);
+      expect(batch.initialGrams, isNull);
 
       await harness.finish(tester);
     });
@@ -159,10 +181,8 @@ void main() {
       await fill(tester, 'bean.price', '88.55');
       await tapSave(tester);
 
-      final List<CoffeeBean> beans = await harness.container
-          .read(beanRepositoryProvider)
-          .getAll();
-      expect(beans.single.price, 88.55);
+      final CoffeeBean bean = await onlyBean();
+      expect((await onlyBatch(bean.id!)).price, 88.55);
 
       await harness.finish(tester);
     });
@@ -176,10 +196,8 @@ void main() {
       await fill(tester, 'bean.price', '88.505');
       await tapSave(tester);
 
-      final List<CoffeeBean> beans = await harness.container
-          .read(beanRepositoryProvider)
-          .getAll();
-      expect(beans.single.price, 88.50);
+      final CoffeeBean bean = await onlyBean();
+      expect((await onlyBatch(bean.id!)).price, 88.50);
 
       await harness.finish(tester);
     });

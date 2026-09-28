@@ -5,6 +5,8 @@ library;
 
 import 'package:beanclick/data/database.dart';
 import 'package:beanclick/domain/entities.dart';
+import 'package:beanclick/domain/enums.dart';
+import 'package:beanclick/domain/extra_attributes.dart';
 import 'package:drift/drift.dart';
 
 // ---------------------------------------------------------------------------
@@ -12,19 +14,32 @@ import 'package:drift/drift.dart';
 // ---------------------------------------------------------------------------
 
 extension CoffeeBeanRowMapper on CoffeeBeanRow {
-  CoffeeBean toEntity() => CoffeeBean(
+  /// [batchCount] 由调用方聚合填充（需要跨表统计，不在本映射里查库）。
+  CoffeeBean toEntity({int batchCount = 0}) => CoffeeBean(
     id: id,
     name: name,
     origin: origin,
     farm: farm,
-    process: process,
-    roastLevel: roastLevel,
-    roastDate: roastDate,
+    processes: process,
     flavorTags: flavorTags,
+    isFavorite: isFavorite,
+    photoPath: photoPath,
+    notes: notes,
+    batchCount: batchCount,
+    createdAt: createdAt,
+    updatedAt: updatedAt,
+  );
+}
+
+extension BeanBatchRowMapper on BeanBatchRow {
+  BeanBatch toEntity() => BeanBatch(
+    id: id,
+    beanId: beanId,
+    roastDate: roastDate,
+    roastLevel: roastLevel,
     remainingGrams: remainingGrams,
     initialGrams: initialGrams,
     price: price,
-    photoPath: photoPath,
     notes: notes,
     createdAt: createdAt,
     updatedAt: updatedAt,
@@ -37,9 +52,11 @@ extension GrinderRowMapper on GrinderRow {
     brand: brand,
     model: model,
     burrType: burrType,
-    scaleUnit: scaleUnit,
+    // 认不出的刻度单位回落到 click（枚举是宽容解码，不会崩）。
+    scaleUnit: scaleUnit ?? GrindScaleUnit.click,
     zeroPoint: zeroPoint,
     clicksPerRevolution: clicksPerRevolution,
+    micronsPerClick: micronsPerClick,
     calibrationNote: calibrationNote,
     notes: notes,
     createdAt: createdAt,
@@ -48,12 +65,20 @@ extension GrinderRowMapper on GrinderRow {
 }
 
 extension BrewLogRowMapper on BrewLogRow {
-  BrewLog toEntity() => BrewLog(
+  /// [beanUsages] / [addIns] 由调用方联表填充；不传则视为未关联。
+  BrewLog toEntity({
+    List<BeanUsage> beanUsages = const [],
+    List<BrewLogAddIn> addIns = const [],
+  }) => BrewLog(
     id: id,
     beanId: beanId,
     grinderId: grinderId,
     recipeId: recipeId,
-    method: method,
+    // 认不出的方法回落到手冲（枚举是宽容解码，不会崩）。
+    method: method ?? BrewMethod.pourOver,
+    methodLabel: methodLabel,
+    grinderZeroPointSnapshot: grinderZeroPointSnapshot,
+    grinderClicksPerRevolutionSnapshot: grinderClicksPerRevolutionSnapshot,
     grindSetting: grindSetting,
     grindClicks: grindClicks,
     doseGrams: doseGrams,
@@ -68,6 +93,7 @@ extension BrewLogRowMapper on BrewLogRow {
     photoPath: photoPath,
     brewedAt: brewedAt,
     isBest: isBest,
+    isFavorite: isFavorite,
     tds: tds,
     extractionYield: extractionYield,
     waterPpm: waterPpm,
@@ -76,11 +102,51 @@ extension BrewLogRowMapper on BrewLogRow {
     beanTemp: beanTemp,
     pressure: pressure,
     pourStages: pourStages,
+    beanRoastDate: beanRoastDate,
+    beanRoastLevel: beanRoastLevel,
     heatLevel: heatLevel,
     yieldGrams: yieldGrams,
     preheatUpperChamber: preheatUpperChamber,
+    beanUsages: beanUsages,
+    addIns: addIns,
     createdAt: createdAt,
     updatedAt: updatedAt,
+  );
+}
+
+extension BrewLogAddInRowMapper on BrewLogAddInRow {
+  BrewLogAddIn toEntity() => BrewLogAddIn(
+    id: id,
+    name: name,
+    amount: amount,
+    // 认不出的单位回落到 ml（宽容解码，不会崩）。
+    unit: unit ?? AddInUnit.ml,
+    position: position,
+  );
+}
+
+extension BrewLogAddInCompanionMapper on BrewLogAddIn {
+  /// [newId] 为空时由调用方给出（新建记录时列表才知道 brewLogId）。
+  BrewLogAddinsCompanion toCompanion(int brewLogId, {int? newId}) =>
+      BrewLogAddinsCompanion(
+        id: newId == null ? const Value.absent() : Value(newId),
+        brewLogId: Value(brewLogId),
+        name: Value(name),
+        amount: Value(amount),
+        unit: Value(unit),
+        position: Value(position),
+      );
+}
+
+extension BeanUsageRowMapper on BeanUsageRow {
+  BeanUsage toEntity({String? beanName}) => BeanUsage(
+    beanId: beanId,
+    batchId: batchId,
+    doseGrams: doseGrams,
+    position: position,
+    // 优先用写入时的快照；快照为空时才回退到联表查到的当前豆子名。
+    beanName: beanNameSnapshot ?? beanName,
+    roastDate: roastDateSnapshot,
   );
 }
 
@@ -88,7 +154,8 @@ extension RecipeRowMapper on RecipeRow {
   Recipe toEntity() => Recipe(
     id: id,
     name: name,
-    method: method,
+    // 认不出的方法回落到手冲（枚举是宽容解码，不会崩）。
+    method: method ?? BrewMethod.pourOver,
     doseGrams: doseGrams,
     waterGrams: waterGrams,
     ratio: ratio,
@@ -102,6 +169,32 @@ extension RecipeRowMapper on RecipeRow {
   );
 }
 
+extension ExtraAttributeRowMapper on ExtraAttributeRow {
+  ExtraAttribute toEntity() => ExtraAttribute(
+    key: key,
+    valueType: ExtraValueType.fromStorage(valueType),
+    value: value,
+    label: label,
+    isBuiltin: isBuiltin,
+    sortOrder: sortOrder,
+  );
+}
+
+extension ExtraAttributeCompanionMapper on ExtraAttribute {
+  ExtraAttributesCompanion toCompanion(ExtraOwnerType owner, int ownerId) =>
+      ExtraAttributesCompanion(
+        ownerType: Value(owner.storageKey),
+        ownerId: Value(ownerId),
+        key: Value(key),
+        value: Value(value),
+        valueType: Value(valueType.storageKey),
+        label: Value(label),
+        isBuiltin: Value(isBuiltin),
+        sortOrder: Value(sortOrder),
+        updatedAt: Value(DateTime.now()),
+      );
+}
+
 // ---------------------------------------------------------------------------
 // 实体 → Companion
 // ---------------------------------------------------------------------------
@@ -112,14 +205,25 @@ extension CoffeeBeanCompanionMapper on CoffeeBean {
     name: Value(name),
     origin: Value(origin),
     farm: Value(farm),
-    process: Value(process),
-    roastLevel: Value(roastLevel),
-    roastDate: Value(roastDate),
+    process: Value(processes),
     flavorTags: Value(flavorTags),
+    isFavorite: Value(isFavorite),
+    photoPath: Value(photoPath),
+    notes: Value(notes),
+    createdAt: Value(createdAt),
+    updatedAt: Value(updatedAt),
+  );
+}
+
+extension BeanBatchCompanionMapper on BeanBatch {
+  BeanBatchesCompanion toCompanion() => BeanBatchesCompanion(
+    id: id == null ? const Value.absent() : Value(id!),
+    beanId: Value(beanId),
+    roastDate: Value(roastDate),
+    roastLevel: Value(roastLevel),
     remainingGrams: Value(remainingGrams),
     initialGrams: Value(initialGrams),
     price: Value(price),
-    photoPath: Value(photoPath),
     notes: Value(notes),
     createdAt: Value(createdAt),
     updatedAt: Value(updatedAt),
@@ -135,6 +239,7 @@ extension GrinderCompanionMapper on Grinder {
     scaleUnit: Value(scaleUnit),
     zeroPoint: Value(zeroPoint),
     clicksPerRevolution: Value(clicksPerRevolution),
+    micronsPerClick: Value(micronsPerClick),
     calibrationNote: Value(calibrationNote),
     notes: Value(notes),
     createdAt: Value(createdAt),
@@ -149,6 +254,11 @@ extension BrewLogCompanionMapper on BrewLog {
     grinderId: Value(grinderId),
     recipeId: Value(recipeId),
     method: Value(method),
+    methodLabel: Value(methodLabel),
+    grinderZeroPointSnapshot: Value(grinderZeroPointSnapshot),
+    grinderClicksPerRevolutionSnapshot: Value(
+      grinderClicksPerRevolutionSnapshot,
+    ),
     grindSetting: Value(grindSetting),
     grindClicks: Value(grindClicks),
     doseGrams: Value(doseGrams),
@@ -163,6 +273,7 @@ extension BrewLogCompanionMapper on BrewLog {
     photoPath: Value(photoPath),
     brewedAt: Value(brewedAt),
     isBest: Value(isBest),
+    isFavorite: Value(isFavorite),
     tds: Value(tds),
     extractionYield: Value(extractionYield),
     waterPpm: Value(waterPpm),
@@ -171,12 +282,28 @@ extension BrewLogCompanionMapper on BrewLog {
     beanTemp: Value(beanTemp),
     pressure: Value(pressure),
     pourStages: Value(pourStages),
+    beanRoastDate: Value(beanRoastDate),
+    beanRoastLevel: Value(beanRoastLevel),
     heatLevel: Value(heatLevel),
     yieldGrams: Value(yieldGrams),
     preheatUpperChamber: Value(preheatUpperChamber),
-    createdAt: Value(createdAt),
-    updatedAt: Value(updatedAt),
   );
+}
+
+extension BeanUsageCompanionMapper on BeanUsage {
+  /// [brewLogId] 与 [newBatchId] 必须由调用方给出——
+  /// 实体里的 [BeanUsage] 不知道自己属于哪条记录，也不知道该写回哪个批次
+  /// （批次可能已被删除）。
+  BrewLogBeansCompanion toCompanion(int brewLogId, {int? newBatchId}) =>
+      BrewLogBeansCompanion(
+        brewLogId: Value(brewLogId),
+        beanId: Value(beanId),
+        batchId: Value(newBatchId),
+        beanNameSnapshot: Value(beanName),
+        roastDateSnapshot: Value(roastDate),
+        doseGrams: Value(doseGrams),
+        position: Value(position),
+      );
 }
 
 extension RecipeCompanionMapper on Recipe {

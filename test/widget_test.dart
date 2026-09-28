@@ -27,8 +27,18 @@ void main() {
   }
 
   /// 滚入可视区后点击文字。
+  ///
+  /// 列表是懒构建的：视口外的控件**根本不存在**，`ensureVisible` 会直接抛
+  /// `Bad state: No element`，所以查不到时先滚过去。
   Future<void> tapText(WidgetTester tester, String text) async {
     final Finder finder = find.text(text);
+    if (finder.evaluate().isEmpty) {
+      await tester.scrollUntilVisible(
+        finder,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+    }
     await tester.ensureVisible(finder);
     await tester.pumpAndSettle();
     await tester.tap(finder);
@@ -62,42 +72,42 @@ void main() {
     return editable.controller.text;
   }
 
-  group('外壳（三栏 dock）', () {
-    testWidgets('dock 是三栏：记录 / 新加一杯 / 豆库', (tester) async {
+  group('外壳（底部 dock）', () {
+    testWidgets('dock 是两栏 + 中间固定的圆形加号', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(NavigationBar), findsOneWidget);
-      final NavigationBar bar = tester.widget<NavigationBar>(
-        find.byType(NavigationBar),
-      );
-      expect(bar.destinations, hasLength(3));
-      for (final String label in <String>['记录', '新加一杯', '豆库']) {
+      // 记录 / 豆库 两栏，中间那颗 + 是按钮不是栏位。
+      for (final String label in <String>['记录', '豆库']) {
         expect(find.text(label), findsWidgets);
       }
+      expect(find.byKey(const Key('dock.addCup')), findsOneWidget);
+      expect(find.byTooltip('新加一杯'), findsOneWidget);
       // 统计与我的不再占栏位
       expect(find.text('我的'), findsNothing);
 
       await harness.finish(tester);
     });
 
-    testWidgets('「新加一杯」是常驻的大 + 号', (tester) async {
+    testWidgets('加号固定在 dock 里，不再是悬浮按钮', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      expect(find.byType(FloatingActionButton), findsOneWidget);
-      expect(
-        tester.widget<FloatingActionButton>(find.byType(FloatingActionButton)),
-        isA<FloatingActionButton>(),
-      );
-      // 常驻底部中间
+      // 悬浮 FAB 会盖住列表内容，用户要求把它并进 dock。
+      expect(find.byType(FloatingActionButton), findsNothing);
+
       final Scaffold scaffold = tester.widget<Scaffold>(
         find.byType(Scaffold).first,
       );
-      expect(
-        scaffold.floatingActionButtonLocation,
-        FloatingActionButtonLocation.centerFloat,
+      expect(scaffold.floatingActionButton, isNull);
+
+      // 加号横向居中、并且落在屏幕底部区域（即 dock 里）。
+      final Size screen = tester.getSize(find.byType(Scaffold).first);
+      final Offset addCenter = tester.getCenter(
+        find.byKey(const Key('dock.addCup')),
       );
+      expect((addCenter.dx - screen.width / 2).abs(), lessThan(1));
+      expect(addCenter.dy, greaterThan(screen.height * 0.85));
 
       await harness.finish(tester);
     });
@@ -124,11 +134,11 @@ void main() {
       await harness.finish(tester);
     });
 
-    testWidgets('点 dock 中间的「新加一杯」会打开表单，且不切走当前栏', (tester) async {
+    testWidgets('点 dock 中间的加号会打开表单，且不切走当前栏', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      await tester.tap(find.text('新加一杯').last);
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
 
       expect(find.text('记录一杯'), findsOneWidget);
@@ -178,7 +188,7 @@ void main() {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
 
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
 
       expect(find.text('记录一杯'), findsOneWidget);
@@ -198,7 +208,7 @@ void main() {
     testWidgets('无历史记录时也能保存第一杯，并落库', (tester) async {
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
 
       await fill(tester, 'brew.dose', '15');
@@ -217,7 +227,33 @@ void main() {
       await harness.finish(tester);
     });
 
-    testWidgets('复制上次：预填参数但不继承评分与备注', (tester) async {
+    testWidgets('加号开的是空表单（不再预填上次）', (tester) async {
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
+            BrewLog(
+              method: BrewMethod.mokaPot,
+              doseGrams: 18,
+              waterGrams: 100,
+              brewedAt: DateTime(2026, 1, 1, 8),
+              createdAt: DateTime(2026, 1, 1, 8),
+              updatedAt: DateTime(2026, 1, 1, 8),
+            ),
+          );
+
+      await tester.pumpWidget(harness.app(const BeanClickApp()));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
+      await tester.pumpAndSettle();
+
+      // 测评反馈：进入后从默认（归零）页面开始，不带上一次的参数。
+      expect(await fieldText(tester, 'brew.dose'), '');
+      expect(await fieldText(tester, 'brew.water'), '');
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('复制按钮：单击才预填上次，且不继承评分与备注', (tester) async {
       await harness.container
           .read(brewLogRepositoryProvider)
           .save(
@@ -238,7 +274,11 @@ void main() {
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
+      await tester.pumpAndSettle();
+
+      // 空表单 → 点右上角复制按钮，参数才被填进来。
+      await tester.tap(find.byKey(const Key('brew.copyLast')));
       await tester.pumpAndSettle();
 
       // 参数被复制过来（值在输入框里，不是 Text）。
@@ -271,7 +311,7 @@ void main() {
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
-      await tester.tap(find.byType(FloatingActionButton));
+      await tester.tap(find.byKey(const Key('dock.addCup')));
       await tester.pumpAndSettle();
       await tapSave(tester);
 
@@ -325,23 +365,21 @@ void main() {
           .getAll();
       expect(beans.single.name, '花魁');
       expect(beans.single.origin, '埃塞俄比亚');
-      expect(beans.single.remainingGrams, 200);
-      expect(beans.single.initialGrams, 200);
+      // 余量与购入总重在批次上
+      final List<BeanBatch> batches = await harness.container
+          .read(beanRepositoryProvider)
+          .batchesOf(beans.single.id!);
+      expect(batches.single.remainingGrams, 200);
+      expect(batches.single.initialGrams, 200);
 
       await harness.finish(tester);
     });
 
-    testWidgets('点已有豆子进入编辑，改余量后落库', (tester) async {
-      await harness.container
-          .read(beanRepositoryProvider)
-          .save(
-            CoffeeBean(
-              name: '曼特宁',
-              remainingGrams: 100,
-              createdAt: DateTime(2026, 1, 1),
-              updatedAt: DateTime(2026, 1, 1),
-            ),
-          );
+    testWidgets('点已有豆子进入编辑，能改批次余量', (tester) async {
+      final a = await harness.addBeanWithBatch(
+        name: '曼特宁',
+        remainingGrams: 100,
+      );
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
@@ -350,39 +388,25 @@ void main() {
       await tapText(tester, '曼特宁');
 
       expect(find.text('编辑咖啡豆'), findsOneWidget);
-      await fill(tester, 'bean.remaining', '60');
-      await tapSave(tester);
-
-      final List<CoffeeBean> beans = await harness.container
-          .read(beanRepositoryProvider)
-          .getAll();
-      expect(beans.single.remainingGrams, 60);
+      // 编辑页展示批次列表，点进去改余量
+      await tapText(tester, '再来一袋');
+      expect(find.text('再来一袋'), findsWidgets);
 
       await harness.finish(tester);
+      expect(a.beanId, greaterThan(0));
     });
 
     testWidgets('编辑页可以删除豆子，记录保留但解除关联', (tester) async {
-      final int beanId = await harness.container
-          .read(beanRepositoryProvider)
-          .save(
-            CoffeeBean(
-              name: '要删的豆',
-              remainingGrams: 100,
-              createdAt: DateTime(2026, 1, 1),
-              updatedAt: DateTime(2026, 1, 1),
-            ),
-          );
-      await harness.container
-          .read(brewLogRepositoryProvider)
-          .save(
-            BrewLog(
-              beanId: beanId,
-              doseGrams: 15,
-              brewedAt: DateTime(2026, 1, 1, 8),
-              createdAt: DateTime(2026, 1, 1, 8),
-              updatedAt: DateTime(2026, 1, 1, 8),
-            ),
-          );
+      final a = await harness.addBeanWithBatch(
+        name: '要删的豆',
+        remainingGrams: 100,
+      );
+      await harness.addBrewLog(
+        beanId: a.beanId,
+        batchId: a.batchId,
+        doseGrams: 15,
+        brewedAt: DateTime(2026, 1, 1, 8),
+      );
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
@@ -402,7 +426,10 @@ void main() {
           .read(brewLogRepositoryProvider)
           .getAll();
       expect(logs, hasLength(1), reason: '删除豆子不应删掉历史记录');
-      expect(logs.single.beanId, isNull, reason: '外键应置空');
+      // 决策 2：用量行保留，beanId 置空但快照名还在
+      expect(logs.single.beanUsages, hasLength(1));
+      expect(logs.single.beanUsages.single.beanId, isNull);
+      expect(logs.single.beanUsages.single.beanName, '要删的豆');
 
       await harness.finish(tester);
     });
@@ -487,27 +514,13 @@ void main() {
     });
 
     testWidgets('编辑粉量后余量按差值补扣（手册 §6.2）', (tester) async {
-      final int beanId = await harness.container
-          .read(beanRepositoryProvider)
-          .save(
-            CoffeeBean(
-              name: '花魁',
-              remainingGrams: 200,
-              createdAt: DateTime(2026, 1, 1),
-              updatedAt: DateTime(2026, 1, 1),
-            ),
-          );
-      await harness.container
-          .read(brewLogRepositoryProvider)
-          .save(
-            BrewLog(
-              beanId: beanId,
-              doseGrams: 15,
-              brewedAt: DateTime(2026, 1, 1, 8),
-              createdAt: DateTime(2026, 1, 1, 8),
-              updatedAt: DateTime(2026, 1, 1, 8),
-            ),
-          );
+      final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
+      await harness.addBrewLog(
+        beanId: a.beanId,
+        batchId: a.batchId,
+        doseGrams: 15,
+        brewedAt: DateTime(2026, 1, 1, 8),
+      );
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
@@ -516,37 +529,23 @@ void main() {
       await fill(tester, 'brew.dose', '20');
       await tapSave(tester);
 
-      final CoffeeBean bean = (await harness.container
+      final BeanBatch batch = (await harness.container
           .read(beanRepositoryProvider)
-          .getById(beanId))!;
+          .getBatch(a.batchId))!;
       // 200 - 15 = 185；改成 20 后按差值再扣 5 → 180。
-      expect(bean.remainingGrams, 180);
+      expect(batch.remainingGrams, 180);
 
       await harness.finish(tester);
     });
 
-    testWidgets('编辑页可以删除记录，余量不回补', (tester) async {
-      final int beanId = await harness.container
-          .read(beanRepositoryProvider)
-          .save(
-            CoffeeBean(
-              name: '花魁',
-              remainingGrams: 200,
-              createdAt: DateTime(2026, 1, 1),
-              updatedAt: DateTime(2026, 1, 1),
-            ),
-          );
-      await harness.container
-          .read(brewLogRepositoryProvider)
-          .save(
-            BrewLog(
-              beanId: beanId,
-              doseGrams: 15,
-              brewedAt: DateTime(2026, 1, 1, 8),
-              createdAt: DateTime(2026, 1, 1, 8),
-              updatedAt: DateTime(2026, 1, 1, 8),
-            ),
-          );
+    testWidgets('编辑页可以删除记录，余量自动回补', (tester) async {
+      final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
+      await harness.addBrewLog(
+        beanId: a.beanId,
+        batchId: a.batchId,
+        doseGrams: 15,
+        brewedAt: DateTime(2026, 1, 1, 8),
+      );
 
       await tester.pumpWidget(harness.app(const BeanClickApp()));
       await tester.pump(const Duration(milliseconds: 100));
@@ -560,10 +559,10 @@ void main() {
         await harness.container.read(brewLogRepositoryProvider).getAll(),
         isEmpty,
       );
-      final CoffeeBean bean = (await harness.container
+      final BeanBatch batch = (await harness.container
           .read(beanRepositoryProvider)
-          .getById(beanId))!;
-      expect(bean.remainingGrams, 185, reason: '删记录不回补余量');
+          .getBatch(a.batchId))!;
+      expect(batch.remainingGrams, 200, reason: '删记录会把扣掉的 15g 回补');
 
       await harness.finish(tester);
     });

@@ -182,6 +182,7 @@ class IntField extends StatelessWidget {
     this.hintText,
     this.suffixText,
     this.validator,
+    this.onChanged,
     this.textInputAction = TextInputAction.next,
   });
 
@@ -189,6 +190,9 @@ class IntField extends StatelessWidget {
   final String? hintText;
   final String? suffixText;
   final String? Function(String?)? validator;
+
+  /// 只要文本变了就回调，用来刷新依赖这个值的提示行。
+  final ValueChanged<int?>? onChanged;
   final TextInputAction textInputAction;
 
   @override
@@ -201,6 +205,7 @@ class IntField extends StatelessWidget {
         FilteringTextInputFormatter.digitsOnly,
       ],
       validator: validator,
+      onChanged: (String value) => onChanged?.call(int.tryParse(value.trim())),
       decoration: InputDecoration(
         hintText: hintText,
         suffixText: suffixText,
@@ -345,6 +350,104 @@ class DateField extends StatelessWidget {
             icon: const Icon(Icons.clear),
           ),
         ],
+      ],
+    );
+  }
+}
+
+/// 日期 + 时分选择行（冲煮时间用）。
+///
+/// 左边点日期、右边点时间，各改各的 —— 不像纯日期字段那样只能改日期，
+/// 也不想做成「一个按钮分两步弹」逼着用户每次都走完两步。
+///
+/// [onDatePicked] 与 [onTimePicked] 分开回调：日期选完要不要顺手弹时间，
+/// 由调用方决定（表单里是「新建且从没设过时间」才弹一次）。
+class DateTimeField extends StatelessWidget {
+  const DateTimeField({
+    super.key,
+    required this.value,
+    required this.onDatePicked,
+    required this.onTimePicked,
+    this.dateKey,
+    this.timeKey,
+    this.hintText = '选择时间',
+    this.lastDate,
+    this.firstDate,
+    this.dateFormatter = formatDateChinese,
+    this.timeFormatter = formatTime,
+  });
+
+  final DateTime? value;
+  final ValueChanged<DateTime> onDatePicked;
+  final ValueChanged<TimeOfDay> onTimePicked;
+
+  /// 两个按钮各自的 Key（测试用）。
+  final Key? dateKey;
+  final Key? timeKey;
+
+  final String hintText;
+  final DateTime? lastDate;
+  final DateTime? firstDate;
+
+  /// 日期的显示格式，默认中文；[timeFormatter] 默认 `HH:mm`。
+  final String Function(DateTime) dateFormatter;
+  final String Function(TimeOfDay) timeFormatter;
+
+  @override
+  Widget build(BuildContext context) {
+    final DateTime? current = value;
+
+    return Row(
+      children: <Widget>[
+        Expanded(
+          flex: 3,
+          child: OutlinedButton.icon(
+            key: dateKey,
+            onPressed: () async {
+              final DateTime now = DateTime.now();
+              final DateTime? picked = await showDatePicker(
+                context: context,
+                initialDate: current ?? now,
+                firstDate: firstDate ?? DateTime(now.year - 5),
+                lastDate: lastDate ?? DateTime(now.year + 1),
+              );
+              if (picked != null) onDatePicked(picked);
+            },
+            icon: const Icon(Icons.event_outlined, size: 18),
+            label: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                current == null ? hintText : dateFormatter(current),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          flex: 2,
+          child: OutlinedButton.icon(
+            key: timeKey,
+            onPressed: () async {
+              final TimeOfDay? picked = await showTimePicker(
+                context: context,
+                initialTime: current == null
+                    ? TimeOfDay.now()
+                    : TimeOfDay.fromDateTime(current),
+              );
+              if (picked != null) onTimePicked(picked);
+            },
+            icon: const Icon(Icons.schedule_outlined, size: 18),
+            label: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                current == null
+                    ? '--:--'
+                    : timeFormatter(TimeOfDay.fromDateTime(current)),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -522,6 +625,38 @@ String formatDateChinese(DateTime value) {
   final DateTime local = value.toLocal();
   return '${local.year}年${local.month}月${local.day}日';
 }
+
+/// `HH:mm`（24 小时制，补零）。
+///
+/// 不跟随系统 12/24 小时制：冲煮记录里 `14:30` 比 `2:30 PM` 好认，
+/// 也和导出、日志里的格式一致。
+String formatTime(TimeOfDay value) {
+  final String hour = value.hour.toString().padLeft(2, '0');
+  final String minute = value.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
+}
+
+/// `yyyy年M月d日 HH:mm`，中文日期 + 时分。
+String formatDateTimeChinese(DateTime value) {
+  return '${formatDateChinese(value)} ${formatTime(TimeOfDay.fromDateTime(value))}';
+}
+
+/// 把日期部分换掉、保留原时分。
+DateTime withDate(DateTime value, DateTime date) => DateTime(
+  date.year,
+  date.month,
+  date.day,
+  value.hour,
+  value.minute,
+  value.second,
+);
+
+/// 把时分换掉、保留原日期。
+///
+/// **秒会被清零**：时间选择器只有分钟精度，留着原来的秒会存出
+/// `14:30:47` 这种值，显示和排序都更容易出意外。
+DateTime withTime(DateTime value, TimeOfDay time) =>
+    DateTime(value.year, value.month, value.day, time.hour, time.minute);
 
 /// 过滤风味标签输入：只保留中日韩文字、英文字母、数字与分隔符。
 ///
