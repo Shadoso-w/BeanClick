@@ -73,11 +73,15 @@ class LabeledField extends StatelessWidget {
     required this.child,
     this.helper,
     this.isRequired = false,
+    this.labelTrailing,
   });
 
   final String label;
   final String? helper;
   final bool isRequired;
+
+  /// 标签右侧的附加控件（例如「研磨刻度 ⓘ」里的信息按钮）。
+  final Widget? labelTrailing;
   final Widget child;
 
   @override
@@ -101,6 +105,7 @@ class LabeledField extends StatelessWidget {
                   ),
                 ),
               ],
+              ?labelTrailing,
             ],
           ),
           const SizedBox(height: 6),

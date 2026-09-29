@@ -467,9 +467,11 @@ void main() {
       await fill(tester, 'grinder.brand', 'Comandante');
       await fill(tester, 'grinder.model', 'C40');
       await fill(tester, 'grinder.zeroPoint', '0');
+      // M2.10 起「每圈 click」是必填项。
+      await fill(tester, 'grinder.clicksPerRevolution', '30');
       await tapSave(tester);
 
-      // 还没有冲煮记录，所以只展示机型与零点。
+      // 还没有冲煮记录，所以第一行只有机型与零点。
       expect(find.text('Comandante C40 / 零点 0'), findsOneWidget);
 
       final List<Grinder> grinders = await harness.container
@@ -478,6 +480,28 @@ void main() {
       expect(grinders.single.brand, 'Comandante');
       expect(grinders.single.model, 'C40');
       expect(grinders.single.zeroPoint, 0);
+      expect(grinders.single.clicksPerRevolution, 30);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('每圈 click 没填时不允许保存（M2.10 必填）', (tester) async {
+      await tester.pumpWidget(harness.app(const BeanClickApp()));
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.tap(find.text('豆库').last);
+      await tester.pump(const Duration(milliseconds: 100));
+      await tapText(tester, '磨豆机');
+      await tapText(tester, '添加第一台磨豆机');
+
+      await fill(tester, 'grinder.brand', 'Comandante');
+      await fill(tester, 'grinder.model', 'C40');
+      await tapSave(tester);
+
+      expect(find.textContaining('请填写每圈 click'), findsOneWidget);
+      expect(
+        await harness.container.read(grinderRepositoryProvider).getAll(),
+        isEmpty,
+      );
 
       await harness.finish(tester);
     });
