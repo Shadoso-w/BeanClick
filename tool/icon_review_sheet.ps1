@@ -44,13 +44,15 @@ function Render-Foreground([int]$size, [double]$keep) {
   return $bmp
 }
 
-function Render-Legacy([int]$size) {
+function Render-Legacy([int]$size, [double]$keep) {
   $bmp = New-Object System.Drawing.Bitmap($size, $size, [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.Clear([System.Drawing.Color]::Transparent)
   $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
   $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-  $g.DrawImage($src, 0, 0, $size, $size)
+  $inner = [int]($size * $keep)
+  $off = [int](($size - $inner) / 2)
+  $g.DrawImage($src, $off, $off, $inner, $inner)
   $g.Dispose()
   Key-OutPixels $bmp 252 245
   return $bmp
@@ -113,7 +115,7 @@ $views = @(
   @{ label = 'adaptive / square mask'; bmp = (Mask-Shape (Flatten-OnCream $fg) 1.0 'square') },
   @{ label = 'adaptive / circle 72dp'; bmp = (Mask-Shape (Flatten-OnCream $fg) 0.667 'circle') },
   @{ label = 'adaptive / squircle (MIUI)'; bmp = (Mask-Shape (Flatten-OnCream $fg) 0.78 'squircle') },
-  @{ label = 'legacy ic_launcher'; bmp = (Render-Legacy $dp) }
+  @{ label = 'legacy ic_launcher'; bmp = (Render-Legacy $dp $Keep) }
 )
 
 $pad = 26
