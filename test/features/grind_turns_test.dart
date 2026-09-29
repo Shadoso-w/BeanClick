@@ -1,3 +1,4 @@
+import 'package:beanclick/app.dart';
 import 'package:beanclick/data/providers.dart';
 import 'package:beanclick/domain/entities.dart';
 import 'package:beanclick/domain/enums.dart';
@@ -7,49 +8,43 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../helpers/widget_harness.dart';
 
-/// 测评反馈：研磨刻度改成「圈 + click」，提示里给**绝对刻度**。
+/// M2.10 研磨刻度：`圈 + click` 输入、相对刻度、ⓘ 算式、圈只收正整数。
 ///
-/// 直接以 `existing` 打开编辑页来带出磨豆机快照，避免在 widget 测试里
+/// 直接以 `existing`/`prefill` 打开表单来带出磨豆机快照，避免在 widget 测试里
 /// 操作 `DropdownButtonFormField` 的浮层菜单（那层菜单不好稳定定位）。
 void main() {
   final WidgetTestHarness harness = setUpWidgetTest();
 
-  /// 表单要能按 id 查到磨豆机，所以先落一台真磨豆机，再打开编辑页。
+  /// 表单要能按 id 查到磨豆机，所以先落一台真磨豆机。
   ///
-  /// 记录里的**快照**才是换算依据（老研磨度关联老记录），所以快照值可以和
-  /// 磨豆机当前的值不一样：这里特意让两者不同，用来证明读的是快照。
+  /// 记录里的**快照**才是换算依据（老研磨度关联老记录），所以这里让快照值
+  /// 可以和磨豆机当前的值不同，用来证明读的是快照。
+  Future<int> addGrinder({
+    double? zeroPoint = 0,
+    int? clicksPerRevolution = 30,
+  }) => harness.container
+      .read(grinderRepositoryProvider)
+      .save(
+        Grinder(
+          brand: 'Comandante',
+          model: 'C40',
+          scaleUnit: GrindScaleUnit.click,
+          zeroPoint: zeroPoint,
+          clicksPerRevolution: clicksPerRevolution,
+          createdAt: DateTime(2026, 1, 1),
+          updatedAt: DateTime(2026, 1, 1),
+        ),
+      );
+
   Future<void> pumpForm(
     WidgetTester tester, {
-    required double? zeroPoint,
-    required int? clicksPerRevolution,
+    BrewLog? existing,
+    BrewLog? prefill,
   }) async {
-    final int grinderId = await harness.container
-        .read(grinderRepositoryProvider)
-        .save(
-          Grinder(
-            brand: 'Comandante',
-            model: 'C40',
-            scaleUnit: GrindScaleUnit.click,
-            zeroPoint: 0,
-            clicksPerRevolution: clicksPerRevolution,
-            createdAt: DateTime(2026, 1, 1),
-            updatedAt: DateTime(2026, 1, 1),
-          ),
-        );
     await tester.pumpWidget(
       harness.app(
         MaterialApp(
-          home: BrewLogFormPage(
-            existing: BrewLog(
-              method: BrewMethod.pourOver,
-              grinderId: grinderId,
-              grinderZeroPointSnapshot: zeroPoint,
-              grinderClicksPerRevolutionSnapshot: clicksPerRevolution,
-              brewedAt: DateTime(2026, 1, 1, 8),
-              createdAt: DateTime(2026, 1, 1, 8),
-              updatedAt: DateTime(2026, 1, 1, 8),
-            ),
-          ),
+          home: BrewLogFormPage(existing: existing, prefill: prefill),
         ),
       ),
     );
@@ -59,65 +54,228 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// 填两个研磨框并读回提示行。
-  Future<String> grindHelperAfter(
-    WidgetTester tester,
-    String turns,
-    String clicks,
-  ) async {
-    await tester.fillField('brew.grindSetting', turns);
-    await tester.fillField('brew.grindClicks', clicks);
-    await tester.pumpAndSettle();
-    final Finder helper = find.textContaining('绝对刻度');
+  /// 读回「相对刻度」那一行提示。
+  Future<String> grindHelper(WidgetTester tester) async {
+    final Finder helper = find.textContaining('相对刻度');
     await tester.scrollTo(helper);
     return tester.widget<Text>(helper).data!;
   }
 
-  testWidgets('知道每圈 click 时，第一个框是「圈」，提示给绝对刻度', (tester) async {
-    await pumpForm(tester, zeroPoint: 0, clicksPerRevolution: 30);
+  testWidgets('圈 + click → 提示行给相对刻度（每圈 30、零点 0）', (tester) async {
+    final int grinderId = await addGrinder();
+    await pumpForm(
+      tester,
+      existing: BrewLog(
+        method: BrewMethod.pourOver,
+        grinderId: grinderId,
+        grinderZeroPointSnapshot: 0,
+        grinderClicksPerRevolutionSnapshot: 30,
+        brewedAt: DateTime(2026, 1, 1, 8),
+        createdAt: DateTime(2026, 1, 1, 8),
+        updatedAt: DateTime(2026, 1, 1, 8),
+      ),
+    );
 
-    expect(find.text('圈'), findsOneWidget);
-
-    // 1.5 圈 + 15 click，零点 0、每圈 30 → 绝对刻度 60。
-    final String helper = await grindHelperAfter(tester, '1.5', '15');
-    expect(helper, contains('绝对刻度 60'), reason: '0 + 1.5 × 30 + 15 = 60');
-
-    await harness.finish(tester);
-  });
-
-  testWidgets('零点不为 0 时算进绝对刻度里', (tester) async {
-    await pumpForm(tester, zeroPoint: 5, clicksPerRevolution: 30);
-
-    // 5 + 1 × 30 + 5 = 40
-    final String helper = await grindHelperAfter(tester, '1', '5');
-    expect(helper, contains('绝对刻度 40'));
-
-    await harness.finish(tester);
-  });
-
-  testWidgets('没填零点时按 0 算，并在提示里说明', (tester) async {
-    await pumpForm(tester, zeroPoint: null, clicksPerRevolution: 30);
-
-    final String helper = await grindHelperAfter(tester, '2', '3');
-    expect(helper, contains('绝对刻度 63'), reason: '0 + 2 × 30 + 3 = 63');
-    expect(helper, contains('未填零点'));
-
-    await harness.finish(tester);
-  });
-
-  testWidgets('没有每圈 click 的磨豆机退回「研磨刻度」的展示格式', (tester) async {
-    await pumpForm(tester, zeroPoint: 0, clicksPerRevolution: null);
-
-    expect(find.text('圈'), findsNothing);
+    // 标签统一叫「研磨刻度」，单位写在框里。
     expect(find.text('研磨刻度'), findsOneWidget);
+    expect(find.text('圈'), findsOneWidget);
+    expect(find.text('click'), findsNWidgets(2));
 
-    await tester.fillField('brew.grindSetting', '6.5');
-    await tester.fillField('brew.grindClicks', '2');
+    await tester.fillField('brew.grindSetting', '1');
+    await tester.fillField('brew.grindClicks', '15');
     await tester.pumpAndSettle();
 
-    // 退回手册 §7 的相对展示格式，不出现「绝对刻度」。
-    expect(find.textContaining('绝对刻度'), findsNothing);
-    expect(find.textContaining('6.5'), findsWidgets);
+    // 1 × 30 + 15 − 0 = 45
+    expect(await grindHelper(tester), '相对刻度 45 click');
+
+    await harness.finish(tester);
+  });
+
+  testWidgets('零点不为 0 时是**减**零点（1 × 30 + 5 − 5 = 30）', (tester) async {
+    final int grinderId = await addGrinder(zeroPoint: 5);
+    await pumpForm(
+      tester,
+      existing: BrewLog(
+        method: BrewMethod.pourOver,
+        grinderId: grinderId,
+        grinderZeroPointSnapshot: 5,
+        grinderClicksPerRevolutionSnapshot: 30,
+        brewedAt: DateTime(2026, 1, 1, 8),
+        createdAt: DateTime(2026, 1, 1, 8),
+        updatedAt: DateTime(2026, 1, 1, 8),
+      ),
+    );
+
+    await tester.fillField('brew.grindSetting', '1');
+    await tester.fillField('brew.grindClicks', '5');
+    await tester.pumpAndSettle();
+
+    expect(await grindHelper(tester), '相对刻度 30 click');
+
+    await harness.finish(tester);
+  });
+
+  testWidgets('留空 = 0 圈：只填 click 也能算', (tester) async {
+    final int grinderId = await addGrinder();
+    await pumpForm(
+      tester,
+      existing: BrewLog(
+        method: BrewMethod.pourOver,
+        grinderId: grinderId,
+        grinderZeroPointSnapshot: 0,
+        grinderClicksPerRevolutionSnapshot: 30,
+        brewedAt: DateTime(2026, 1, 1, 8),
+        createdAt: DateTime(2026, 1, 1, 8),
+        updatedAt: DateTime(2026, 1, 1, 8),
+      ),
+    );
+
+    await tester.fillField('brew.grindClicks', '15');
+    await tester.pumpAndSettle();
+
+    expect(find.text('留空'), findsOneWidget, reason: '圈框的 hint');
+    expect(await grindHelper(tester), '相对刻度 15 click');
+
+    await harness.finish(tester);
+  });
+
+  testWidgets('ⓘ 弹窗给出公式、这台磨豆机的参数与结果', (tester) async {
+    final int grinderId = await addGrinder();
+    await pumpForm(
+      tester,
+      existing: BrewLog(
+        method: BrewMethod.pourOver,
+        grinderId: grinderId,
+        grinderZeroPointSnapshot: 0,
+        grinderClicksPerRevolutionSnapshot: 30,
+        brewedAt: DateTime(2026, 1, 1, 8),
+        createdAt: DateTime(2026, 1, 1, 8),
+        updatedAt: DateTime(2026, 1, 1, 8),
+      ),
+    );
+
+    await tester.fillField('brew.grindSetting', '1');
+    await tester.fillField('brew.grindClicks', '15');
+    await tester.tapKey('brew.grindInfo');
+
+    expect(find.text('研磨刻度怎么算'), findsOneWidget);
+    expect(find.text('相对刻度 = 圈 × 每圈 click + click − 零点'), findsOneWidget);
+    expect(find.text('这台磨豆机：每圈 30 click · 零点 0'), findsOneWidget);
+    expect(find.text('这次填写：1 圈 + 15 click'), findsOneWidget);
+    expect(find.text('结果：45 click'), findsOneWidget);
+
+    await tester.tapTextScrolled('知道了');
+    await harness.finish(tester);
+  });
+
+  testWidgets('圈填 0 时报错并拦住保存', (tester) async {
+    final int grinderId = await addGrinder();
+    await pumpForm(
+      tester,
+      existing: BrewLog(
+        method: BrewMethod.pourOver,
+        grinderId: grinderId,
+        grinderZeroPointSnapshot: 0,
+        grinderClicksPerRevolutionSnapshot: 30,
+        brewedAt: DateTime(2026, 1, 1, 8),
+        createdAt: DateTime(2026, 1, 1, 8),
+        updatedAt: DateTime(2026, 1, 1, 8),
+      ),
+    );
+
+    await tester.fillField('brew.grindSetting', '0');
+    await tester.tapSaveButton();
+
+    expect(find.textContaining('圈只能是正整数'), findsOneWidget);
+    // 没被保存：这个测试用的是内存里的 existing（没落库），落库列表应保持空。
+    expect(
+      await harness.container.read(brewLogRepositoryProvider).getAll(),
+      isEmpty,
+      reason: '校验没过就不应该写库',
+    );
+
+    await harness.finish(tester);
+  });
+
+  testWidgets('旧记录的小数圈数打开时折成「整数圈 + click」', (tester) async {
+    final int grinderId = await addGrinder();
+    await pumpForm(
+      tester,
+      existing: BrewLog(
+        method: BrewMethod.pourOver,
+        grinderId: grinderId,
+        grinderZeroPointSnapshot: 0,
+        grinderClicksPerRevolutionSnapshot: 30,
+        grindSetting: 1.5,
+        brewedAt: DateTime(2026, 1, 1, 8),
+        createdAt: DateTime(2026, 1, 1, 8),
+        updatedAt: DateTime(2026, 1, 1, 8),
+      ),
+    );
+
+    expect(await tester.readField('brew.grindSetting'), '1');
+    expect(await tester.readField('brew.grindClicks'), '15');
+    expect(await grindHelper(tester), '相对刻度 45 click');
+
+    await harness.finish(tester);
+  });
+
+  testWidgets('每圈 click 缺失的存量旧机器：给提示，不瞎算', (tester) async {
+    final int grinderId = await addGrinder(clicksPerRevolution: null);
+    await pumpForm(
+      tester,
+      existing: BrewLog(
+        method: BrewMethod.pourOver,
+        grinderId: grinderId,
+        grinderZeroPointSnapshot: 0,
+        grindSetting: 2,
+        grindClicks: 2,
+        brewedAt: DateTime(2026, 1, 1, 8),
+        createdAt: DateTime(2026, 1, 1, 8),
+        updatedAt: DateTime(2026, 1, 1, 8),
+      ),
+    );
+
+    expect(find.textContaining('还没填「每圈几 click」'), findsOneWidget);
+
+    await harness.finish(tester);
+  });
+
+  testWidgets('记录卡片第二行只给一个相对刻度值', (tester) async {
+    final int grinderId = await addGrinder();
+    final a = await harness.addBeanWithBatch(name: '耶菲雪加');
+    await harness.addBrewLog(
+      beanId: a.beanId,
+      batchId: a.batchId,
+      grinderId: grinderId,
+      doseGrams: 15,
+      brewedAt: DateTime(2026, 1, 1, 8),
+    );
+    // 补上研磨读数（夹具只写粉量）。
+    final BrewLog log =
+        (await harness.container.read(brewLogRepositoryProvider).getAll())
+            .single;
+    await harness.container
+        .read(brewLogRepositoryProvider)
+        .save(
+          log.copyWith(
+            grinderZeroPointSnapshot: 0,
+            grinderClicksPerRevolutionSnapshot: 30,
+            grindSetting: 2,
+            grindClicks: 15,
+          ),
+        );
+
+    // 用完整的 App（带 zh_CN 本地化），记录页就是首页 tab。
+    await tester.pumpWidget(harness.app(const BeanClickApp()));
+    for (int i = 0; i < 5; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+    await tester.pumpAndSettle();
+
+    // 2 × 30 + 15 − 0 = 75，且不再出现「30 click + 15 click」那种两段写法。
+    expect(find.textContaining('相对刻度 75 click'), findsOneWidget);
+    expect(find.textContaining('click + 15 click'), findsNothing);
 
     await harness.finish(tester);
   });

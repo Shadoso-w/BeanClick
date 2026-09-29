@@ -268,12 +268,17 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
                 ),
                 LabeledField(
                   label: '每圈 click 数',
-                  helper: '用于把「圈数」换算成刻度，例如 C40 为 30',
+                  isRequired: true,
+                  helper: '用于把「圈数」换算成相对刻度，例如 C40 为 30',
                   child: IntField(
                     key: const Key('grinder.clicksPerRevolution'),
                     controller: _clicksPerRevolution,
-                    hintText: '选填，例如：30',
+                    hintText: '例如：30',
                     suffixText: 'click',
+                    validator: (String? value) =>
+                        (int.tryParse((value ?? '').trim()) ?? 0) > 0
+                        ? null
+                        : '请填写每圈 click（正整数）',
                   ),
                 ),
                 LabeledField(
