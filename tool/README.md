@@ -21,9 +21,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\make_app_icons.ps1
 
 | 文件 | 用途 |
 |---|---|
-| `android/app/src/main/res/mipmap-*/ic_launcher.png` | 传统图标（48 / 72 / 96 / 144 / 192 px）。把原图里**圆角方块之外的白色页面**抠成透明，留下米白方块 |
+| `android/app/src/main/res/mipmap-*/ic_launcher.png` | 传统图标（48 / 72 / 96 / 144 / 192 px）。把原图里**圆角方块之外的白色页面**抠成透明，留下米白方块；方块按 `$legacyKeep` 内缩，和自适应图标视觉等大 |
 | `android/app/src/main/res/mipmap-*/ic_launcher_foreground.png` | 自适应图标前景（尺寸为传统图标的 2.25 倍）。把米白背景**也**抠成透明，只留圆环 / 豆 / 刻度点；原图按 `$foregroundKeep` 缩小后居中，四周留出系统裁切要吃的空白 |
-| `assets/icon/app_icon_512.png` | 512px 留档与商店用 |
+| `assets/icon/app_icon_512.png` | 512px 留档与商店用；**故意满幅**（keep 1.00），商店自己会做遮罩 |
 | `tool/out/app_icon_preview.png` | 复核用对照表（传统图标 / 前景叠米白底 / 前景叠棋盘格） |
 
 抠图是**按亮度**做的（`Key-OutPixels`）：传统图标把亮度 ≥252 的当页面白去掉；
@@ -31,15 +31,19 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\make_app_icons.ps1
 `res/values/colors.xml` 里的 `ic_launcher_background` 取原图的米白 `#F3EBDC`，
 所以自适应图标裁切后的观感和传统图标一致。
 
-### 前景为什么要缩小（`$foregroundKeep = 0.82`）
+### 两种图标为什么一起缩小（`$foregroundKeep` = `$legacyKeep` = 0.82）
 
 自适应图标画在 108dp 画布上，但**系统只显示中间一块**：圆形遮罩只有 72/108 ≈ 67%，
 MIUI 的圆角方形大约 78%。原图铺满整个画布时，深棕圆环会占画布的 ~85%，
 裁切之后几乎贴到遮罩边缘（四周只剩 2～5%），看起来就是「图标太大了」。
+`$foregroundKeep` 把原图缩到画布的 82% 再居中，圆环回到画布的 ~70%。
 
-`$foregroundKeep` 把原图缩到画布的 82% 再居中，圆环回到画布的 ~70%，
-四周留出 10% 以上的余量。传统图标不动（它本来就是整块圆角方块）。
-想换档位就在脚本里改这一个数字，然后用下面的预览脚本看效果。
+`$legacyKeep` **取同一个值**：传统图标是整块画布直接显示的（老 Android、
+部分厂商桌面），原来铺满时它的圆角方块比自适应图标大一圈，两者并排尺寸不一致；
+缩到 82% 之后，两块画布里的图案视觉等大。
+
+> 缩图留出的空白靠 `Key-OutPixels` 里的 `if ($bytes[$i+3] -eq 0) { continue }` 保住
+> —— 清空的像素是 `(0,0,0,0)`、亮度算出来是 0，不跳过就会被写成不透明的黑边。
 
 ### 图标预览脚本（决策用，不进构建）
 
