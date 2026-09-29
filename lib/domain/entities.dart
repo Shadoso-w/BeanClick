@@ -409,6 +409,37 @@ class Grinder {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// 相对刻度：把「几圈 + 几个 click」换算成一个 click 值（M2.10 定稿公式）。
+  ///
+  /// ```
+  /// 相对刻度 = 圈 × 每圈 click + click − 零点
+  /// ```
+  ///
+  /// 用的是**记录里的快照**（当时的每圈 click 与零点），不是这台磨豆机现在的值
+  /// —— 老研磨度关联老记录，后来重新校准零点不会把历史读数重新解释。
+  ///
+  /// 「每圈 click」缺失（存量旧机器没填）时返回 null：宁可不显示，也不瞎算。
+  double? relativeClicks({double? turns, int? clicks}) => relativeClicksWith(
+    turns: turns,
+    clicks: clicks,
+    clicksPerRevolution: clicksPerRevolution,
+    zeroPoint: zeroPoint,
+  );
+
+  /// [relativeClicks] 的显式参数版本：记录卡片刻度用记录里的快照调它。
+  static double? relativeClicksWith({
+    double? turns,
+    int? clicks,
+    int? clicksPerRevolution,
+    double? zeroPoint,
+  }) {
+    if (clicksPerRevolution == null || clicksPerRevolution <= 0) return null;
+    if (turns == null && clicks == null) return null;
+    return (turns ?? 0) * clicksPerRevolution +
+        (clicks ?? 0) -
+        (zeroPoint ?? 0);
+  }
+
   /// 手册 §7 的展示格式：`C40 / 22 click / 零点 0`。
   ///
   /// [showCurrentSetting] 为 false 时只给「名称 / 零点」——
