@@ -219,11 +219,7 @@ class _GrindSheet extends StatelessWidget {
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
                   const SizedBox(height: 6),
-                  _Box(
-                    text: '30',
-                    suffix: 'click',
-                    hint: '例如：30（C40 是 30）',
-                  ),
+                  _Box(text: '30', suffix: 'click', hint: '例如：30（C40 是 30）'),
                   const SizedBox(height: 4),
                   const _Error('请填写每圈 click —— 记录里要用它把圈数换算成 click'),
                 ],
