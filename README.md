@@ -10,7 +10,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%207%2B-3DDC84?logo=android)](https://developer.android.com)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-> 当前状态：**0.1.0**（= M0–M2.9，schema v7，292 个测试）。内测 APK 见 [Releases](https://github.com/Shadoso-w/BeanClick/releases) 与 [RELEASING.md](RELEASING.md)。
+> 当前状态：**0.2.0**（= M0–M2.11，schema v7，297 个测试）。内测 APK 见 [Releases](https://github.com/Shadoso-w/BeanClick/releases) 与 [RELEASING.md](RELEASING.md)。
 
 ---
 
@@ -79,6 +79,7 @@ flutter run
 - [x] **M2.5** P0 导出（JSON 备份 / CSV 表格）
 - [x] **M2.6–M2.9** 批次模型 / 多豆冲煮 / 扩展属性 / 自定义方法与辅料 / 测评反馈
       （schema 升到 v7，见 [CHANGELOG](docs/CHANGELOG.md)）
+- [x] **M2.10–M2.11** 研磨刻度「圈 + click」与相对刻度 / 图标尺寸对齐
 - [ ] **M3** Android 内测
 - [ ] **M5** P1 计时器、统计、图片分享、同步
 - [ ] **M6** P2 智能推荐、社区、设备连接
@@ -110,14 +111,16 @@ flutter run
 
 M2 尚未做：**独立搜索页**（记录页已有内存过滤）。导出已在 M2.5 完成。
 
-### M2.6–M2.9 已完成的内容
+### M2.6 起的已完成内容
 
 | 版本 | 内容 |
 |---|---|
 | M2.6 | 批次模型（一支豆子多袋，各记烘焙日期 / 余量）+ 多豆冲煮（拼配）+ 扩展属性；schema v4 |
 | M2.7 | dock 改两栏 + 中间固定加号；记录卡片刻度；收藏 / 删除改左滑；schema v5 |
 | M2.8 | 日期时间弹窗中文化、时间可选到时分；记录卡片第一行 = 豆名 + 方法 + 评分；自定义冲煮方法；辅料；schema v6 |
-| M2.9 | 处理法多选、每 click µm、研磨刻度「圈 + click」与绝对刻度提示、零点快照、删除回补、新增一杯从归零页开始；schema v7 |
+| M2.9 | 处理法多选、每 click µm、研磨刻度「圈 + click」、零点快照、删除回补、新增一杯从归零页开始；schema v7 |
+| M2.10 | 研磨刻度：圈只收正整数（留空 = 0 圈）、单位进框、提示给**相对刻度**、算式收进 ⓘ、每圈 click 改必填；卡片只显示一个相对刻度值 |
+| M2.11 | 传统图标与自适应图标同比例内缩（都在画布 82%），两者视觉等大 |
 
 ### M2.5 已完成的内容
 

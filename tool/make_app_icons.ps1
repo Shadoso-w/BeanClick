@@ -26,6 +26,10 @@ $src = New-Object System.Drawing.Bitmap($srcPath)
 # margin the launcher masks expect. Preview: tool/icon_review_sheet.ps1
 $foregroundKeep = 0.82
 
+# Legacy icon keeps the SAME ratio, so the rounded plate and the adaptive ring
+# come out the same visual size side by side. See Render-Legacy below.
+$legacyKeep = $foregroundKeep
+
 # Legacy sizes per density (mdpi 48 ... xxxhdpi 192); adaptive foreground is 2.25x.
 $densities = @(
   @{ name = 'mdpi';    size = 48 },
@@ -43,13 +47,21 @@ function New-TransparentBitmap([int]$size) {
 
 # Copy $src into a $size canvas, keying out near-white pixels (the page outside
 # the rounded square). Cream stays opaque: cream luminance is ~237, page ~254.
-function Render-Legacy([int]$size) {
+#
+# The source is scaled to $keep of the canvas and centred, so the rounded plate
+# ends up the SAME visual size as the adaptive foreground's ring -- otherwise the
+# legacy icon (old Android, some vendor launchers) looks a size bigger than the
+# adaptive one sitting next to it. The margin the source does not paint stays
+# fully transparent, which Key-OutPixels leaves alone.
+function Render-Legacy([int]$size, [double]$keep) {
   $bmp = New-TransparentBitmap $size
   $g = [System.Drawing.Graphics]::FromImage($bmp)
   $g.Clear([System.Drawing.Color]::Transparent)
   $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
   $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-  $g.DrawImage($src, 0, 0, $size, $size)
+  $inner = [int]($size * $keep)
+  $off = [int](($size - $inner) / 2)
+  $g.DrawImage($src, $off, $off, $inner, $inner)
   $g.Dispose()
   Key-OutPixels $bmp 252 245
   return $bmp
@@ -109,7 +121,7 @@ foreach ($d in $densities) {
   $dir = Join-Path $resDir ("mipmap-" + $d.name)
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
 
-  $legacy = Render-Legacy $d.size
+  $legacy = Render-Legacy $d.size $legacyKeep
   $legacy.Save((Join-Path $dir 'ic_launcher.png'), [System.Drawing.Imaging.ImageFormat]::Png)
   $legacy.Dispose()
 
@@ -120,7 +132,10 @@ foreach ($d in $densities) {
 }
 
 # Archived 512px source-resized copy.
-$archived = Render-Legacy 512
+#
+# Deliberately FULL BLEED (keep = 1.00), unlike the launcher icons: this one is a
+# plain archive / store-style square, where the store applies its own masking.
+$archived = Render-Legacy 512 1.00
 $archived.Save((Join-Path $root 'assets\icon\app_icon_512.png'), [System.Drawing.Imaging.ImageFormat]::Png)
 $archived.Dispose()
 
@@ -138,7 +153,7 @@ for ($y = 0; $y -lt 260; $y += 13) {
     }
   }
 }
-$legacy192 = Render-Legacy 192
+$legacy192 = Render-Legacy 192 $legacyKeep
 $fg432 = Render-Foreground 432 $foregroundKeep
 $fg192 = Render-Foreground 192 $foregroundKeep
 
