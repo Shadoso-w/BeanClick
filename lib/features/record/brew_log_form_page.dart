@@ -161,12 +161,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   void initState() {
     super.initState();
     final BrewLog? source = _source;
-    _grindSetting = TextEditingController(
-      text: numberToText(source?.grindSetting),
-    );
-    _grindClicks = TextEditingController(
-      text: source?.grindClicks?.toString() ?? '',
-    );
+    _grindSetting = TextEditingController();
+    _grindClicks = TextEditingController();
     _dose = TextEditingController(text: numberToText(source?.doseGrams));
     _water = TextEditingController(text: numberToText(source?.waterGrams));
     _waterTemp = TextEditingController(text: numberToText(source?.waterTemp));
@@ -203,6 +199,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     // 编辑旧记录：沿用当时的零点快照（= 老研磨度关联老记录）。
     _grinderZeroPoint = source?.grinderZeroPointSnapshot;
     _grinderClicksPerRevolution = source?.grinderClicksPerRevolutionSnapshot;
+    // 研磨读数的写法由「小数刻度」改成「整数圈 + click」，旧记录在这里折算
+    // （放在快照赋值之后：折算要用当时的每圈 click）。
+    _setGrindFromLog(source);
     // 复制上次时不继承评分与备注（见 copyFrom 的说明）。
     _rating = widget.existing?.rating;
     _isBest = widget.existing?.isBest ?? false;
@@ -275,8 +274,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       // 换刻度/重新校准前的老记录保留当时的零点与每圈 click（见 schema v7）。
       grinderZeroPointSnapshot: _grinderZeroPoint,
       grinderClicksPerRevolutionSnapshot: _grinderClicksPerRevolution,
-      grindSetting: parseNumber(_grindSetting.text),
-      grindClicks: int.tryParse(_grindClicks.text.trim()),
+      grindSetting: _turnsInput?.toDouble(),
+      grindClicks: _clicksInput,
       doseGrams: parseNumber(_dose.text),
       waterGrams: parseNumber(_water.text),
       waterTemp: parseNumber(_waterTemp.text),
@@ -303,8 +302,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       updatedAt: now,
       clearBeanId: primaryBeanId == null,
       clearGrinderId: _grinderId == null,
-      clearGrindSetting: parseNumber(_grindSetting.text) == null,
-      clearGrindClicks: int.tryParse(_grindClicks.text.trim()) == null,
+      clearGrindSetting: _turnsInput == null,
+      clearGrindClicks: _clicksInput == null,
       clearDoseGrams: parseNumber(_dose.text) == null,
       clearWaterGrams: parseNumber(_water.text) == null,
       clearWaterTemp: parseNumber(_waterTemp.text) == null,
@@ -618,8 +617,10 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   void _applyCopyFrom(BrewLog source, {required String message}) {
     final BrewLog copied = BrewLogFormPage.copyFrom(source);
     setState(() {
-      _grindSetting.text = numberToText(copied.grindSetting);
-      _grindClicks.text = copied.grindClicks?.toString() ?? '';
+      _grinderId = copied.grinderId;
+      _grinderZeroPoint = copied.grinderZeroPointSnapshot;
+      _grinderClicksPerRevolution = copied.grinderClicksPerRevolutionSnapshot;
+      _setGrindFromLog(copied);
       _dose.text = numberToText(copied.doseGrams);
       _water.text = numberToText(copied.waterGrams);
       _waterTemp.text = numberToText(copied.waterTemp);
@@ -638,9 +639,6 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       _method = copied.method;
       _methodLabel = copied.methodLabel;
       _resetPicks(copied);
-      _grinderId = copied.grinderId;
-      _grinderZeroPoint = copied.grinderZeroPointSnapshot;
-      _grinderClicksPerRevolution = copied.grinderClicksPerRevolutionSnapshot;
       _preheatUpperChamber = copied.preheatUpperChamber;
       _rating = null;
       _isBest = false;
@@ -732,21 +730,22 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                   child: _buildGrinderSelector(grinders),
                 ),
                 LabeledField(
-                  // 知道「每圈几 click」时，第一个框就是**圈数**（x圈xclick），
-                  // 否则退回原来的「刻度」语义（电动磨这类没有圈的概念）。
-                  label: _usesTurns(selectedGrinder) ? '圈' : '研磨刻度',
+                  // M2.10：标签统一叫「研磨刻度」，两个框里分别填「圈」与 click，
+                  // 单位写在框内（suffixText）。算式收进 ⓘ，提示行只给相对刻度。
+                  label: '研磨刻度',
+                  labelTrailing: _buildGrindInfoButton(),
                   helper: _grindHelper(selectedGrinder),
                   child: Row(
                     children: <Widget>[
                       Expanded(
                         flex: 3,
-                        child: NumberField(
+                        child: IntField(
                           key: const Key('brew.grindSetting'),
                           controller: _grindSetting,
-                          hintText: _usesTurns(selectedGrinder)
-                              ? '例如：1.5'
-                              : (selectedGrinder?.scaleUnit.label ?? '刻度'),
+                          hintText: '留空',
+                          suffixText: '圈',
                           onChanged: (_) => setState(() {}),
+                          validator: _validateTurns,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -756,6 +755,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                           key: const Key('brew.grindClicks'),
                           controller: _grindClicks,
                           hintText: 'click',
+                          suffixText: 'click',
                           onChanged: (_) => setState(() {}),
                           textInputAction: TextInputAction.next,
                         ),
@@ -1324,39 +1324,140 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   static bool _usesTurns(Grinder? grinder) =>
       grinder?.clicksPerRevolution != null && grinder!.clicksPerRevolution! > 0;
 
-  /// 研磨刻度的提示行：**给绝对刻度**，不给相对读数。
+  /// 「圈」框里的整数圈数：空串 → null（= 0 圈）。
+  int? get _turnsInput => int.tryParse(_grindSetting.text.trim());
+
+  /// click 框里的整数 click。
+  int? get _clicksInput => int.tryParse(_grindClicks.text.trim());
+
+  /// 表单当前选中的磨豆机（列表还在加载或已被删时为 null）。
+  Grinder? _selectedGrinder() {
+    if (_grinderId == null) return null;
+    final List<Grinder> grinders =
+        ref.read(grinderListProvider).value ?? const <Grinder>[];
+    return grinders.where((Grinder g) => g.id == _grinderId).firstOrNull;
+  }
+
+  /// 把一条记录里的研磨读数填进表单。
   ///
-  /// 绝对刻度 = 零点 + 圈 × 每圈 click + click（测评反馈要的就是这个换算；
-  /// 零点用记录里的快照，所以老记录不会被后来改的零点重新换算）。
+  /// M2.10：旧记录存的是**小数刻度**（0.1.0 允许 1.5 圈），而「圈」现在只收正整数，
+  /// 所以这里把它折算成「整数圈 + click」——只改表单里的写法，库里的数据不动。
+  /// 折算规则：`1.5 圈 × 每圈 30` → `1 圈 + 15 click`。
+  void _setGrindFromLog(BrewLog? log, {int? clicksPerRevolution}) {
+    final double? setting = log?.grindSetting;
+    if (setting == null) {
+      _grindSetting.text = '';
+      _grindClicks.text = log?.grindClicks?.toString() ?? '';
+      return;
+    }
+
+    final int whole = setting.floor();
+    final double fraction = setting - whole;
+    final int perRevolution =
+        clicksPerRevolution ?? _grinderClicksPerRevolution ?? 0;
+
+    // 小数部分先按「每圈几 click」折算成 click；没有这个值就整体进位到圈数。
+    int extraClicks = 0;
+    int turns = whole;
+    if (fraction > 0) {
+      if (perRevolution > 0) {
+        extraClicks = (fraction * perRevolution).round();
+      } else {
+        turns = setting.round();
+      }
+    }
+
+    final int? loggedClicks = log?.grindClicks;
+    final int totalClicks = extraClicks + (loggedClicks ?? 0);
+    _grindSetting.text = turns == 0 ? '' : turns.toString();
+    _grindClicks.text = totalClicks == 0 ? '' : totalClicks.toString();
+  }
+
+  /// 「圈」框的校验（M2.10 用户要求）：只收正整数。
+  ///
+  /// 留空是合法的 —— 表示 0 圈，机器停在第 1 圈以内时就该留空，
+  /// 把不足一圈的部分填到右边的 click 框里。
+  String? _validateTurns(String? value) {
+    final String text = (value ?? '').trim();
+    if (text.isEmpty) return null;
+    final int? turns = int.tryParse(text);
+    if (turns == null || turns <= 0) {
+      return '圈只能是正整数（1、2、3…）；不到一圈请留空';
+    }
+    return null;
+  }
+
+  /// 研磨刻度的提示行：**只给相对刻度**，算式收在 [ _buildGrindInfoButton ] 里。
   String _grindHelper(Grinder? grinder) {
     if (grinder == null) {
-      return '选择磨豆机后可自动换算绝对刻度';
+      return '选择磨豆机后可自动换算相对刻度';
     }
     if (!_usesTurns(grinder)) {
-      // 没有「每圈几 click」的磨豆机：退回手册 §7 的展示格式。
-      return grinder.displayName(
-        grindSetting: parseNumber(_grindSetting.text),
-        clicks: int.tryParse(_grindClicks.text.trim()),
-      );
+      return '这台磨豆机还没填「每圈几 click」，去磨豆机编辑页补上就能换算';
     }
 
-    final double turns = parseNumber(_grindSetting.text) ?? 0;
-    final int clicks = int.tryParse(_grindClicks.text.trim()) ?? 0;
-    final double zero = _grinderZeroPoint ?? 0;
-    final double absolute =
-        zero + turns * grinder.clicksPerRevolution! + clicks;
+    final double? relative = grinder.relativeClicks(
+      turns: _turnsInput?.toDouble(),
+      clicks: _clicksInput,
+    );
+    if (relative == null) return '填入圈数或 click 后自动算出相对刻度';
+    return '相对刻度 ${formatNumber(relative)} click';
+  }
 
-    final StringBuffer buffer = StringBuffer()
-      ..write('绝对刻度 ${formatNumber(absolute)}')
-      ..write(
-        '（零点 ${formatNumber(zero)}'
-        ' + ${formatNumber(turns)} 圈 × ${grinder.clicksPerRevolution}'
-        ' + $clicks click）',
-      );
-    if (_grinderZeroPoint == null) {
-      buffer.write('　未填零点，按 0 算');
-    }
-    return buffer.toString();
+  /// 标签旁的 ⓘ：点开看「怎么算的」。
+  Widget _buildGrindInfoButton() {
+    return IconButton(
+      key: const Key('brew.grindInfo'),
+      onPressed: _showGrindInfo,
+      icon: const Icon(Icons.info_outline, size: 16),
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.only(left: 6),
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      tooltip: '研磨刻度怎么算',
+    );
+  }
+
+  Future<void> _showGrindInfo() async {
+    final Grinder? grinder = _selectedGrinder();
+    final double? relative = grinder?.relativeClicks(
+      turns: _turnsInput?.toDouble(),
+      clicks: _clicksInput,
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('研磨刻度怎么算'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Text('相对刻度 = 圈 × 每圈 click + click − 零点'),
+            const SizedBox(height: 12),
+            Text(
+              grinder == null
+                  ? '这台记录还没选磨豆机'
+                  : '这台磨豆机：每圈 ${grinder.clicksPerRevolution} click'
+                        ' · 零点 ${formatNumber(_grinderZeroPoint ?? 0)}',
+            ),
+            Text(
+              '这次填写：${formatNumber((_turnsInput ?? 0).toDouble())} 圈'
+              ' + ${_clicksInput ?? 0} click',
+            ),
+            if (relative != null)
+              Text('结果：${formatNumber(relative)} click')
+            else if (grinder != null && !_usesTurns(grinder))
+              const Text('这台磨豆机还没填「每圈几 click」，补上后才能换算'),
+          ],
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// 豆子选择（含拼配）。

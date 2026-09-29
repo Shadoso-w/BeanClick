@@ -596,18 +596,38 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-/// 研磨刻度：有磨豆机时走 `Grinder.displayName`（手册 §7 展示格式）。
+/// 研磨刻度（卡片第二行，M2.10）。
+///
+/// 磨豆机之后**只给一个值**：相对刻度（`圈 × 每圈 click + click − 零点`）。
+/// 用记录里的**快照**算，所以后来改刻度或重新校准零点都不会改动历史记录的显示。
+/// 「每圈 click」缺失的存量旧机器没法换算，这时退回原始读数的写法。
 String _grindLabel(BrewLog log, Grinder? grinder) {
-  final double? setting = log.grindSetting;
   final int? clicks = log.grindClicks;
 
   if (grinder != null) {
-    if (setting == null && clicks == null) return grinder.displayName();
-    return grinder.displayName(grindSetting: setting, clicks: clicks);
+    final double? relative = Grinder.relativeClicksWith(
+      turns: log.grindSetting,
+      clicks: clicks,
+      clicksPerRevolution: log.grinderClicksPerRevolutionSnapshot,
+      zeroPoint: log.grinderZeroPointSnapshot,
+    );
+    if (relative != null) {
+      return '${grinder.brand} ${grinder.model} · '
+          '相对刻度 ${_formatNumber(relative)} click';
+    }
+    // 没有每圈 click（存量旧机器）：给原始读数，别瞎算。
+    final List<String> raw = <String>[
+      '${grinder.brand} ${grinder.model}',
+      if (log.grindSetting != null) '刻度 ${_formatNumber(log.grindSetting!)}',
+      if (clicks != null) '$clicks click',
+    ];
+    return raw.join(' · ');
   }
 
   final List<String> parts = <String>[];
-  if (setting != null) parts.add('刻度 ${_formatNumber(setting)}');
+  if (log.grindSetting != null) {
+    parts.add('刻度 ${_formatNumber(log.grindSetting!)}');
+  }
   if (clicks != null) parts.add('$clicks click');
   return parts.isEmpty ? '未记录研磨刻度' : parts.join(' · ');
 }
