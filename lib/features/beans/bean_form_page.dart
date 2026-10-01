@@ -407,18 +407,55 @@ class _FirstBatchSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+
     return FormSection(
       title: '第一袋',
       subtitle: '烘焙日期与余量记在批次上；以后复购再加一袋即可',
       children: <Widget>[
         LabeledField(
           label: '烘焙日期',
-          child: DateField(
-            value: roastDate,
-            formatter: formatDateChinese,
-            lastDate: DateTime.now().add(const Duration(days: 1)),
-            onPick: (DateTime value) => onRoastDateChanged(value),
-            onClear: () => onRoastDateChanged(null),
+          isRequired: true,
+          // `DateField` 本身不是 `FormField`，包一层才能让「必填」和名称、
+          // 剩余克数那样由 `_formKey.currentState.validate()` 一起触发。
+          // 值仍以父级的 `roastDate` 为准：`builder` 里读 `field.value`，
+          // 避免 FormField 只在 initState 认一次 `initialValue` 导致读旧值。
+          child: FormField<DateTime?>(
+            initialValue: roastDate,
+            validator: (DateTime? value) => value == null ? '请填写烘焙日期' : null,
+            builder: (FormFieldState<DateTime?> field) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  DateField(
+                    value: field.value,
+                    formatter: formatDateChinese,
+                    lastDate: DateTime.now().add(const Duration(days: 1)),
+                    onPick: (DateTime value) {
+                      field.didChange(value);
+                      onRoastDateChanged(value);
+                    },
+                    onClear: () {
+                      field.didChange(null);
+                      onRoastDateChanged(null);
+                    },
+                  ),
+                  // 报错前这一列只有 DateField，与改动前的布局逐像素一致。
+                  if (field.hasError) ...<Widget>[
+                    const SizedBox(height: 6),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Text(
+                        field.errorText!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.error,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              );
+            },
           ),
         ),
         LabeledField(
@@ -433,6 +470,7 @@ class _FirstBatchSection extends StatelessWidget {
         ),
         LabeledField(
           label: '剩余克数',
+          isRequired: true,
           child: NumberField(
             key: const Key('bean.remaining'),
             controller: remaining,
@@ -441,8 +479,9 @@ class _FirstBatchSection extends StatelessWidget {
             onChanged: (_) => onNumberChanged(),
             validator: (String? value) {
               final double? r = parseNumber(value);
+              if (r == null) return '请填写剩余克数';
               final double? i = parseNumber(initial.text);
-              if (r != null && i != null && r > i) {
+              if (i != null && r > i) {
                 return '剩余克数不能大于购入总重（${formatNumber(i)} g）';
               }
               return null;

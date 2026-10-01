@@ -409,24 +409,25 @@ class Grinder {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  /// 相对刻度：把「几圈 + 几个 click」换算成一个 click 值（M2.10 定稿公式）。
+  /// 相对刻度：把「几圈 + 几个 click」换算成一个 click 值（M2.10 公式、M3-T15 定稿取值规则）。
   ///
   /// ```
   /// 相对刻度 = 圈 × 每圈 click + click − 零点
   /// ```
   ///
-  /// 用的是**记录里的快照**（当时的每圈 click 与零点），不是这台磨豆机现在的值
-  /// —— 老研磨度关联老记录，后来重新校准零点不会把历史读数重新解释。
+  /// 「每圈 click」与「零点」都**优先用磨豆机当前的值**；磨豆机被删或该字段为空时，
+  /// 才回落到**记录里的快照**（[BrewLog.grinderClicksPerRevolutionSnapshot] /
+  /// [BrewLog.grinderZeroPointSnapshot]）。两个值**各判各的**：当前值缺一个，不会连带
+  /// 另一个也回落，所以算出来的数可能一个来自当前值、一个来自快照。取舍由调用方做，
+  /// 本方法只接算好的两个参数——唯一调用点是 `BrewLogFormPage.relativeClicks`
+  /// （表单页静态方法，记录卡片与表单提示共用，两处必须算同一个数）。
   ///
-  /// 「每圈 click」缺失（存量旧机器没填）时返回 null：宁可不显示，也不瞎算。
-  double? relativeClicks({double? turns, int? clicks}) => relativeClicksWith(
-    turns: turns,
-    clicks: clicks,
-    clicksPerRevolution: clicksPerRevolution,
-    zeroPoint: zeroPoint,
-  );
-
-  /// [relativeClicks] 的显式参数版本：记录卡片刻度用记录里的快照调它。
+  /// 行为后果：改磨豆机零点后，**历史记录卡片上显示的数字会跟着变**（记录里的圈 /
+  /// click 不变），屏幕上的读数因此和机器上的实际刻度一致；磨豆机被删的老记录
+  /// 也仍然读得出来。两个校准值当前值与快照都取不到时按 0 参与计算。
+  ///
+  /// [clicksPerRevolution] 为空或 ≤ 0 时返回 null；`turns` 与 `clicks` 都为空时也返回
+  /// null（存量旧机器没填「每圈 click」）：宁可不显示，也不瞎算。
   static double? relativeClicksWith({
     double? turns,
     int? clicks,

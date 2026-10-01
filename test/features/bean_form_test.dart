@@ -271,4 +271,70 @@ void main() {
       await harness.finish(tester);
     });
   });
+
+  group('新增豆子：烘焙日期与剩余克数必填', () {
+    /// 清掉表单预填的「今天」——不点一下「清除日期」就测不到「没选烘焙日期」。
+    Future<void> clearRoastDate(WidgetTester tester) async {
+      final Finder clear = find.byTooltip('清除日期');
+      await tester.scrollTo(clear);
+      await tester.tap(clear);
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('没选烘焙日期时保存被拦下', (tester) async {
+      await pumpBeanForm(tester);
+      await fill(tester, 'bean.name', '花魁');
+      await clearRoastDate(tester);
+      await tapSave(tester);
+
+      expect(find.text('请填写烘焙日期'), findsOneWidget);
+      expect(
+        await harness.container.read(beanRepositoryProvider).getAll(),
+        isEmpty,
+        reason: '校验不通过时不应落库',
+      );
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('没填剩余克数时保存被拦下', (tester) async {
+      await pumpBeanForm(tester);
+      await fill(tester, 'bean.name', '花魁');
+      // 表单默认预填 200，这里显式清空才算「没填剩余克数」。
+      await fill(tester, 'bean.remaining', '');
+      await tapSave(tester);
+
+      expect(find.text('请填写剩余克数'), findsOneWidget);
+      expect(
+        await harness.container.read(beanRepositoryProvider).getAll(),
+        isEmpty,
+        reason: '校验不通过时不应落库',
+      );
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('编辑既有豆子：没烘焙日期与余量也不拦（老数据仍能改别的字段）', (tester) async {
+      // 老数据可能本来就没记烘焙日期、余量也见底。
+      final a = await harness.addBeanWithBatch(
+        name: '花魁',
+        roastDate: null,
+        remainingGrams: 0,
+      );
+      final CoffeeBean bean = (await harness.container
+          .read(beanRepositoryProvider)
+          .getById(a.beanId))!;
+
+      await pumpBeanForm(tester, bean: bean);
+      // 编辑页只有批次列表，没有「第一袋」那两个必填项。
+      expect(find.byKey(const Key('bean.remaining')), findsNothing);
+
+      await fill(tester, 'bean.name', '花魁（改）');
+      await tapSave(tester);
+
+      expect((await onlyBean()).name, '花魁（改）');
+
+      await harness.finish(tester);
+    });
+  });
 }

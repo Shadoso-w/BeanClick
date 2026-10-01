@@ -279,4 +279,171 @@ void main() {
 
     await harness.finish(tester);
   });
+
+  /// M3-T15：相对刻度改用**磨豆机当前的校准**（零点 / 每圈 click），
+  /// 磨豆机被删或该字段为空时回落到记录里的快照。
+  ///
+  /// 两个值各回各的：当前值缺一个不会连带另一个也回落。
+  group('M3-T15 相对刻度用当前校准', () {
+    /// 整屏 App：记录页就是首页 tab，直接断言卡片第二行的刻度。
+    Future<void> pumpApp(WidgetTester tester) async {
+      await tester.pumpWidget(harness.app(const BeanClickApp()));
+      for (int i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.pumpAndSettle();
+    }
+
+    /// 再等几帧 drift 的流查询把新状态推上来（删磨豆机之后用）。
+    Future<void> settle(WidgetTester tester) async {
+      for (int i = 0; i < 5; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      await tester.pumpAndSettle();
+    }
+
+    /// 造一条「2 圈 + 15 click」的记录；快照值可以与磨豆机当前值不同。
+    Future<void> seedLog({
+      required int grinderId,
+      required double zeroPointSnapshot,
+      required int clicksPerRevolutionSnapshot,
+      double turns = 2,
+      int clicks = 15,
+    }) async {
+      final a = await harness.addBeanWithBatch(name: '耶菲雪加');
+      final int logId = await harness.addBrewLog(
+        beanId: a.beanId,
+        batchId: a.batchId,
+        grinderId: grinderId,
+        doseGrams: 15,
+        brewedAt: DateTime(2026, 1, 1, 8),
+      );
+      final BrewLog log = (await harness.container
+          .read(brewLogRepositoryProvider)
+          .getById(logId))!;
+      await harness.container
+          .read(brewLogRepositoryProvider)
+          .save(
+            log.copyWith(
+              grinderZeroPointSnapshot: zeroPointSnapshot,
+              grinderClicksPerRevolutionSnapshot: clicksPerRevolutionSnapshot,
+              grindSetting: turns,
+              grindClicks: clicks,
+            ),
+          );
+    }
+
+    testWidgets('① 改了零点后，旧记录卡片按磨豆机现在的零点显示', (tester) async {
+      // 磨豆机现在零点 5；这条记录当时的快照是 0。
+      final int grinderId = await addGrinder(zeroPoint: 5);
+      await seedLog(
+        grinderId: grinderId,
+        zeroPointSnapshot: 0,
+        clicksPerRevolutionSnapshot: 30,
+      );
+
+      await pumpApp(tester);
+
+      // 2 × 30 + 15 − **5**（当前零点）= 70，而不是快照算出的 75。
+      expect(find.textContaining('相对刻度 70 click'), findsOneWidget);
+      expect(find.textContaining('相对刻度 75 click'), findsNothing);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('② 磨豆机被删时回落记录里的快照', (tester) async {
+      final int grinderId = await addGrinder(zeroPoint: 0);
+      await seedLog(
+        grinderId: grinderId,
+        zeroPointSnapshot: 12,
+        clicksPerRevolutionSnapshot: 30,
+      );
+
+      await pumpApp(tester);
+      // 磨豆机还在：用当前零点 0 → 2 × 30 + 15 − 0 = 75。
+      expect(find.textContaining('相对刻度 75 click'), findsOneWidget);
+
+      await harness.container.read(grinderRepositoryProvider).delete(grinderId);
+      await settle(tester);
+
+      // 磨豆机没了：回落记录里的快照零点 12 → 2 × 30 + 15 − 12 = 63。
+      expect(find.textContaining('相对刻度 63 click'), findsOneWidget);
+      expect(find.textContaining('相对刻度 75 click'), findsNothing);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('③ 每圈 click 同理：当前值优先，磨豆机被删后回落快照', (tester) async {
+      final int grinderId = await addGrinder(
+        clicksPerRevolution: 30,
+        zeroPoint: 0,
+      );
+      await seedLog(
+        grinderId: grinderId,
+        zeroPointSnapshot: 0,
+        clicksPerRevolutionSnapshot: 20,
+        turns: 2,
+        clicks: 5,
+      );
+
+      await pumpApp(tester);
+      // 当前每圈 30 → 2 × 30 + 5 = 65。
+      expect(find.textContaining('相对刻度 65 click'), findsOneWidget);
+
+      await harness.container.read(grinderRepositoryProvider).delete(grinderId);
+      await settle(tester);
+
+      // 回落快照的每圈 20 → 2 × 20 + 5 = 45。
+      expect(find.textContaining('相对刻度 45 click'), findsOneWidget);
+      expect(find.textContaining('相对刻度 65 click'), findsNothing);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('④ 表单提示同样按当前校准（编辑旧记录，快照零点 0 vs 当前 5）', (tester) async {
+      final int grinderId = await addGrinder(zeroPoint: 5);
+      await pumpForm(
+        tester,
+        existing: BrewLog(
+          method: BrewMethod.pourOver,
+          grinderId: grinderId,
+          grinderZeroPointSnapshot: 0,
+          grinderClicksPerRevolutionSnapshot: 30,
+          grindSetting: 2,
+          grindClicks: 15,
+          brewedAt: DateTime(2026, 1, 1, 8),
+          createdAt: DateTime(2026, 1, 1, 8),
+          updatedAt: DateTime(2026, 1, 1, 8),
+        ),
+      );
+
+      // 2 × 30 + 15 − 5（当前零点）= 70。
+      expect(await grindHelper(tester), '相对刻度 70 click');
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('⑤ 磨豆机已被删除的表单：回落记录里的快照', (tester) async {
+      await pumpForm(
+        tester,
+        existing: BrewLog(
+          method: BrewMethod.pourOver,
+          // 这台磨豆机已经不在库里了。
+          grinderId: 999,
+          grinderZeroPointSnapshot: 12,
+          grinderClicksPerRevolutionSnapshot: 30,
+          grindSetting: 2,
+          grindClicks: 15,
+          brewedAt: DateTime(2026, 1, 1, 8),
+          createdAt: DateTime(2026, 1, 1, 8),
+          updatedAt: DateTime(2026, 1, 1, 8),
+        ),
+      );
+
+      // 2 × 30 + 15 − 12（快照零点）= 63。
+      expect(await grindHelper(tester), '相对刻度 63 click');
+
+      await harness.finish(tester);
+    });
+  });
 }

@@ -22,4 +22,4 @@ const String kAppName = '豆刻 BeanClick';
 const String kAppTagline = '本地优先，无追踪';
 
 /// 展示用版本号：对应 `pubspec.yaml` 的 `version:`，**不含** `+构建号`。
-const String kAppVersion = '0.2.0';
+const String kAppVersion = '0.3.0';

@@ -86,6 +86,30 @@ class BrewLogFormPage extends ConsumerStatefulWidget {
     );
   }
 
+  /// 相对刻度：`圈 × 每圈 click + click − 零点`（M3-T15 定稿规则）。
+  ///
+  /// **零点与每圈 click 优先取磨豆机当前的值**；磨豆机被删（[grinder] 为 null）
+  /// 或该字段为空时，回落到记录里的快照（[zeroPointSnapshot] /
+  /// [clicksPerRevolutionSnapshot]）。两个值各回各的：当前值缺一个，
+  /// 不会连带另一个也回落。
+  ///
+  /// 放在页面上是因为记录卡片（`record_page.dart` 的 `_grindLabel`）与表单提示
+  /// （[_BrewLogFormPageState._grindHelper]）共用它 —— 两处必须算同一个数。
+  /// 「每圈 click」两处都取不到时返回 null：宁可不显示，也不瞎算。
+  static double? relativeClicks({
+    required double? turns,
+    required int? clicks,
+    Grinder? grinder,
+    double? zeroPointSnapshot,
+    int? clicksPerRevolutionSnapshot,
+  }) => Grinder.relativeClicksWith(
+    turns: turns,
+    clicks: clicks,
+    clicksPerRevolution:
+        grinder?.clicksPerRevolution ?? clicksPerRevolutionSnapshot,
+    zeroPoint: grinder?.zeroPoint ?? zeroPointSnapshot,
+  );
+
   @override
   ConsumerState<BrewLogFormPage> createState() => _BrewLogFormPageState();
 }
@@ -98,7 +122,10 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   late final TextEditingController _dose;
   late final TextEditingController _water;
   late final TextEditingController _waterTemp;
-  late final TextEditingController _totalTime;
+
+  /// 总时间的「分」与「秒」两个框（M3-T15）；内部仍只存总秒数。
+  late final TextEditingController _totalTimeMin;
+  late final TextEditingController _totalTimeSec;
   late final TextEditingController _dripper;
   late final TextEditingController _flavors;
   late final TextEditingController _notes;
@@ -111,6 +138,17 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   late final TextEditingController _pressure;
   late final TextEditingController _heatLevel;
   late final TextEditingController _yieldGrams;
+
+  /// 打开时的**原始文本**（M3-T22 / B1）：上下限只对「这次改动过的值」生效。
+  ///
+  /// 库里可能存着加上下限之前的越界值 —— `doseGrams` / `waterGrams` /
+  /// `waterTemp` 在 HEAD 上根本没有 validator，`totalTimeSeconds` 也可能是
+  /// 3600 以上（旧上限下 3600 秒连合法写法都没有）。历史记录不该一打开就飘红、
+  /// 更不该「没有合法表示」而改不动。校验时先比原值，相等直接放行。
+  late final String _originalDoseText;
+  late final String _originalWaterText;
+  late final String _originalWaterTempText;
+  late final int? _originalTotalSeconds;
 
   BrewMethod _method = BrewMethod.pourOver;
 
@@ -166,8 +204,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     _dose = TextEditingController(text: numberToText(source?.doseGrams));
     _water = TextEditingController(text: numberToText(source?.waterGrams));
     _waterTemp = TextEditingController(text: numberToText(source?.waterTemp));
-    _totalTime = TextEditingController(
-      text: source?.totalTimeSeconds?.toString() ?? '',
+    _totalTimeMin = TextEditingController(
+      text: _minutesText(source?.totalTimeSeconds),
+    );
+    _totalTimeSec = TextEditingController(
+      text: _secondsText(source?.totalTimeSeconds),
     );
     _dripper = TextEditingController(text: source?.dripper ?? '');
     _flavors = TextEditingController(text: source?.flavorTags.join('、') ?? '');
@@ -187,6 +228,12 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     _pressure = TextEditingController(text: numberToText(source?.pressure));
     _heatLevel = TextEditingController(text: source?.heatLevel ?? '');
     _yieldGrams = TextEditingController(text: numberToText(source?.yieldGrams));
+
+    // 记住打开时的原值（见 [_originalDoseText]）：控制器都建好之后才能取。
+    _originalDoseText = _dose.text;
+    _originalWaterText = _water.text;
+    _originalWaterTempText = _waterTemp.text;
+    _originalTotalSeconds = _totalSecondsInput;
 
     _method = source?.method ?? BrewMethod.pourOver;
     _methodLabel = source?.methodLabel;
@@ -230,7 +277,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       _dose,
       _water,
       _waterTemp,
-      _totalTime,
+      _totalTimeMin,
+      _totalTimeSec,
       _dripper,
       _flavors,
       _notes,
@@ -251,6 +299,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   Future<void> _save() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    // 兜底：`validate()` 只看得到**还在册**的字段，滚出视口的输入框已经被
+    // `ListView` 销毁了（见 [_validateRanges]）。
+    if (!_validateRanges()) return;
     if (!_validatePicks()) return;
     setState(() => _saving = true);
 
@@ -263,7 +314,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
         .where((p) => p.beanId != null)
         .firstOrNull
         ?.beanId;
-    final int? totalTime = int.tryParse(_totalTime.text.trim());
+    final int? totalTime = _totalSecondsInput;
     final BrewLog log = base.copyWith(
       beanId: primaryBeanId,
       grinderId: _grinderId,
@@ -276,7 +327,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       grinderClicksPerRevolutionSnapshot: _grinderClicksPerRevolution,
       grindSetting: _turnsInput?.toDouble(),
       grindClicks: _clicksInput,
-      doseGrams: parseNumber(_dose.text),
+      doseGrams: _totalDose,
       waterGrams: parseNumber(_water.text),
       waterTemp: parseNumber(_waterTemp.text),
       totalTimeSeconds: totalTime,
@@ -304,7 +355,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       clearGrinderId: _grinderId == null,
       clearGrindSetting: _turnsInput == null,
       clearGrindClicks: _clicksInput == null,
-      clearDoseGrams: parseNumber(_dose.text) == null,
+      clearDoseGrams: _totalDose == null,
       clearWaterGrams: parseNumber(_water.text) == null,
       clearWaterTemp: parseNumber(_waterTemp.text) == null,
       clearTotalTimeSeconds: totalTime == null,
@@ -360,9 +411,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   /// 从数据来源（编辑原记录 / 复制上次的预填）还原豆子列表。
   ///
-  /// 拼配的占比是从**各支豆子的粉量**倒推的：一条记录只存总粉量
-  /// （`brew_logs.doseGrams`）和每支豆子的粉量（`brew_log_beans.doseGrams`），
-  /// 界面上的「占比」是这两者的比值。
+  /// 一条记录只存总粉量（`brew_logs.doseGrams`）和每支豆子的粉量
+  /// （`brew_log_beans.doseGrams`）。拼配时表单里**每支填的就是那个克数**，
+  /// 占比是按各支克数算出来的只读展示。
   List<_BeanPick> _initialPicks(BrewLog? source) {
     final List<BeanUsage> usages = source?.beanUsages ?? const <BeanUsage>[];
     _orphanUsageCount = usages.where((u) => u.beanId == null).length;
@@ -384,17 +435,15 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       ];
     }
 
-    final double total =
-        source?.doseGrams ?? usable.fold<double>(0, (s, u) => s + u.doseGrams);
     return <_BeanPick>[
       for (final BeanUsage usage in usable)
         _BeanPick(
           beanId: usage.beanId,
           batchId: usage.batchId,
           beanName: usage.beanName,
-          share: total > 0
-              ? usage.doseGrams / total * 100
-              : 100 / usable.length,
+          grams: usage.doseGrams,
+          // 这一支打开时的克数（M3-T25 / F2）：与另外四个字段同一套「原值放行」。
+          originalGrams: numberToText(usage.doseGrams),
         ),
     ];
   }
@@ -402,39 +451,92 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   /// 是否拼配（多于一支豆子）。
   bool get _isBlend => _picks.length > 1;
 
-  /// 占比合计。单支时恒为 100（那一支就是全部）。
-  double get _shareSum => _picks.length < 2
-      ? 100
-      : _picks.fold<double>(0, (s, p) => s + (parseNumber(p.share.text) ?? 0));
+  /// 拼配时各支克数之和。
+  double get _gramsSum => _picks.fold<double>(
+    0,
+    (double sum, _BeanPick pick) => sum + (parseNumber(pick.grams.text) ?? 0),
+  );
 
-  /// 归一化后的占比（合计正好 100）。
+  /// 这条记录的粉量。
   ///
-  /// 不直接用输入值，是为了容忍 33.3 + 33.3 + 33.4 这种输入；
-  /// 合计偏离 100 太多的情况在 [_validatePicks] 里已经被拦下。
-  double _shareOf(_BeanPick pick) {
-    if (!_isBlend) return 100;
-    final double sum = _shareSum;
-    if (sum <= 0) return 0;
-    return (parseNumber(pick.share.text) ?? 0) / sum * 100;
+  /// 单支时就是「粉量」框里填的值（行为与拼配改造前一致）；
+  /// 拼配时恒等于**各支克数之和**，「总粉量」框只读展示它。
+  /// 这样「总粉量 = 各支之和」不可能被输入破坏。
+  double? get _totalDose =>
+      _isBlend ? roundGrams(_gramsSum) : parseNumber(_dose.text);
+
+  /// 这支豆子的占比（只读展示）：它的克数 ÷ 各支克数之和。
+  double _sharePercentOf(_BeanPick pick) {
+    final double total = _gramsSum;
+    if (total <= 0) return 0;
+    return (parseNumber(pick.grams.text) ?? 0) / total * 100;
   }
 
-  /// 这支豆子分到的粉量（按当前总粉量与占比实时算出来，给界面显示）。
-  double _gramsOf(_BeanPick pick) {
-    final double total = parseNumber(_dose.text) ?? 0;
-    return roundGrams(total * _shareOf(pick) / 100);
-  }
-
-  /// 保存前的拼配校验。返回 false 表示已经提示过用户，不要继续。
+  /// 保存前的豆子校验。返回 false 表示已经提示过用户，不要继续。
   bool _validatePicks() {
-    if (!_isBlend) return true;
-
-    final double sum = _shareSum;
-    if ((sum - 100).abs() > 0.5) {
-      _showMessage('各支豆子的占比合计要等于 100%（现在是 ${formatNumber(sum)}%）');
+    // 豆子必填（第二轮反馈）：豆库里**有**豆子时，一支都没选就拦住 ——
+    // 有得选还留空，余量扣减无处可去，记录也统计不进来。
+    //
+    // 例外（用户裁决）：豆库**一支豆子都没有**时放行，允许以「未指定」
+    // 存下这一杯。首杯零阻力（手册 §8「快速记录」），而且这一页本身就有
+    // 「+ 新增豆子」入口，想建豆的用户随时可以建。
+    //
+    // 注意：**加载中不是空库**。第一次发射之前 `.value` 同样是 null，
+    // 直接当空库会把「豆子必填」放过去（落一条无豆记录）；还在加载就先请用户
+    // 稍等。`hasError` 不拦——数据库报错不该把用户锁死。
+    final AsyncValue<List<CoffeeBean>> asyncBeans = ref.read(beanListProvider);
+    final List<CoffeeBean> beans = asyncBeans.value ?? const <CoffeeBean>[];
+    if (asyncBeans.isLoading && beans.isEmpty) {
+      _showMessage('豆子列表还在加载，请稍候再保存');
       return false;
     }
+    if (beans.isNotEmpty && _picks.every((p) => p.beanId == null)) {
+      _showMessage('请先选一支豆子再保存');
+      return false;
+    }
+    if (!_isBlend) return true;
+
     if (_picks.any((p) => p.beanId == null)) {
       _showMessage('有一支豆子还没选，请选上或删掉这一行');
+      return false;
+    }
+    // 占比是算出来的，所以这里没有「合计要等于 100%」那条校验；
+    // 改成每支都要有克数，否则总粉量（= 各支之和）本身就是空的。
+    //
+    // 每支克数的范围与行内 validator **同口径**（M3-T25 / F1）：行内那条只在
+    // 输入框还在册时才跑得了，而 `ListView` 会把滚出视口的输入框反注册 ——
+    // 「填 0.05 g → 滚走 → 点保存」原本能静默落库。这里直接读控制器再查一遍，
+    // 文案用行内那一句，同一个错因不出现两种说法。
+    //
+    // 打开时那一支的克数**没改过就放行**（与单支路径同一套机制，见
+    // [_BeanPick.originalGrams]）：库里存着加上下限之前记下的 250 g。
+    for (final _BeanPick pick in _picks) {
+      // 留空是另一回事（「还没填」而不是「填超了」），沿用原来那句提示：
+      // 行内 validator 把留空当合法，只能在这里兜住。
+      if (pick.grams.text.trim().isEmpty) {
+        _showMessage('每支豆子都要填大于 0 的克数');
+        return false;
+      }
+      final String? gramsError = _gramsRangeError(pick);
+      if (gramsError != null) {
+        _showMessage(gramsError);
+        return false;
+      }
+    }
+    // 总分这一层同样要认「原值放行」（M3-T25 / F2）：拼配记录的总粉量就是
+    // `brew_logs.doseGrams`。加限之前记下的 60 + 60 = 120 每支都 ≤ 100，
+    // 只卡总分会让这条旧记录**连改个备注都存不回去**。新建记录没有原值，
+    // 仍然必须落在 0.1–100 g 之内。
+    final double total = _gramsSum;
+    final double? originalTotal = widget.existing?.doseGrams;
+    final bool totalUnchanged =
+        originalTotal != null &&
+        _unchangedFromOriginal(
+          numberToText(total),
+          numberToText(originalTotal),
+        );
+    if ((total < 0.1 || total > 100) && !totalUnchanged) {
+      _showMessage('粉量应在 0.1–100 g 之间');
       return false;
     }
     final List<int> ids = _picks
@@ -448,7 +550,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     return true;
   }
 
-  /// 把「豆子 + 占比 + 总粉量」换算成记录关联的用量行。
+  /// 把「豆子 + 克数」换算成记录关联的用量行。
   ///
   /// 余量自动扣减（手册 §6.2）就是按这些用量行的 `doseGrams` 走的：
   /// 新建时各支按各自粉量扣，编辑时按各支的差值补扣，换豆则旧豆回补。
@@ -460,7 +562,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
         .toList(growable: false);
     if (picks.isEmpty) return const <BeanUsage>[];
 
-    final double total = parseNumber(_dose.text) ?? 0;
+    final double total = _totalDose ?? 0;
     if (picks.length == 1) {
       final _BeanPick only = picks.first;
       return <BeanUsage>[
@@ -468,7 +570,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       ];
     }
 
-    // 拼配：按归一化占比分摊总粉量。**最后一支吃掉四舍五入的零头**，
+    // 拼配：直接写各支填的克数。**最后一支吃掉四舍五入的零头**，
     // 这样各支粉量之和一定等于总粉量，不会出现「加总比总粉量多 0.1g」。
     final List<BeanUsage> usages = <BeanUsage>[];
     double assigned = 0;
@@ -477,7 +579,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       final bool isLast = i == picks.length - 1;
       final double grams = isLast
           ? roundGrams(total - assigned)
-          : roundGrams(total * _shareOf(pick) / 100);
+          : roundGrams(parseNumber(pick.grams.text) ?? 0);
       assigned = roundGrams(assigned + grams);
       usages.add(
         BeanUsage(
@@ -494,26 +596,35 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   void _addPick() {
     setState(() {
       if (_picks.length == 1) {
-        // 1 → 2：默认对半分，省得用户先算一遍
-        _picks[0].share.text = '50';
-        _picks.add(_BeanPick(share: 50));
+        // 1 → 2：把当前粉量对半分，总粉量保持不变，省得用户先算一遍。
+        final double total = parseNumber(_dose.text) ?? 0;
+        // 小于 0.2 g 拆半没有合法写法（半支不足 0.1 g），干脆不预填 ——
+        // 否则第二支会被写成 `0`，一加就报「每支豆子都要填大于 0 的克数」。
+        if (total >= 0.2) {
+          final double first = roundGrams(total / 2);
+          _picks[0].grams.text = numberToText(first);
+          _picks.add(_BeanPick(grams: roundGrams(total - first)));
+        } else {
+          _picks[0].grams.text = '';
+          _picks.add(_BeanPick());
+        }
       } else {
-        _picks.add(_BeanPick(share: 0));
+        _picks.add(_BeanPick());
       }
     });
   }
 
   void _removePick(int index) {
     setState(() {
-      // 拿掉一支就把它的粉量从总粉量里减掉，剩下几支实际克数**保持不变**。
-      // 否则「删掉 30% 那支」会把这 30% 悄悄转给剩下的豆子，余量跟着多扣。
-      final double removed = _gramsOf(_picks[index]);
-      final double? total = parseNumber(_dose.text);
-      if (_isBlend && total != null) {
-        _dose.text = numberToText(roundGrams(total - removed));
-      }
+      // 总粉量是各支之和，删掉一支它自动跟着降，剩下几支的克数**保持不变**。
       _picks.removeAt(index).dispose();
-      if (_picks.length == 1) _picks.first.share.text = '100';
+      // 只剩一支时它回落到「粉量」框（单支路径行为不变）。
+      if (_picks.length == 1) {
+        // 克数框为空就留空（M3-T22 / S2）：写出 `'0'` 等于替用户填了一个他
+        // 没填过的数，还会立刻触发「每支豆子都要填大于 0 的克数」。
+        final double? grams = parseNumber(_picks.first.grams.text);
+        _dose.text = grams == null ? '' : numberToText(roundGrams(grams));
+      }
     });
   }
 
@@ -624,7 +735,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       _dose.text = numberToText(copied.doseGrams);
       _water.text = numberToText(copied.waterGrams);
       _waterTemp.text = numberToText(copied.waterTemp);
-      _totalTime.text = copied.totalTimeSeconds?.toString() ?? '';
+      _totalTimeMin.text = _minutesText(copied.totalTimeSeconds);
+      _totalTimeSec.text = _secondsText(copied.totalTimeSeconds);
       _dripper.text = copied.dripper ?? '';
       _flavors.text = copied.flavorTags.join('、');
       _tds.text = numberToText(copied.tds);
@@ -722,7 +834,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                 ),
                 LabeledField(
                   label: '豆子',
-                  helper: _isBlend ? '拼配：按占比分摊下面的总粉量' : null,
+                  helper: _isBlend ? '拼配：每支填克数，占比与总粉量自动算' : null,
                   child: _buildBeanPicker(beans),
                 ),
                 LabeledField(
@@ -783,14 +895,24 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
               children: <Widget>[
                 LabeledField(
                   label: _isBlend ? '总粉量' : '粉量',
-                  helper: _isBlend ? '下面几支豆子的粉量加起来就是它' : null,
-                  child: NumberField(
-                    key: const Key('brew.dose'),
-                    controller: _dose,
-                    hintText: '例如：15',
-                    suffixText: 'g',
-                    onChanged: (_) => setState(() {}),
-                  ),
+                  helper: _isBlend ? '各支豆子的克数之和，自动算出来' : null,
+                  child: _isBlend
+                      ? _buildTotalDoseDisplay()
+                      : NumberField(
+                          key: const Key('brew.dose'),
+                          controller: _dose,
+                          hintText: '例如：15',
+                          suffixText: 'g',
+                          validator: (String? value) => _rangeError(
+                            value,
+                            label: '粉量',
+                            range: '0.1–100 g',
+                            min: 0.1,
+                            max: 100,
+                            original: _originalDoseText,
+                          ),
+                          onChanged: (_) => setState(() {}),
+                        ),
                 ),
                 LabeledField(
                   label: '水量',
@@ -800,6 +922,15 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                     controller: _water,
                     hintText: '例如：240',
                     suffixText: 'g',
+                    // 只做保守的上下限：水量可以比粉量多，也可以是 0。
+                    validator: (String? value) => _rangeError(
+                      value,
+                      label: '水量',
+                      range: '0–2000 g',
+                      min: 0,
+                      max: 2000,
+                      original: _originalWaterText,
+                    ),
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
@@ -810,16 +941,41 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                     controller: _waterTemp,
                     hintText: '例如：92',
                     suffixText: '℃',
+                    validator: (String? value) => _rangeError(
+                      value,
+                      label: '水温',
+                      range: '0–100 ℃',
+                      min: 0,
+                      max: 100,
+                      original: _originalWaterTempText,
+                    ),
                   ),
                 ),
                 LabeledField(
                   label: '总时间',
                   helper: _timeHint(),
-                  child: IntField(
-                    key: const Key('brew.totalTime'),
-                    controller: _totalTime,
-                    hintText: '例如：155',
-                    suffixText: '秒',
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: IntField(
+                          key: const Key('brew.totalTimeMin'),
+                          controller: _totalTimeMin,
+                          suffixText: '分',
+                          onChanged: (_) => setState(() {}),
+                          validator: _validateMinutes,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: IntField(
+                          key: const Key('brew.totalTimeSec'),
+                          controller: _totalTimeSec,
+                          suffixText: '秒',
+                          onChanged: (_) => setState(() {}),
+                          validator: _validateTotalTimeSeconds,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 LabeledField(
@@ -1041,7 +1197,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
           ).withLongPress(() => _manageCustomMethod(custom)),
         ActionChip(
           key: const Key('brew.addMethod'),
-          avatar: const Icon(Icons.add, size: 16),
+          // 不要 avatar：它和 label 的「＋」会在同一个 chip 上画出两个加号
+          // （第二轮反馈：仅保留一个＋号框）。
           label: const Text('＋'),
           tooltip: '新建冲煮方法',
           onPressed: _saving ? null : _createCustomMethod,
@@ -1181,6 +1338,20 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     );
   }
 
+  /// 辅料行里三个框共用的高度。
+  ///
+  /// 数量框是 [NumberField]（TextFormField），名称与单位是 [InputDecorator]，
+  /// 两者即使装饰写得一样，自然高度也差 4dp（实测 48 vs 44），
+  /// 所以外层统一套一个固定高度，两个 [InputDecorator] 再用 `expands` 撑满，
+  /// 这样三个框的边框上下沿严格对齐（测评反馈：数字框大小和其他框不一样）。
+  static const double _addInBoxHeight = 48;
+
+  /// 名称与单位共用的装饰：与 [NumberField] 里那份保持一致（isDense + 外框线）。
+  static const InputDecoration _addInBoxDecoration = InputDecoration(
+    isDense: true,
+    border: OutlineInputBorder(),
+  );
+
   Widget _buildAddInRow(int index) {
     final _AddIn addIn = _addIns[index];
 
@@ -1191,44 +1362,44 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
           Expanded(
-            flex: 4,
             child: InkWell(
               key: Key('brew.addInName.$index'),
               onTap: _saving ? null : () => _renameAddIn(index),
-              child: InputDecorator(
-                decoration: const InputDecoration(
-                  isDense: true,
-                  border: OutlineInputBorder(),
+              child: SizedBox(
+                height: _addInBoxHeight,
+                child: InputDecorator(
+                  decoration: _addInBoxDecoration,
+                  expands: true,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(addIn.name, overflow: TextOverflow.ellipsis),
+                  ),
                 ),
-                child: Text(addIn.name, overflow: TextOverflow.ellipsis),
               ),
             ),
           ),
           const SizedBox(width: 8),
-          Expanded(
-            flex: 2,
+          // 数量框给固定宽度：以前只占 6 份里的 2 份，去掉单位与删除按钮后
+          // 实测只剩 58dp，`1000` 这种四位数就显示不全（第二轮反馈）。
+          SizedBox(
+            width: 88,
+            height: _addInBoxHeight,
             child: NumberField(
               key: Key('brew.addInAmount.$index'),
               controller: addIn.amount,
               hintText: '数量',
             ),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
           // 单位：ml / g / 泵 / 份。
           // 外面套 SizedBox 给个确定宽度：InputDecorator 在无界宽度下会断言失败；
-          // 顺带让它的边框与高度跟左边的名字/数量框对齐
-          // （测评反馈：两个框大小不一致，要对齐）。
+          // 高度与装饰和左边的名称框完全一致，边框才对得齐。
           SizedBox(
-            width: 84,
+            width: 72,
+            height: _addInBoxHeight,
             child: InputDecorator(
-              decoration: const InputDecoration(
-                isDense: true,
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 8,
-                ),
-              ),
+              decoration: _addInBoxDecoration,
+              expands: true,
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<AddInUnit>(
                   key: Key('brew.addInUnit.$index'),
@@ -1254,6 +1425,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
           ),
           IconButton(
             tooltip: '删掉这一项',
+            // 紧凑一点，把宽度让给数量框。
+            visualDensity: VisualDensity.compact,
             onPressed: _saving
                 ? null
                 : () => setState(() => _addIns.removeAt(index).dispose()),
@@ -1320,10 +1493,6 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     setState(() => _addIns[index].name = name);
   }
 
-  /// 这台磨豆机能不能用「圈」表达刻度（知道每圈几 click 才行）。
-  static bool _usesTurns(Grinder? grinder) =>
-      grinder?.clicksPerRevolution != null && grinder!.clicksPerRevolution! > 0;
-
   /// 「圈」框里的整数圈数：空串 → null（= 0 圈）。
   int? get _turnsInput => int.tryParse(_grindSetting.text.trim());
 
@@ -1387,18 +1556,31 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     return null;
   }
 
+  /// 换算用的「每圈 click」：优先磨豆机**当前**的值，取不到回落记录里的快照。
+  int? _effectiveClicksPerRevolution(Grinder? grinder) =>
+      grinder?.clicksPerRevolution ?? _grinderClicksPerRevolution;
+
+  /// 换算用的零点：同上（当前值优先，回落到快照）。
+  double? _effectiveZeroPoint(Grinder? grinder) =>
+      grinder?.zeroPoint ?? _grinderZeroPoint;
+
   /// 研磨刻度的提示行：**只给相对刻度**，算式收在 [ _buildGrindInfoButton ] 里。
+  ///
+  /// 用的是磨豆机**现在**的校准；磨豆机被删或字段为空才回落记录里的快照。
   String _grindHelper(Grinder? grinder) {
-    if (grinder == null) {
-      return '选择磨豆机后可自动换算相对刻度';
-    }
-    if (!_usesTurns(grinder)) {
-      return '这台磨豆机还没填「每圈几 click」，去磨豆机编辑页补上就能换算';
+    final int? perRevolution = _effectiveClicksPerRevolution(grinder);
+    if (perRevolution == null || perRevolution <= 0) {
+      return grinder == null
+          ? '选择磨豆机后可自动换算相对刻度'
+          : '这台磨豆机还没填「每圈几 click」，去磨豆机编辑页补上就能换算';
     }
 
-    final double? relative = grinder.relativeClicks(
+    final double? relative = BrewLogFormPage.relativeClicks(
       turns: _turnsInput?.toDouble(),
       clicks: _clicksInput,
+      grinder: grinder,
+      zeroPointSnapshot: _grinderZeroPoint,
+      clicksPerRevolutionSnapshot: _grinderClicksPerRevolution,
     );
     if (relative == null) return '填入圈数或 click 后自动算出相对刻度';
     return '相对刻度 ${formatNumber(relative)} click';
@@ -1420,9 +1602,14 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   Future<void> _showGrindInfo() async {
     final Grinder? grinder = _selectedGrinder();
-    final double? relative = grinder?.relativeClicks(
+    final int? perRevolution = _effectiveClicksPerRevolution(grinder);
+    final double? zeroPoint = _effectiveZeroPoint(grinder);
+    final double? relative = BrewLogFormPage.relativeClicks(
       turns: _turnsInput?.toDouble(),
       clicks: _clicksInput,
+      grinder: grinder,
+      zeroPointSnapshot: _grinderZeroPoint,
+      clicksPerRevolutionSnapshot: _grinderClicksPerRevolution,
     );
     await showDialog<void>(
       context: context,
@@ -1434,19 +1621,14 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
           children: <Widget>[
             const Text('相对刻度 = 圈 × 每圈 click + click − 零点'),
             const SizedBox(height: 12),
-            Text(
-              grinder == null
-                  ? '这台记录还没选磨豆机'
-                  : '这台磨豆机：每圈 ${grinder.clicksPerRevolution} click'
-                        ' · 零点 ${formatNumber(_grinderZeroPoint ?? 0)}',
-            ),
+            Text(_grindSourceText(grinder, perRevolution, zeroPoint)),
             Text(
               '这次填写：${formatNumber((_turnsInput ?? 0).toDouble())} 圈'
               ' + ${_clicksInput ?? 0} click',
             ),
             if (relative != null)
               Text('结果：${formatNumber(relative)} click')
-            else if (grinder != null && !_usesTurns(grinder))
+            else if (perRevolution == null || perRevolution <= 0)
               const Text('这台磨豆机还没填「每圈几 click」，补上后才能换算'),
           ],
         ),
@@ -1460,17 +1642,54 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     );
   }
 
+  /// ⓘ 里「这两个数分别从哪来」那一行（M3-T22 / S3）。
+  ///
+  /// **按值分别判断来源**：[_effectiveClicksPerRevolution] 与
+  /// [_effectiveZeroPoint] 是**各自**回落的（磨豆机字段为空就取记录里的快照），
+  /// 所以不能只看「磨豆机还在不在」——磨豆机在、但它的「每圈 click」为空时，
+  /// 那个数其实来自记录快照。用户正是拿这一行核对「为什么减零点」，
+  /// 把它说成「这台磨豆机的值」就是事实性错误。
+  String _grindSourceText(
+    Grinder? grinder,
+    int? perRevolution,
+    double? zeroPoint,
+  ) {
+    if (perRevolution == null && zeroPoint == null) {
+      return grinder == null ? '这台记录还没选磨豆机' : '这台磨豆机还没填「每圈几 click」';
+    }
+    final bool clicksCurrent = grinder?.clicksPerRevolution != null;
+    final bool zeroCurrent = grinder?.zeroPoint != null;
+    String source(bool current) => current ? '这台磨豆机' : '记录里的快照';
+
+    // 两个数都在、且来源相同时并成一行（最常见的情形）。
+    if (perRevolution != null &&
+        zeroPoint != null &&
+        clicksCurrent == zeroCurrent) {
+      return '${source(clicksCurrent)}：每圈 $perRevolution click'
+          ' · 零点 ${formatNumber(zeroPoint)}';
+    }
+    // 只有一个数、或者两个数来源不同：逐个标注。
+    final List<String> parts = <String>[
+      if (perRevolution != null)
+        '每圈 $perRevolution click（${source(clicksCurrent)}）',
+      if (zeroPoint != null)
+        '零点 ${formatNumber(zeroPoint)}（${source(zeroCurrent)}）',
+    ];
+    return parts.join(' · ');
+  }
+
   /// 豆子选择（含拼配）。
   ///
-  /// 单支时不显示占比——那一支就是全部；一旦加到两支以上，每行多出「占比」，
-  /// 各支按归一化占比分摊「核心参数」里的总粉量。这样总粉量始终只有一个
-  /// 真值，不会出现「各支加起来和总粉量对不上」。
+  /// 单支时不显示克数与占比——那一支的粉量直接在「核心参数」里填；
+  /// 一旦加到两支以上，每行填**这一支的克数**，占比只是按各支克数算出来的
+  /// 只读展示，总粉量同样由各支求和得到。这样总粉量始终只有一个真值，
+  /// 不会出现「各支加起来和总粉量对不上」。
   Widget _buildBeanPicker(List<CoffeeBean> beans) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         for (int i = 0; i < _picks.length; i++) _buildBeanRow(beans, i),
-        if (_isBlend) _buildShareSummary(),
+        if (_isBlend) _buildBlendSummary(),
         if (_orphanUsageCount > 0)
           FormHint(
             message: _orphanUsageCount == 1
@@ -1589,11 +1808,12 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
               SizedBox(
                 width: 104,
                 child: NumberField(
-                  key: Key('brew.share.$index'),
-                  controller: pick.share,
-                  hintText: '占比',
-                  suffixText: '%',
+                  key: Key('brew.beanGrams.$index'),
+                  controller: pick.grams,
+                  hintText: '克数',
+                  suffixText: 'g',
                   onChanged: (_) => setState(() {}),
+                  validator: (_) => _gramsRangeError(pick),
                 ),
               ),
               IconButton(
@@ -1603,29 +1823,29 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
               ),
             ],
           ),
-          if (pick.beanId != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 2, bottom: 2),
-              child: Text(
-                '这一支约 ${formatNumber(_gramsOf(pick))} g',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 2),
+            child: Text(
+              // 占比只读：由这一支的克数 ÷ 各支之和算出来。
+              '占比 ${formatNumber(_sharePercentOf(pick))}%',
+              key: Key('brew.share.$index'),
+              style: Theme.of(context).textTheme.bodySmall,
             ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildShareSummary() {
-    final double sum = _shareSum;
-    final bool ok = (sum - 100).abs() <= 0.5;
-    final double total = parseNumber(_dose.text) ?? 0;
+  /// 拼配那一行的合计提示：总粉量 = 各支克数之和。
+  Widget _buildBlendSummary() {
+    final double total = _gramsSum;
 
     return FormHint(
-      message: ok
-          ? '占比合计 100%，共 ${formatNumber(total)} g 由 ${_picks.length} 支豆子分摊'
-          : '占比合计 ${formatNumber(sum)}%，要凑成 100% 才能保存',
-      isWarning: !ok,
+      message: total > 0
+          ? '各支合计 ${formatNumber(roundGrams(total))} g，总粉量与占比都按它自动算'
+          : '填上每支豆子的克数，总粉量与占比会自动算出来',
+      isWarning: total <= 0,
     );
   }
 
@@ -1721,10 +1941,19 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   /// 加一行并选好豆子。调用方负责已经处在 `setState` 里或自行刷新。
   void _addPickSilently(int beanId) {
     if (_picks.length == 1) {
-      _picks[0].share.text = '50';
-      _picks.add(_BeanPick(beanId: beanId, share: 50));
+      // 同 [_addPick]：1 → 2 时把当前粉量对半分，总粉量保持不变；
+      // 小于 0.2 g 没有合法写法，不预填（否则第二支会被写成 0）。
+      final double total = parseNumber(_dose.text) ?? 0;
+      if (total >= 0.2) {
+        final double first = roundGrams(total / 2);
+        _picks[0].grams.text = numberToText(first);
+        _picks.add(_BeanPick(beanId: beanId, grams: roundGrams(total - first)));
+      } else {
+        _picks[0].grams.text = '';
+        _picks.add(_BeanPick(beanId: beanId));
+      }
     } else {
-      _picks.add(_BeanPick(beanId: beanId, share: 0));
+      _picks.add(_BeanPick(beanId: beanId));
     }
   }
 
@@ -1745,8 +1974,23 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     });
   }
 
+  /// 拼配时的「总粉量」：只读展示各支克数之和（M3-T15）。
+  ///
+  /// 不再可编辑 —— 它是算出来的，写死在界面上就不会出现「各支加起来
+  /// 和总粉量对不上」。单支时仍然是 [NumberField] 直接填。
+  Widget _buildTotalDoseDisplay() {
+    return InputDecorator(
+      key: const Key('brew.dose'),
+      decoration: const InputDecoration(
+        isDense: true,
+        border: OutlineInputBorder(),
+      ),
+      child: Text('${numberToText(_totalDose)} g'),
+    );
+  }
+
   String? _ratioHint() {
-    final double? dose = parseNumber(_dose.text);
+    final double? dose = _totalDose;
     final double? water = parseNumber(_water.text);
     if (dose == null || water == null || dose <= 0) {
       return '填写粉量与水量后可自动算出粉水比';
@@ -1754,21 +1998,220 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     return '粉水比 1 : ${formatNumber(water / dose)}';
   }
 
+  /// 「分」框的初始文本：0 分不写出来（留空 = 0）。
+  static String _minutesText(int? totalSeconds) {
+    if (totalSeconds == null) return '';
+    final int minutes = totalSeconds ~/ 60;
+    return minutes == 0 ? '' : minutes.toString();
+  }
+
+  /// 「秒」框的初始文本：**整体 0 秒写 `0`**（要能原样往返）；
+  /// 被 60 整除的**余数**才留空（留空 = 0）。
+  static String _secondsText(int? totalSeconds) {
+    if (totalSeconds == null) return '';
+    if (totalSeconds == 0) return '0';
+    final int seconds = totalSeconds % 60;
+    return seconds == 0 ? '' : seconds.toString();
+  }
+
+  /// 「分 + 秒」两框合计出来的总秒数。
+  ///
+  /// **两个都留空 = 未记录**（null）；只填一个也合法，另一个按 0 算 ——
+  /// 所以这里不能把「都留空」当成 0 秒（那是「记了 0 秒」）。
+  int? get _totalSecondsInput {
+    final String minutes = _totalTimeMin.text.trim();
+    final String seconds = _totalTimeSec.text.trim();
+    if (minutes.isEmpty && seconds.isEmpty) return null;
+    return (int.tryParse(minutes) ?? 0) * 60 + (int.tryParse(seconds) ?? 0);
+  }
+
+  /// 「分」框：0–60（留空合法）。
+  ///
+  /// 上限是 **60** 而不是 59（M3-T22 / B1）：分与秒各 ≤ 59 时总分最大 3599，
+  /// `60:00 = 3600` 秒这个上限内的合法值**永远填不出来**，`total > 3600` 那条
+  /// 校验就成了死代码。60 分 + 非 0 秒会由「总分」那条拦住。
+  String? _validateMinutes(String? value) {
+    // 历史记录里的越界总时间（如 7200 秒 → 分框 120）原样不动就放行。
+    if (_totalSecondsInput == _originalTotalSeconds) return null;
+    return _rangeError(value, label: '分', range: '0–60', min: 0, max: 60);
+  }
+
+  /// 「秒」框：本框 0–59，另外把 M3-T12 的 0–3600 上限落到**总分**上。
+  ///
+  /// 文案是写死的：`_rangeError` 的 `$range 之间` 会在「秒」后面留一个
+  /// 多余的空格（第二轮反馈）。
+  String? _validateTotalTimeSeconds(String? value) {
+    final String? fieldError = _rangeError(
+      value,
+      label: '秒',
+      range: '0–59',
+      min: 0,
+      max: 59,
+    );
+    if (fieldError != null) return fieldError;
+
+    // 总分与打开时的原值相同就放行（历史记录里有 > 3600 的旧值，见 B1）。
+    if (_totalSecondsInput == _originalTotalSeconds) return null;
+    return _totalTimeError();
+  }
+
+  /// 总分超过 3600 秒的报错（分/秒两处与保存兜底共用）。
+  String? _totalTimeError() {
+    final int? total = _totalSecondsInput;
+    if (total == null) return null;
+    // 没改动过的历史值放行（B1）。
+    if (total == _originalTotalSeconds) return null;
+    if (total > 3600) return '总时间应在 0–3600 秒之间';
+    return null;
+  }
+
+  /// 「分 + 秒」整段的复查：两个框各自的上下限 + 总分的 0–3600。
+  ///
+  /// 规则与 [_validateMinutes] / [_validateTotalTimeSeconds] 一致，只是这里
+  /// 是**直接读控制器**（给 [_validateRanges] 的兜底用）。
+  String? _timeRangeError() {
+    // 历史记录里的越界总时间原样不动就放行（B1）。
+    if (_totalSecondsInput == _originalTotalSeconds) return null;
+    final String? minutesError = _rangeError(
+      _totalTimeMin.text,
+      label: '分',
+      range: '0–60',
+      min: 0,
+      max: 60,
+    );
+    if (minutesError != null) return minutesError;
+    final String? secondsError = _rangeError(
+      _totalTimeSec.text,
+      label: '秒',
+      range: '0–59',
+      min: 0,
+      max: 59,
+    );
+    if (secondsError != null) return secondsError;
+    return _totalTimeError();
+  }
+
+  /// `_save()` 的兜底范围复查（M3-T22 / S1）：**不依赖控件还在不在册**。
+  ///
+  /// `FormState.validate()` 只校验注册着的 `FormField`，而 `ListView` 会把
+  /// 滚出视口的输入框反注册（`EditableText.wantKeepAlive => hasFocus`），
+  /// 保存按钮却在**常驻的 bottomNavigationBar** 上 —— 「填越界值 → 滚上去看
+  /// 豆子 → 点保存」原本能静默把越界数据存进库（拼配克数有 [_validatePicks]
+  /// 兜底，单支的粉量/水量/水温/总时间没有）。这里照 [_validatePicks] 的写法
+  /// 直接读控制器文本再查一遍，规则与行内 validator 完全一致
+  /// （等于打开时的原值就放行，见 [_originalDoseText]）。
+  bool _validateRanges() {
+    final List<String?> errors = <String?>[
+      // 拼配时「粉量」是各支克数之和（只读展示），由 [_validatePicks] 查。
+      if (!_isBlend)
+        _rangeError(
+          _dose.text,
+          label: '粉量',
+          range: '0.1–100 g',
+          min: 0.1,
+          max: 100,
+          original: _originalDoseText,
+        ),
+      _rangeError(
+        _water.text,
+        label: '水量',
+        range: '0–2000 g',
+        min: 0,
+        max: 2000,
+        original: _originalWaterText,
+      ),
+      _rangeError(
+        _waterTemp.text,
+        label: '水温',
+        range: '0–100 ℃',
+        min: 0,
+        max: 100,
+        original: _originalWaterTempText,
+      ),
+      _timeRangeError(),
+    ];
+    for (final String? error in errors) {
+      if (error != null) {
+        _showMessage(error);
+        return false;
+      }
+    }
+    return true;
+  }
+
   String? _timeHint() {
-    final int? seconds = int.tryParse(_totalTime.text.trim());
+    final int? seconds = _totalSecondsInput;
     if (seconds == null) return null;
     return '即 ${formatDuration(seconds)}';
+  }
+
+  /// 拼配里**某一支克数**的范围校验（M3-T25）。
+  ///
+  /// 行内 validator 与 [_validatePicks] 的保存兜底**共用这一个入口**：
+  /// 「0.1–100 g」这条范围与它的文案「克数应在 0.1–100 g 之间」就不会在两侧
+  /// 各写一遍、各走各的样。打开时那一支的克数没改过照样放行，见
+  /// [_BeanPick.originalGrams]。
+  String? _gramsRangeError(_BeanPick pick) => _rangeError(
+    pick.grams.text,
+    label: '克数',
+    range: '0.1–100 g',
+    min: 0.1,
+    max: 100,
+    original: pick.originalGrams,
+  );
+
+  /// 核心参数的保守上下限校验（第二轮反馈）。
+  ///
+  /// **留空仍然合法**：这些都是可空字段，只有「填了但超范围」才报错，
+  /// 免得把「还没量」当成「填了 0」。
+  ///
+  /// [original] 是打开这条记录时该字段的原文（M3-T22 / B1）：值没被改动过就
+  /// 直接放行 —— 库里可能存着加上下限之前的越界值，历史记录不该一打开就飘红。
+  String? _rangeError(
+    String? raw, {
+    required String label,
+    required String range,
+    required double min,
+    required double max,
+    String? original,
+  }) {
+    final String text = raw?.trim() ?? '';
+    if (text.isEmpty) return null;
+    if (_unchangedFromOriginal(text, original)) return null;
+    final double? value = parseNumber(text);
+    if (value == null) return '$label请填数字';
+    if (value < min || value > max) return '$label应在 $range 之间';
+    return null;
+  }
+
+  /// [text] 是否还是**打开时那个值** [original]（M3-T22 / B1 的「原值放行」）。
+  ///
+  /// 文本一致，或者只是写法不同（`15` 与 `15.0`）都算没改过。[original] 为
+  /// null 时一律不放行 —— 那是没记过这个字段的旧记录 / 新建记录。
+  bool _unchangedFromOriginal(String text, String? original) {
+    if (original == null) return false;
+    final String before = original.trim();
+    if (text == before) return true;
+    final double? now = parseNumber(text);
+    final double? was = parseNumber(before);
+    return now != null && was != null && now == was;
   }
 }
 
 /// 表单里的一支豆子。
 ///
-/// [share] 是拼配占比的输入框（单支时不显示，恒等于 100%）。
+/// [grams] 是拼配时**这一支的克数**输入框（单支时不显示，粉量在「核心参数」
+/// 里直接填）。占比不再有输入框，只按各支克数算出来展示。
 /// [batchId] 只在编辑已有记录时带出来——新建时留空，让仓储按烘焙日期
 /// 自己挑一袋（见 `BeanRepository.adjustStock`）。
 class _BeanPick {
-  _BeanPick({this.beanId, this.batchId, this.beanName, double share = 100})
-    : share = TextEditingController(text: numberToText(share));
+  _BeanPick({
+    this.beanId,
+    this.batchId,
+    this.beanName,
+    double? grams,
+    this.originalGrams,
+  }) : grams = TextEditingController(text: numberToText(grams));
 
   int? beanId;
   int? batchId;
@@ -1777,9 +2220,16 @@ class _BeanPick {
   /// 免得下拉框既没有候选也说不清选的是谁。
   String? beanName;
 
-  final TextEditingController share;
+  final TextEditingController grams;
 
-  void dispose() => share.dispose();
+  /// 打开这条记录时这一支的克数**原文**（M3-T25 / F2）。
+  ///
+  /// 与单支路径的 `_originalDoseText` 等是同一套机制：`brew_log_beans.doseGrams`
+  /// 里可能存着加上下限之前记下的 250 g，值没被改动过就放行，改过才按新范围拦。
+  /// 新建记录（含「复制上次」的预填）为 null —— 没有任何原值可放行。
+  final String? originalGrams;
+
+  void dispose() => grams.dispose();
 }
 
 /// 「复制收藏的参数」选择面板：列出收藏过的记录，点一条就复制。
