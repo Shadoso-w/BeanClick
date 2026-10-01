@@ -285,7 +285,11 @@ void main() {
       expect(await fieldText(tester, 'brew.dose'), '18');
       expect(await fieldText(tester, 'brew.water'), '100');
       expect(await fieldText(tester, 'brew.waterTemp'), '95');
-      expect(await fieldText(tester, 'brew.totalTime'), '120');
+      // 总时间改成「分 + 秒」两个框（M3-T15）：120 秒 = 2 分 0 秒。
+      // 秒框留空就是 0 秒（见 `_secondsText`），合计 120 秒看提示行。
+      expect(await fieldText(tester, 'brew.totalTimeMin'), '2');
+      expect(await fieldText(tester, 'brew.totalTimeSec'), '');
+      expect(find.text('即 2:00'), findsOneWidget);
       // 方法跟着一起复制，摩卡壶专属字段因此出现。
       expect(find.text('摩卡壶'), findsWidgets);
       // 评分与备注不继承。
