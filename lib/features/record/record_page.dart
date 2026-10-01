@@ -596,39 +596,40 @@ class _ErrorView extends StatelessWidget {
   }
 }
 
-/// 研磨刻度（卡片第二行，M2.10）。
+/// 研磨刻度（卡片第二行，M2.10 / M3-T15）。
 ///
 /// 磨豆机之后**只给一个值**：相对刻度（`圈 × 每圈 click + click − 零点`）。
-/// 用记录里的**快照**算，所以后来改刻度或重新校准零点都不会改动历史记录的显示。
-/// 「每圈 click」缺失的存量旧机器没法换算，这时退回原始读数的写法。
+///
+/// 换算用的是这台磨豆机**现在**的校准（零点 / 每圈 click）——
+/// 记录里的 `圈 / click` 不变，改刻度后卡片上的数字会跟着变，
+/// 这样屏幕上的读数和机器上的实际刻度一致。磨豆机被删（或某个字段为空）
+/// 时回落到**记录里的快照**，老记录即使机器没了也还读得出来。
+/// 两处（卡片与表单提示）共用 [BrewLogFormPage.relativeClicks] 这一个规则。
+/// 「每圈 click」当前值与快照都取不到时，退回原始读数的写法。
 String _grindLabel(BrewLog log, Grinder? grinder) {
   final int? clicks = log.grindClicks;
 
-  if (grinder != null) {
-    final double? relative = Grinder.relativeClicksWith(
-      turns: log.grindSetting,
-      clicks: clicks,
-      clicksPerRevolution: log.grinderClicksPerRevolutionSnapshot,
-      zeroPoint: log.grinderZeroPointSnapshot,
-    );
-    if (relative != null) {
-      return '${grinder.brand} ${grinder.model} · '
-          '相对刻度 ${_formatNumber(relative)} click';
-    }
-    // 没有每圈 click（存量旧机器）：给原始读数，别瞎算。
-    final List<String> raw = <String>[
-      '${grinder.brand} ${grinder.model}',
-      if (log.grindSetting != null) '刻度 ${_formatNumber(log.grindSetting!)}',
-      if (clicks != null) '$clicks click',
-    ];
-    return raw.join(' · ');
+  final double? relative = BrewLogFormPage.relativeClicks(
+    turns: log.grindSetting,
+    clicks: clicks,
+    grinder: grinder,
+    zeroPointSnapshot: log.grinderZeroPointSnapshot,
+    clicksPerRevolutionSnapshot: log.grinderClicksPerRevolutionSnapshot,
+  );
+  if (relative != null) {
+    // 磨豆机已被删：没有名字可写，只给算出来的相对刻度。
+    final String prefix = grinder == null
+        ? ''
+        : '${grinder.brand} ${grinder.model} · ';
+    return '$prefix相对刻度 ${_formatNumber(relative)} click';
   }
 
-  final List<String> parts = <String>[];
-  if (log.grindSetting != null) {
-    parts.add('刻度 ${_formatNumber(log.grindSetting!)}');
-  }
-  if (clicks != null) parts.add('$clicks click');
+  // 没有每圈 click（存量旧机器，记录里也没有快照）：给原始读数，别瞎算。
+  final List<String> parts = <String>[
+    if (grinder != null) '${grinder.brand} ${grinder.model}',
+    if (log.grindSetting != null) '刻度 ${_formatNumber(log.grindSetting!)}',
+    if (clicks != null) '$clicks click',
+  ];
   return parts.isEmpty ? '未记录研磨刻度' : parts.join(' · ');
 }
 
