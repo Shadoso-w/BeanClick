@@ -358,6 +358,13 @@ void main() {
       expect(find.text('新增咖啡豆'), findsOneWidget);
       await fill(tester, 'bean.name', '花魁');
       await fill(tester, 'bean.origin', '埃塞俄比亚');
+      // M3-T31：新增豆子必须主动确认烘焙日期（表单不再预填「今天」）。
+      // `BeanClickApp` 锁 zh-CN，日历确认按钮是「确定」而不是 OK。
+      await tester.scrollTo(find.text('选择日期'));
+      await tester.tap(find.text('选择日期'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('确定'));
+      await tester.pumpAndSettle();
       await fill(tester, 'bean.remaining', '200');
       await fill(tester, 'bean.initial', '200');
       await tapSave(tester);
