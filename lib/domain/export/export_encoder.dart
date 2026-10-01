@@ -10,6 +10,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:beanclick/core/app_info.dart';
 import 'package:beanclick/domain/entities.dart';
 import 'package:beanclick/domain/enums.dart';
 
@@ -34,7 +35,7 @@ class ExportDocument {
     required this.grinders,
     required this.brewLogs,
     required this.recipes,
-    this.appVersion = '0.1.0',
+    this.appVersion = kAppVersion,
   });
 
   final DateTime exportedAt;

@@ -14,49 +14,21 @@
 /// 产物：`tool/design_preview/goldens/batch1_previews.png`
 library;
 
-import 'dart:io';
-import 'dart:typed_data';
-
-import 'package:beanclick/app.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show FontLoader;
 import 'package:flutter_test/flutter_test.dart';
 
-/// 预览用的字体。`flutter_test` 默认字体把**汉字和图标都渲染成方块**，
-/// 所以中文字体和 Material 图标字体都要显式加载。
-const String _cjkFontPath = r'C:\Windows\Fonts\Deng.ttf';
-const String _iconFontPath =
-    r'D:\devtools\flutter\bin\cache\artifacts\material_fonts\materialicons-regular.otf';
-const String _fontFamily = 'PreviewCJK';
-
-Future<void> _loadFontFile(String path, String family) async {
-  final File file = File(path);
-  if (!file.existsSync()) return;
-  final Uint8List bytes = file.readAsBytesSync();
-  final FontLoader loader = FontLoader(family)
-    ..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
-  await loader.load();
-}
-
-Future<void> _loadFonts() async {
-  await _loadFontFile(_cjkFontPath, _fontFamily);
-  // 图标字体家族名必须是 'MaterialIcons'，否则 Icon 找不到字形。
-  await _loadFontFile(_iconFontPath, 'MaterialIcons');
-}
+import 'preview_support.dart';
 
 void main() {
-  setUpAll(_loadFonts);
+  setUpAll(loadPreviewFonts);
 
   testWidgets('第一批 UI 改稿', (WidgetTester tester) async {
     // 画布要足够高，否则下半部分会被裁掉（golden 只截视口）。
-    tester.view.physicalSize = const Size(760, 5360);
+    tester.view.physicalSize = const Size(760, 12000);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
 
-    final ThemeData theme = buildAppTheme(Brightness.light).copyWith(
-      textTheme: buildAppTheme(Brightness.light).textTheme
-          .apply(fontFamily: _fontFamily),
-    );
+    final ThemeData theme = previewTheme(Brightness.light);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -67,8 +39,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 内容一旦高过**视口**，超出部分不会进图 —— golden 会**静默**变短
+    // （本项目踩过：M2.10 稿的「⑧ 记录卡片」整段消失而测试全绿）。
+    // 注意要跟真实视口高比，不能跟写死的画布常量比 —— 后者在画布被调小时
+    // 依然会通过，等于没守住。见 previewSheetKey 的说明。
+    expect(
+      tester.getSize(find.byKey(previewSheetKey)).height,
+      lessThanOrEqualTo(
+        tester.view.physicalSize.height / tester.view.devicePixelRatio,
+      ),
+      reason: '内容已超过画布高度，请抬高 physicalSize —— 否则 golden 会被静默裁掉',
+    );
+
     await expectLater(
-      find.byType(_MockSheet),
+      find.byKey(previewSheetKey),
       matchesGoldenFile('goldens/batch1_previews.png'),
     );
   });
@@ -87,6 +71,7 @@ class _MockSheet extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          key: previewSheetKey,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const _SectionTitle('① 记录卡片标题：[B2] 第一行「所有豆名 + 方法 chip」'),
