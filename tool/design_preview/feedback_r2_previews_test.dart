@@ -13,6 +13,15 @@
 /// 产物：
 /// - `tool/design_preview/goldens/feedback_r2_form.png`  —— 记录一杯（拼配填克数 / 总时间分秒 / 辅料行）
 /// - `tool/design_preview/goldens/feedback_r2_card.png`  —— 记录卡片（相对刻度按**当前**零点算）
+///
+/// ⚠️ 本文件依赖 `test/helpers/*`（`test_harness.dart` 的 `makeLog`、
+/// `widget_harness.dart` 的内存库与交互扩展）—— **改测试脚手架时这里要跟着改**。
+/// 依赖是单向的（`test/` 下没有任何文件 import `tool/`），且 `flutter test` 默认只收集
+/// `test/`，所以它不会被执行；但 `dart format` 与 `flutter analyze` 是**全仓**范围，会覆盖它。
+///
+/// ⚠️ 渲染真页面时**必须问一遍有没有挂钟/随机/网络依赖**：本稿第一版就是漏了
+/// 「新建表单的冲煮时间取 `DateTime.now()`」，导致那张 golden 烙上渲染当时的那一分钟、
+/// 换时间重跑必红（由 PG 门抓到）。修法是给页面加 `initialBrewedAt` 注入缝。
 library;
 
 import 'package:beanclick/data/providers.dart';
@@ -98,7 +107,13 @@ void main() {
                     // （fillField 会让输入框获焦并自动滚动），你反馈的那两处
                     // ——方法行与辅料行——就会被滚出画面、静默不在图里。
                     height: 2400,
-                    child: BrewLogFormPage(existing: null),
+                    // **冲煮时间必须注入固定值**：表单新建时默认取 `DateTime.now()`，
+                    // 不注入的话这张 golden 会烙上"渲染当时的那一分钟"，
+                    // 换个时间重跑必然报红（PG 门正是这么抓到的）。
+                    child: BrewLogFormPage(
+                      existing: null,
+                      initialBrewedAt: DateTime(2026, 1, 1, 13, 22),
+                    ),
                   ),
                 ],
               ),

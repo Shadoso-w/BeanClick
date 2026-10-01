@@ -18,13 +18,25 @@ import '../beans/grinder_form_page.dart';
 /// - 记录页 FAB 走「复制上次」：把最近一条的参数预填，但**不带评分与备注**，
 ///   因为这是一杯新的咖啡，需要重新评价。
 class BrewLogFormPage extends ConsumerStatefulWidget {
-  const BrewLogFormPage({super.key, this.existing, this.prefill});
+  const BrewLogFormPage({
+    super.key,
+    this.existing,
+    this.prefill,
+    this.initialBrewedAt,
+  });
 
   /// 编辑已有记录。
   final BrewLog? existing;
 
   /// 新增时的预填数据（通常是「上次」的参数）。
   final BrewLog? prefill;
+
+  /// 新增时的「冲煮时间」初始值（不传就是打开表单的那一刻）。
+  ///
+  /// 存在的理由只有一个：**让渲染稿/golden 可复现**。
+  /// 不注入时新建表单的时间来自 `DateTime.now()`，于是每次渲染出的日期/时间文本
+  /// 都不一样 —— 截图比对必然失败（生产代码不受影响，行为与 `DateTime.now()` 完全一致）。
+  final DateTime? initialBrewedAt;
 
   /// 打开表单。返回 `true` 表示已保存或删除。
   static Future<bool> show(
@@ -185,7 +197,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   /// 只影响「选完日期要不要顺手弹时间」这一个行为，见 [_onBrewedDatePicked]。
   bool _timeConfirmed = false;
   bool? _preheatUpperChamber;
-  DateTime _brewedAt = DateTime.now();
+
+  /// 新建时的「冲煮时间」：优先用注入值（渲染稿要可复现），否则就是打开表单的那一刻。
+  ///
+  /// 用 `late` 才能读 `widget`；[initState] 里还会按「编辑既有记录」再赋一次。
+  late DateTime _brewedAt = widget.initialBrewedAt ?? DateTime.now();
   bool _advancedExpanded = false;
   bool _showAllMethods = false;
   bool _saving = false;
@@ -254,7 +270,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     _isBest = widget.existing?.isBest ?? false;
     _isFavorite = widget.existing?.isFavorite ?? false;
     _preheatUpperChamber = source?.preheatUpperChamber;
-    _brewedAt = widget.existing?.brewedAt ?? DateTime.now();
+    _brewedAt =
+        widget.existing?.brewedAt ??
+        // 渲染稿注入的固定值；不传时就是打开表单的这一刻（行为与改前一致）。
+        widget.initialBrewedAt ??
+        DateTime.now();
     // 编辑旧记录时，时分就是它当时真实的时间，不需要再确认一次。
     _timeConfirmed = widget.existing != null;
 
