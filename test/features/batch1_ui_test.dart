@@ -268,6 +268,13 @@ void main() {
         greaterThanOrEqualTo(80),
         reason: '数量框至少要放得下 1000：amount=$amountSize',
       );
+      // 单位框不能为了给数量框腾地方而挤到放不下单位文字 + 下拉箭头：
+      // 72dp 时 `ml` 会被截成 `m`（渲染稿抓到过这个回归），所以下限锁在 84。
+      expect(
+        unitSize.width,
+        greaterThanOrEqualTo(84),
+        reason: '单位框放不下「单位文字 + 下拉箭头」时会被截断：unit=$unitSize',
+      );
 
       // 四位数要完整显示，不能换行或被截断。
       await tester.fillField('brew.addInAmount.0', '1000');

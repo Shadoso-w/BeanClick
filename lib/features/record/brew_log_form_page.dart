@@ -1394,8 +1394,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
           // 单位：ml / g / 泵 / 份。
           // 外面套 SizedBox 给个确定宽度：InputDecorator 在无界宽度下会断言失败；
           // 高度与装饰和左边的名称框完全一致，边框才对得齐。
+          //
+          // 宽度 84 而不是更窄：DropdownButton 还要占掉右侧的箭头（约 24dp），
+          // 72dp 时 `ml` 会被截成 `m`（渲染稿抓到的回归），84dp 才放得下单位文字 + 箭头。
           SizedBox(
-            width: 72,
+            width: 84,
             height: _addInBoxHeight,
             child: InputDecorator(
               decoration: _addInBoxDecoration,
