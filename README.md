@@ -10,7 +10,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%207%2B-3DDC84?logo=android)](https://developer.android.com)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-> 当前状态：**0.2.0**（= M0–M2.11，schema v7，297 个测试）。内测 APK 见 [Releases](https://github.com/Shadoso-w/BeanClick/releases) 与 [RELEASING.md](RELEASING.md)。
+> 当前状态：**0.2.0**（= M0–M2.11，schema v7）。`flutter test` 实测 **299 通过**（2026-10-01，退出码 0）。内测 APK 见 [Releases](https://github.com/Shadoso-w/BeanClick/releases) 与 [RELEASING.md](RELEASING.md)。
 
 ---
 
