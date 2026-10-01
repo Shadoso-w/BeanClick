@@ -3,10 +3,13 @@
 /// 一条记录可以关联**多支豆子**（拼配），每支豆子与各自粉量存在
 /// `brew_log_beans` 表里；`brew_logs.beanId` 只是主豆的冗余字段。
 ///
-/// 这里承载手册 §6.2 的「余量自动扣减」规则，按**每支豆子各自的粉量**扣：
+/// 这里承载手册 §6.2 的「余量自动扣减」规则，按**每支豆子各自的粉量**扣，
+/// 且扣减与回补都落到**当初那一袋**（同一支豆子有多袋时不会互相漂）；
+/// 例外：v4 之前 `batchId` 为 NULL 的历史记录**没有**「当初那一袋」，
+/// 只能按 `adjustStock` 的自动挑批次回落（见 `_doseByBatch`）：
 /// - 新建记录 → 各支豆子按各自粉量扣减
-/// - 编辑记录 → 按各支豆子的粉量差值补扣；换豆则旧豆回补、新豆扣减
-/// - 删除记录 → **不回补**（避免历史余量漂移）
+/// - 编辑记录 → 按「每支豆子 + 那一袋」的粉量差值补扣；换豆或换袋则旧袋整袋回补、新袋扣减
+/// - 删除记录 → 按各支豆子当时的粉量退回**原批次**（批次已被删则退回自动挑到的那一袋）
 ///
 /// 规则实现在事务里，便于单元测试。
 library;
@@ -180,38 +183,11 @@ class BrewLogRepository {
       await _replaceAddIns(existingId, log.addIns);
 
       if (autoDeductStock) {
-        // 按 beanId 聚合；被删除的豆子（beanId 为空）不参与扣减。
-        final previousByBean = <int, double>{};
-        for (final u in previous) {
-          final id = u.beanId;
-          if (id != null) previousByBean[id] = u.doseGrams;
-        }
-        final currentByBean = <int, double>{};
-        for (final u in usages) {
-          final id = u.beanId;
-          if (id != null) currentByBean[id] = u.doseGrams;
-        }
-
-        // 回补被移除或减量的豆子。
-        for (final entry in previousByBean.entries) {
-          final now = currentByBean[entry.key] ?? 0;
-          final delta = now - entry.value; // 负数 = 回补
-          if (delta == 0) continue;
-          adjustments.add(await _beans.adjustStock(entry.key, delta));
-        }
-        // 扣减新增或加量的豆子。
-        for (final entry in currentByBean.entries) {
-          if (previousByBean.containsKey(entry.key)) continue;
-          if (entry.value == 0) continue;
-          final usage = usages.firstWhere((u) => u.beanId == entry.key);
-          adjustments.add(
-            await _beans.adjustStock(
-              entry.key,
-              entry.value,
-              batchId: usage.batchId,
-            ),
-          );
-        }
+        // 按「豆子 + 那一袋」算差值：回补才会落到当初扣的那一袋，
+        // 而不是 `adjustStock` 自动挑到的另一袋（详见 _applyDoseDiff）。
+        adjustments.addAll(
+          await _applyDoseDiff(_doseByBatch(previous), _doseByBatch(usages)),
+        );
       }
 
       return SaveBrewLogResult(
@@ -278,6 +254,68 @@ class BrewLogRepository {
       _db.select(_db.brewLogs)..orderBy([
         (t) => OrderingTerm(expression: t.brewedAt, mode: OrderingMode.desc),
       ]);
+
+  /// 把用量按「豆子 + 那一袋」聚合成克数，供编辑路径算差值。
+  ///
+  /// 为什么键要带上 `batchId`：余量记在批次上，编辑时若只按 `beanId` 算差值，
+  /// 回补就只能交给 `adjustStock` 自动挑批次，同一支豆子有第二袋时会补错袋。
+  /// 同一键出现多行时**求和**（与新建路径「每行各扣一次」一致）。
+  ///
+  /// 键里的 `batchId` 可以是 null：v4 之前的记录没有批次信息，
+  /// 那时 `adjustStock` 仍走自动挑批次，历史数据的行为保持不变。
+  /// `beanId` 为空的行（豆子已被删除）不参与扣减，直接跳过。
+  Map<(int, int?), double> _doseByBatch(List<BeanUsage> usages) {
+    final byBatch = <(int, int?), double>{};
+    for (final usage in usages) {
+      final int? beanId = usage.beanId;
+      if (beanId == null) continue;
+      final key = (beanId, usage.batchId);
+      byBatch[key] = (byBatch[key] ?? 0) + usage.doseGrams;
+    }
+    return byBatch;
+  }
+
+  /// 编辑记录时，按「豆子 + 那一袋」的粉量差值调整余量。
+  ///
+  /// 为什么必须带批次：余量记在批次上。若只按 `beanId` 算差值就把 `delta`
+  /// 交给 `adjustStock`，负数（回补）会走它的「自动挑批次」分支
+  /// ——挑到的是「有余量 + 烘焙日期最新」的那一袋，同一支豆子有第二袋时
+  /// 余量就补到**另一袋**上了。新建路径一直是带 batchId 扣的，这里与它对齐：
+  /// 扣了哪一袋，就还哪一袋。
+  ///
+  /// 两轮顺序沿用旧实现，但**不是**「先做完所有回补、再统一扣减」：
+  /// 第一轮遍历 **`previous` 的键** —— 两边都有就按差值调整（负 = 回补、正 = 补扣），
+  /// 只在 `previous` 里的键整额回补；第二轮才处理**只在 `current` 里的键**（整额扣减）。
+  ///
+  /// 返回本次产生的调整，供调用方记录与提示（余量不足 / 换了批次）。
+  Future<List<AdjustStockResult>> _applyDoseDiff(
+    Map<(int, int?), double> previous,
+    Map<(int, int?), double> current,
+  ) async {
+    final adjustments = <AdjustStockResult>[];
+
+    // 回补被移除或减量的（换批次时旧批次整袋退回）。
+    for (final entry in previous.entries) {
+      final now = current[entry.key] ?? 0;
+      final delta = now - entry.value; // 负数 = 回补
+      if (delta == 0) continue;
+      final (beanId, batchId) = entry.key;
+      adjustments.add(
+        await _beans.adjustStock(beanId, delta, batchId: batchId),
+      );
+    }
+    // 扣减新增或加量的豆子。
+    for (final entry in current.entries) {
+      if (previous.containsKey(entry.key)) continue;
+      if (entry.value == 0) continue;
+      final (beanId, batchId) = entry.key;
+      adjustments.add(
+        await _beans.adjustStock(beanId, entry.value, batchId: batchId),
+      );
+    }
+
+    return adjustments;
+  }
 
   /// 规范化豆子用量：丢掉没有 beanId 的行、按 position 排序、重排 position。
   ///

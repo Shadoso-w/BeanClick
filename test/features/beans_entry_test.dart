@@ -1,5 +1,7 @@
 import 'package:beanclick/app.dart';
 import 'package:beanclick/core/icons.dart';
+import 'package:beanclick/data/providers.dart';
+import 'package:beanclick/domain/entities.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -98,13 +100,30 @@ void main() {
     await tester.enterText(nameField, '曼特宁');
     await tester.pump();
 
+    // M3-T31：新增豆子必须主动确认烘焙日期、填剩余克数，否则保存被拦下。
+    // `BeanClickApp` 锁 zh-CN，日历确认按钮是「确定」而不是 OK。
+    await tester.scrollTo(find.text('选择日期'));
+    await tester.tap(find.text('选择日期'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('确定'));
+    await tester.pumpAndSettle();
+    await tester.fillField('bean.remaining', '200');
+
     final Finder save = find.widgetWithText(FilledButton, '保存');
     await tester.ensureVisible(save);
     await tester.pumpAndSettle();
     await tester.tap(save);
     await tester.pumpAndSettle();
 
-    expect(find.text('曼特宁'), findsOneWidget);
+    // 断言必须落库、且表单已关掉。
+    // `find.text` 会连 `EditableText.controller.text` 一起匹配：表单没关时，
+    // 它命中的是那个**没提交**的名称输入框——这正是这条用例以前假绿的原因。
+    expect(find.text('新增咖啡豆'), findsNothing, reason: '保存成功才会关掉表单');
+    final List<CoffeeBean> beans = await harness.container
+        .read(beanRepositoryProvider)
+        .getAll();
+    expect(beans.single.name, '曼特宁');
+    expect(find.text('曼特宁'), findsOneWidget, reason: '列表里应出现新豆子');
 
     await harness.finish(tester);
   });

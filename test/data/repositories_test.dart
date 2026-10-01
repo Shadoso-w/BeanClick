@@ -471,6 +471,177 @@ void main() {
   });
 
   // -------------------------------------------------------------------------
+  // 编辑路径的余量回补要落到原批次（M3-T23）
+  //
+  // 边界用例通常放 design_decisions_test，但这三条例外：M3-T23 的卡把写作用域
+  // 限定在本文件，所以留在这里，避免与卡外文件互相污染。
+  // -------------------------------------------------------------------------
+  group('BrewLogRepository：扣减与回补的批次归属', () {
+    test('同豆两袋：编辑改小粉量，回补落在原来那一袋', () async {
+      final a = await harness.addBeanWithBatch(
+        name: '花魁',
+        roastDate: DateTime(2026, 1, 1),
+        remainingGrams: 200,
+      );
+      // 同一支豆子的第二袋，烘焙日期更新 → 「自动挑批次」会挑到它。
+      final newerBatchId = await harness.beans.saveBatch(
+        makeBatch(
+          beanId: a.beanId,
+          roastDate: DateTime(2026, 3, 1),
+          remainingGrams: 100,
+        ),
+      );
+
+      final int logId = (await harness.logs.save(
+        makeLog(beanId: a.beanId, batchId: a.batchId, doseGrams: 15),
+      )).brewLogId;
+      expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 185);
+      expect((await harness.beans.getBatch(newerBatchId))!.remainingGrams, 100);
+
+      // 15g → 10g：应回补 5g 到当初扣的那一袋。
+      final saved = await harness.logs.getById(logId);
+      final result = await harness.logs.save(
+        saved!.copyWith(
+          beanUsages: <BeanUsage>[
+            BeanUsage(beanId: a.beanId, batchId: a.batchId, doseGrams: 10),
+          ],
+        ),
+      );
+
+      expect(
+        result.stockAdjustments.single.batchId,
+        a.batchId,
+        reason: '回补要记在原来那一袋上',
+      );
+      expect(
+        (await harness.beans.getBatch(a.batchId))!.remainingGrams,
+        190,
+        reason: '回补的 5g 应落在 A 袋',
+      );
+      expect(
+        (await harness.beans.getBatch(newerBatchId))!.remainingGrams,
+        100,
+        reason: 'B 袋不该被回补（缺陷：改前会漂到烘焙日期更新的这一袋）',
+      );
+    });
+
+    test('新建记录：仍按指定的那一袋扣，不因另一袋更新而漂移', () async {
+      final a = await harness.addBeanWithBatch(
+        name: '花魁',
+        roastDate: DateTime(2026, 1, 1),
+        remainingGrams: 200,
+      );
+      final newerBatchId = await harness.beans.saveBatch(
+        makeBatch(
+          beanId: a.beanId,
+          roastDate: DateTime(2026, 3, 1),
+          remainingGrams: 100,
+        ),
+      );
+
+      final result = await harness.logs.save(
+        makeLog(beanId: a.beanId, batchId: a.batchId, doseGrams: 15),
+      );
+
+      expect(result.stockAdjustments.single.batchId, a.batchId);
+      expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 185);
+      expect((await harness.beans.getBatch(newerBatchId))!.remainingGrams, 100);
+    });
+
+    test('历史数据没有 batchId：编辑时保持「自动挑批次」不退化', () async {
+      final a = await harness.addBeanWithBatch(
+        name: '花魁',
+        roastDate: DateTime(2026, 1, 1),
+        remainingGrams: 200,
+      );
+
+      // 模拟旧数据：用量行不带批次，扣减与回补都只能靠自动挑批次。
+      final int logId = (await harness.logs.save(
+        makeLog(beanId: a.beanId, doseGrams: 15),
+      )).brewLogId;
+      expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 185);
+
+      final saved = await harness.logs.getById(logId);
+      expect(
+        saved!.beanUsages.single.batchId,
+        isNull,
+        reason: '确认夹具确实是「没有批次」的旧数据',
+      );
+
+      final result = await harness.logs.save(
+        saved.copyWith(
+          beanUsages: <BeanUsage>[BeanUsage(beanId: a.beanId, doseGrams: 10)],
+        ),
+      );
+
+      expect(result.stockAdjustments.single.batchId, a.batchId);
+      expect(
+        (await harness.beans.getBatch(a.batchId))!.remainingGrams,
+        190,
+        reason: '没有批次的历史数据仍按自动挑到的批次回补',
+      );
+    });
+
+    test('同一袋出现两行用量：编辑后的净变化按两行之和算', () async {
+      final a = await harness.addBeanWithBatch(name: '花魁', remainingGrams: 200);
+
+      // 「同一支豆子 + 同一袋」出现两行，正常 UI 造不出来：表单是按选中的
+      // 豆子各出一行（`_usagesFromPicks`）。这里直接构造用量行，钉住
+      // `_doseByBatch` 的**求和**语义：旧实现是「后者覆盖」，编辑时会把
+      // 10 + 5 当成 5，算出 +3（扣成 182），与新建路径「逐行各扣一次」矛盾；
+      // 求和则应回补 3g，落到 188。
+      final int logId = (await harness.logs.save(
+        makeLog(
+          doseGrams: 15,
+          beanUsages: <BeanUsage>[
+            BeanUsage(
+              beanId: a.beanId,
+              batchId: a.batchId,
+              doseGrams: 10,
+              position: 0,
+            ),
+            BeanUsage(
+              beanId: a.beanId,
+              batchId: a.batchId,
+              doseGrams: 5,
+              position: 1,
+            ),
+          ],
+        ),
+      )).brewLogId;
+      // 新建路径逐行扣：10 + 5 = 15。
+      expect((await harness.beans.getBatch(a.batchId))!.remainingGrams, 185);
+
+      final BrewLog saved = (await harness.logs.getById(logId))!;
+      final SaveBrewLogResult result = await harness.logs.save(
+        saved.copyWith(
+          beanUsages: <BeanUsage>[
+            BeanUsage(
+              beanId: a.beanId,
+              batchId: a.batchId,
+              doseGrams: 4,
+              position: 0,
+            ),
+            BeanUsage(
+              beanId: a.beanId,
+              batchId: a.batchId,
+              doseGrams: 8,
+              position: 1,
+            ),
+          ],
+        ),
+      );
+
+      expect(result.stockAdjustments.single.requested, -3);
+      expect(
+        (await harness.beans.getBatch(a.batchId))!.remainingGrams,
+        188,
+        reason: '净变化 = (4 + 8) - (10 + 5) = -3，与新建路径的逐行扣减一致',
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // 设置项
   // -------------------------------------------------------------------------
   group('SettingsRepository —— 手册 §6.3', () {

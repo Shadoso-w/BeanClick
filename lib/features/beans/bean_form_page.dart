@@ -12,6 +12,13 @@ import '../../domain/enums.dart';
 import '../../domain/extra_attributes.dart';
 import 'batch_form_page.dart';
 
+/// 「第一袋」两个必填项的**行内**错误文案。
+///
+/// 与 `_save()` 里那条可见提示（`_firstBatchHint`）用词不同：同一个字段在
+/// 同一屏上不会出现两个文案相同的 `Text`（M3-T31）。
+const String _roastDateRequiredMessage = '请填写烘焙日期';
+const String _remainingRequiredMessage = '请填写剩余克数';
+
 /// 咖啡豆新增 / 编辑表单。
 ///
 /// 表单分三块：
@@ -82,11 +89,16 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     _processes.addAll(bean?.processes ?? const <ProcessMethod>[]);
     _isFavorite = bean?.isFavorite ?? false;
 
-    // 首个批次默认值：刚买回来通常是满袋。
-    _remaining = TextEditingController(text: '200');
-    _initial = TextEditingController(text: '200');
+    // 首个批次：**三项都不预填**（M3-T31）。
+    // 「必填」= 必须主动确认：一打开就带着「今天 / 200 g」，用户什么都不选
+    // 也能存下一袋没确认过的库存，等于必填形同虚设。
+    _remaining = TextEditingController();
+    // 购入总重是**选填**，但同样不预填：那个没人填过的 200 会反过来把
+    // 「剩余克数不能大于购入总重」这条校验套在真实袋重上（250 g 的袋子
+    // 会被一个用户从没输入过的数字拦住）。留空即不参与该校验。
+    _initial = TextEditingController();
     _price = TextEditingController();
-    _roastDate = DateTime.now();
+    _roastDate = null;
     _roastLevel = RoastLevel.medium;
 
     _loadExtras();
@@ -126,8 +138,44 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     super.dispose();
   }
 
+  /// 新增豆子时，「第一袋」缺项的**可见提示**（保存路径用）。
+  ///
+  /// 两个各自独立成立的坑：
+  /// - 表单是 `ListView`，**视口外的控件根本不会被构建** → 那一段的 `FormField`
+  ///   可能压根没注册进 `Form`，`validate()` 会直接放行（同一事实见
+  ///   `test/helpers/widget_harness.dart` 的文件头与「为什么不能只用
+  ///   `scrollUntilVisible`」一节）；
+  /// - 即便那一段落在 `cacheExtent` 内被构建过、`validate()` 也确实返回 false，
+  ///   行内错误也渲染在视口外 —— 用户点「保存」之后**屏幕上什么都不动**。
+  ///
+  /// 所以这条兜底**不看 `validate()` 的结果**，直接读 `_roastDate` 与
+  /// `_remaining` 控制器。文案与行内（[_roastDateRequiredMessage] /
+  /// [_remainingRequiredMessage]）故意不同：同屏时不会有两处渲染同一个 `Text`。
+  String? _firstBatchHint() {
+    if (_isEditing) return null;
+    final bool noDate = _roastDate == null;
+    final bool noGrams = parseNumber(_remaining.text) == null;
+    if (noDate && noGrams) return '请先填写第一袋的烘焙日期与剩余克数';
+    if (noDate) return '请先填写第一袋的烘焙日期';
+    if (noGrams) return '请先填写第一袋的剩余克数';
+    return null;
+  }
+
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final bool formValid = _formKey.currentState?.validate() ?? false;
+
+    // **不依赖 `validate()` 结果**的兜底（照 T22 在冲煮表单里的做法）：
+    // 「第一袋」在视口外时它的 `FormField` 可能没注册进 `Form`（`ListView`
+    // 不构建视口外的控件）→ `validate()` 返回 true 并放行，等于把「日期 /
+    // 余量都没确认」静默存成「日期为空、余量 0 g」。所以这里直接读实例状态；
+    // `validate()` 只负责在该段可见时把行内错误照常渲染出来。
+    final String? firstBatchHint = _firstBatchHint();
+    if (firstBatchHint != null) {
+      _showMessage(firstBatchHint);
+      return;
+    }
+
+    if (!formValid) return;
     setState(() => _saving = true);
 
     final DateTime now = DateTime.now();
@@ -422,7 +470,8 @@ class _FirstBatchSection extends StatelessWidget {
           // 避免 FormField 只在 initState 认一次 `initialValue` 导致读旧值。
           child: FormField<DateTime?>(
             initialValue: roastDate,
-            validator: (DateTime? value) => value == null ? '请填写烘焙日期' : null,
+            validator: (DateTime? value) =>
+                value == null ? _roastDateRequiredMessage : null,
             builder: (FormFieldState<DateTime?> field) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,7 +528,7 @@ class _FirstBatchSection extends StatelessWidget {
             onChanged: (_) => onNumberChanged(),
             validator: (String? value) {
               final double? r = parseNumber(value);
-              if (r == null) return '请填写剩余克数';
+              if (r == null) return _remainingRequiredMessage;
               final double? i = parseNumber(initial.text);
               if (i != null && r > i) {
                 return '剩余克数不能大于购入总重（${formatNumber(i)} g）';

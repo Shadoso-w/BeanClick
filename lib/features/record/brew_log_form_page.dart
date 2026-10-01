@@ -415,7 +415,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
               : '已保存，但这支豆子余量不足，已扣至 0',
         );
       } else if (result.hasBatchFallback) {
-        _showMessage('已保存。原来那一袋批次已不在，余量扣到了别的批次上');
+        _showMessage('已保存。原来那一袋批次已不在，余量算到了别的批次上');
       }
       Navigator.of(context).pop(true);
     } catch (error) {
@@ -1749,8 +1749,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
   Widget _buildBeanRow(List<CoffeeBean> beans, int index) {
     final _BeanPick pick = _picks[index];
-    // 同一支豆子不能在一条记录里选两次（仓储按 beanId 汇总差值，重复会算错），
-    // 所以别的行已经选过的豆子不在这一行的候选里。
+    // 同一支豆子不能在一条记录里选两次：仓储按 `(beanId, batchId)` 汇总差值，
+    // 同豆同袋出现两行会被和算成一条。所以别的行已经选过的豆子不在这一行的候选里。
     final Set<int> takenElsewhere = <int>{
       for (int i = 0; i < _picks.length; i++)
         if (i != index && _picks[i].beanId != null) _picks[i].beanId!,
