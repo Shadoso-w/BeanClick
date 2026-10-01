@@ -5,9 +5,9 @@
 >
 > | 项 | 值 |
 > |---|---|
-> | 最后更新 | 2026-10-01（第二批：用户反馈修复 T12–T25 全部落盘；**G6 已过（343）、PG 门已过（可推送）**，待推送） |
+> | 最后更新 | 2026-10-01（第二批用户反馈修复已合并：`844b127` / PR #7 / merge `4b05f0d`） |
 > | 更新人 | `lead` |
-> | 当前里程碑 | **M3 Android 内测**（第一批文档 3 张卡 + 第二批反馈修复 10 张卡均已 `done`） |
+> | 当前里程碑 | **M3 Android 内测**（第一批文档 3 张卡 + 第二批反馈修复 10 张卡均已 `done` 并合并进 `main`） |
 > | 已发布 | `v0.2.0`（= M0–M2.11，schema v7） |
 > | 回归基线 | ✅ **已实测（2026-10-01）**：`flutter test` = **299 通过 / 退出码 0**；`flutter analyze` = `No issues found!` / 退出码 0；`dart format --output=none --set-exit-if-changed .` = 0 处改动 / 退出码 0。Flutter 3.47.5 · Dart 3.13.4 |
 > | 工作分支 | `feat/m3-intake`（worktree = `<工程根目录的父目录>\BeanClick-m3-intake`）；`4ec919c` → T00 `2b6a4f8` → T01 `5653d20` → T10 `0a8bdc5` → T10 返工 `e47d08b` |
@@ -405,3 +405,4 @@ flowchart LR
 | 2026-10-01 | `impl-*` / `verifier` / `guardian` | **T20–T25 收口**：T20 修 F1 回归（0 秒往返）+ F4 loading 收紧 + F3 补覆盖（327）；T21 修 `entities.dart` 旧注释 + 删死方法；T22 处置 **G5 阻断 B1**（上下限只对改动过的值生效、分上限 59→60 让 3600 可达、`_save()` 补不依赖控件的兜底、S2/S3）→ 337；**第二次 G6 `DONE`**（337 复现两次、新增用例双路径闭合 `T20+4 / T21+0 / T22+11 = +15`、逐文件净 Δ 全 ≥0、零 schema 改动）；**第二次 G4 `DONE_WITH_CONCERNS`**（证明"原值放行"没架空上下限、新建仍校验、严格数值相等不放大；但发现 **F2 拼配路径漏了同一豁免** → 旧 120 g 拼配记录改个备注都存不下去、**F1 每支范围只在行内**）→ 立 T25 |
 | 2026-10-01 | `impl-ui`（临时） | **T25 `DONE`**：拼配补齐与单支**同一套**「原值放行」（总分对 `brew_logs.doseGrams`、每支对 `brew_log_beans.doseGrams`），每支 0.1–100 g 收进保存兜底并与行内**收敛到同一入口** `_gramsRangeError`（同口径由结构保证）→ 全量 **343**。它自查纠了一个假绿（首版 RED 用 `logs().single` 读到 seed 行） |
 | 2026-10-01 | `lead` | 修 G4 的 F4（`docs/M2.10-研磨刻度设计稿.md` 仍引用已删除的 `Grinder.relativeClicks`）→ 补一段"落地补充"，说明现由 `relativeClicksWith` + `BrewLogFormPage.relativeClicks` 承担、且**零点取值口径已从"记录快照"改为"当前值优先"**；立 **T23**（预存在的回补不带 batchId）与 **T24**（harness 覆盖跨测试泄漏，会静默串味）|
+| 2026-10-01 | `lead` | **第二批合并进 `main`**：`844b127`（16 文件、+2405/−225）→ PR #7 → merge `4b05f0d`；CI 两个 job 全绿。提交前做过锚点对账：`verifier` 给的 16 个 SHA256 中 **15 个与提交树逐字节一致**，唯一不同的是 `PROGRESS.md`（PG 门要求我填死 G6 终值、补门禁状态与 T26/T27 卡）→ 代码与测试就是它验的那份 |
