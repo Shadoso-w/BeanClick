@@ -10,12 +10,15 @@
 > | 当前里程碑 | **M3 Android 内测**（首批 3 张卡已 `done`，等 G7/PG 与推送） |
 > | 已发布 | `v0.2.0`（= M0–M2.11，schema v7） |
 > | 回归基线 | ✅ **已实测（2026-10-01）**：`flutter test` = **299 通过 / 退出码 0**；`flutter analyze` = `No issues found!` / 退出码 0；`dart format --output=none --set-exit-if-changed .` = 0 处改动 / 退出码 0。Flutter 3.47.5 · Dart 3.13.4 |
-> | 工作分支 | `feat/m3-intake`（worktree = `<工程根目录上级>\BeanClick-m3-intake`）；`4ec919c` → T00 `2b6a4f8` → T01 `5653d20` → T10 `0a8bdc5` → T10 返工 `e47d08b` |
+> | 工作分支 | `feat/m3-intake`（worktree = `<工程根目录的父目录>\BeanClick-m3-intake`）；`4ec919c` → T00 `2b6a4f8` → T01 `5653d20` → T10 `0a8bdc5` → T10 返工 `e47d08b` |
 > | 主分支 | `main` 干净；`docs/agent-teams/` 已由 **M3-T00** 纳入版本控制 |
 >
 > > ✅ **测试数三处不一致已收口**（2026-10-01，M3-T01）：`README.md` 与
 > > `docs/DEVELOPMENT.md` §11 都已改为**实测 299**。此前 README 记 297、DEVELOPMENT 记 292
 > > —— 那次不一致本身就是"基线必须实测"的活证据，已写进 DEVELOPMENT §11 当教训。
+>
+> ⚠️ **本文件是团队内部开发台账**：随每次迭代更新，其中的数字（测试数、包体、行号）会随时间失效。
+> **判断代码行为一律以代码与实跑输出为准**，本文件的数字不构成对外承诺。
 >
 > **记账规则**：只有**真实发生过**的事才能标 `done`；预估、计划、口头承诺一律留在 `todo`。
 > 状态词只用七个：`todo` / `in_progress` / `spec_review` / `code_review` / `blocked` / `done` / `dropped`。
@@ -77,7 +80,7 @@ flowchart LR
 
 ## 2. M3 任务 DAG
 
-> ⚠️ **本节是候选拆分草案，全部为 `todo`，尚未派单。**
+> 首批 T00/T01/T10 已 `done`（见 §3）；T02–T09 与 T11 仍是候选，`todo`，由 Lead 显式派单。
 > Lead 在 G0/G1 澄清后重排依赖，再逐张派单。
 
 ```mermaid
@@ -110,7 +113,9 @@ flowchart TD
     T11["M3-T11 文档一致性收尾<br/>todo 非阻塞"] -.-> M5
 
     classDef todo fill:#eceff1,stroke:#90a4ae,color:#37474f
-    class T01,T02,T03,T04,T05,T06,T07,T08,T09,T10,M5 todo
+    classDef done fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
+    class T00,T01,T10 done
+    class T02,T03,T04,T05,T06,T07,T08,T09,T11,M5 todo
 ```
 
 ---
@@ -157,11 +162,11 @@ flowchart TD
 ```mermaid
 flowchart LR
     subgraph LEAD["lead"]
-        L1["拆卡与派单<br/>todo"]
-        L2["落盘 PROGRESS.md<br/>todo"]
+        L1["拆卡与派单<br/>done"]
+        L2["落盘 PROGRESS.md<br/>in_progress"]
     end
     subgraph VER["verifier"]
-        V1["M3-T01 基线收口<br/>todo"]
+        V1["M3-T01 基线收口<br/>done"]
         V2["M3-T02 冷启动口径<br/>todo"]
     end
     subgraph IMPL["impl-data / impl-test"]
@@ -214,9 +219,9 @@ flowchart LR
     classDef todo fill:#eceff1,stroke:#90a4ae,color:#37474f
     classDef doing fill:#e3f2fd,stroke:#1976d2,color:#0d47a1
     classDef done fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20
-    class G0 doing
-    class G1,G2,G3,G4,G5,G6 done
-    class G7,DG,MG,PG doing
+    class G0,G3,G7 doing
+    class G1,G2,G4,G5,G6 done
+    class DG,MG,PG todo
 ```
 
 **本批特区门预判**：
@@ -289,16 +294,16 @@ flowchart LR
 | # | 位置 | 问题 | 为什么危险 | 建议动作 |
 |---|---|---|---|---|
 | 1 | `README.md` 状态行 / `docs/DEVELOPMENT.md` §11 | 测试数记 297 / 292，实测是 **299** | 照抄当基线 → 基线是错的，"没退化"结论失效 | ✅ **已修**（M3-T01 `5653d20`） |
-| 2 | `docs/添加新属性指南.md` §2.2（:102） | 示例 `int get schemaVersion => 5; // 从 4 递增` 已过期（当前 **7**） | 🔴 **比原来写的严重**：`guardian` 追了 drift 2.35.0 源码——写小 → drift 认为发生了升级 → 把 `PRAGMA user_version` **静默降回**旧值（不报错）→ 修好后重新发版时 `from` = 那个旧值 → 迁移段对已存在的列再跑 `addColumn` → `duplicate column name` → **库打不开、App 起不来**。盘上数据大概率还在，但用户打不开 | 删掉具体数字 + 补"禁止把版本号写小"的后果说明（措辞见下方「裁决文本」） |
-| 3 | `docs/添加新属性指南.md` §7 检查清单（:304-316）；`CONTRIBUTING.md` :66-75 同类 | 漏项**不止一条**：缺 ③`build_runner` 重新生成、⑤补「旧库升上来」夹具、⑦真机覆盖安装验证。`M1-DATA-MODEL.md` :229-232 反而是唯一写全了的 | 漏夹具会被守门用例点名（代价=返工一轮）；漏真机验证才有数据风险，但那一步被 MG 第⑦步与 T08 兜着 | 两份清单都补上三条勾选项 |
-| 4 | `docs/添加新属性指南.md` §2.2（:118）↔ `docs/DEVELOPMENT.md` §7.4（:221） | 前者"改类型/改主键必须建新表→搬数据→删旧表"且**全篇不提外键级联**；后者"**一律**用 addColumn/dropColumn 不重建表" | 🔴 唯一裁决住在 [`手册 §7.3`](AgentTeams-开发手册.md) 第 6 条，而**迁移卡的输入清单**（`任务卡模板.md`:116）给实现者的是"指南 §2 + DEVELOPMENT §7.4"——**正好是相互冲突的那两份**，裁决不在他的输入里。一旦有人按指南做 → 级联删数据 | 把手册 §7.3 第 6 条回写进指南 §2.2 |
+| 2 | `docs/添加新属性指南.md` §2.2（:102） | 示例 `int get schemaVersion => 5; // 从 4 递增` 已过期（当前 **7**） | 🔴 **比原来写的严重**：`guardian` 追了 drift 2.35.0 源码——写小 → drift 认为发生了升级 → 把 `PRAGMA user_version` **静默降回**旧值（不报错）→ 修好后重新发版时 `from` = 那个旧值 → 迁移段对已存在的列再跑 `addColumn` → `duplicate column name` → **库打不开、App 起不来**。盘上数据大概率还在，但用户打不开 | ✅ **已修**（M3-T10 `0a8bdc5`；`onUpgrade` 示例的第二入口由返工 `e47d08b` 补上） |
+| 3 | `docs/添加新属性指南.md` §7 检查清单（:304-316）；`CONTRIBUTING.md` :66-75 同类 | 漏项**不止一条**：缺 ③`build_runner` 重新生成、⑤补「旧库升上来」夹具、⑦真机覆盖安装验证。`M1-DATA-MODEL.md` :229-232 反而是唯一写全了的 | 漏夹具会被守门用例点名（代价=返工一轮）；漏真机验证才有数据风险，但那一步被 MG 第⑦步与 T08 兜着 | ✅ **已修**（M3-T10 `0a8bdc5`） |
+| 4 | `docs/添加新属性指南.md` §2.2（:118）↔ `docs/DEVELOPMENT.md` §7.4（:221） | 前者"改类型/改主键必须建新表→搬数据→删旧表"且**全篇不提外键级联**；后者"**一律**用 addColumn/dropColumn 不重建表" | 🔴 唯一裁决住在 [`手册 §7.3`](AgentTeams-开发手册.md) 第 6 条，而**迁移卡的输入清单**（`任务卡模板.md`:116）给实现者的是"指南 §2 + DEVELOPMENT §7.4"——**正好是相互冲突的那两份**，裁决不在他的输入里。一旦有人按指南做 → 级联删数据 | ✅ **已修**（M3-T10 `0a8bdc5`，指南侧）；`DEVELOPMENT §7.4` 侧见 row 11 |
 | 5 | `docs/DEVELOPMENT.md` §13.1 | 渲染命令写 `flutter test tool/design_preview/xxx.dart`，真实文件是 `*_test.dart` | 照抄命令找不到文件 | 改成 `<xxx>_test.dart` |
 | 6 | `docs/DEVELOPMENT.md` §8.2 | 只提 `await db.close()` 会永久阻塞；`test/helpers/widget_harness.dart` 的注释里写明 `ProviderContainer.dispose()` **同样会** | 换了种写法又踩同一个坑 | 补上 `dispose()` |
 | 7 | `docs/M2.10-研磨刻度设计稿.md` | 小节顺序是 §1.1 → §1.2 → §1.3 → **§1.5** → §1.4 | 读起来跳号，引用小节号时容易指错 | 重排编号 |
+| 8 | `docs/M1-DATA-MODEL.md` :223 / :226-228 | 写"当前是 **v6**"、"只出现过 1 / 4 / 5 / 6"，迁移列表停在 `_upgradeToV6`，**漏 v7 与 `_upgradeToV7`** | 这是**事实陈述**式的过期（比 row 2 的代码示例更容易被直接照抄），且它正是迁移卡必读的文档 | ✅ **已修**（M3-T10 `0a8bdc5`） |
+| 9 | `docs/agent-teams/任务卡模板.md` :138 | REFACTOR 让"同步 `docs/M1-DATA-MODEL.md` 与**手册 §6** 的字段说明"，但手册 §6 是"任务卡规范"，没有字段说明表 | 引用失效，照做会找不到东西 | 改成只说 `M1-DATA-MODEL.md` |
 | 10 | `docs/M1-DATA-MODEL.md` :185 / :235 | 写"共 **7 项**默认设置"，实际 `SettingsKeys.all`（`lib/domain/settings_keys.dart:23-32`）是 **8 项**（漏 `customBrewMethods`） | 与 row 2 同类：硬编码数字会过期，照抄写出来的 `onCreate` 会少种一项 | 不写数字，改指 `SettingsKeys.all`（并入 M3-T11） |
 | 11 | `docs/DEVELOPMENT.md` §7.4 :221 | "**一律**用 `addColumn`/`dropColumn` + 改写值"仍缺"改类型 / 改主键是另一类"的豁免（裁决只在 Agent Teams 手册 §7.3） | **方向保守**：照它做的人会卡住/报 BLOCKED，不会产生删数据的迁移 —— 危险方向已由 `指南 §2.2` 堵住 | 回写豁免说明（并入 M3-T11） |
-| 8 | `docs/M1-DATA-MODEL.md` :223 / :226-228 | 写"当前是 **v6**"、"只出现过 1 / 4 / 5 / 6"，迁移列表停在 `_upgradeToV6`，**漏 v7 与 `_upgradeToV7`** | 这是**事实陈述**式的过期（比 row 2 的代码示例更容易被直接照抄），且它正是迁移卡必读的文档 | 改为 v7 并补上 v6→v7 一行 |
-| 9 | `docs/agent-teams/任务卡模板.md` :138 | REFACTOR 让"同步 `docs/M1-DATA-MODEL.md` 与**手册 §6** 的字段说明"，但手册 §6 是"任务卡规范"，没有字段说明表 | 引用失效，照做会找不到东西 | 改成只说 `M1-DATA-MODEL.md` |
 
 **已裁决（不必再开卡）**：
 
@@ -307,7 +312,7 @@ flowchart LR
 | `docs/CHANGELOG.md` :84（写着 297） | 是过期事实还是发布快照？ | **不改**。0.2.0 发布时确实跑出 297（M2.10 批次的结果），这一行是**如实的历史记录**；299 是之后那批"审核修复 +2 条测试"才到的。`verifier` 提的 scope 缺口据此关闭 |
 | `docs/agent-teams/Mermaid-图集.md` :232（"当前 测试 303 通过 +4"） | 是不是又一处过期数字？ | **不改**，它是母版里的**格式示例**（演示"相对基线 +Δ"怎么写），不是事实断言。但它与真实数字太像、容易误读——若哪天顺手整理，把示例值换成 `<n+Δ>` 更稳 |
 
-**待落盘的裁决文本**（`guardian` 产出，措辞可直接粘贴；`docs/**` 归 Lead，等 M3-T10 决定后落）：
+**裁决文本（✅ 已落盘：M3-T10 `0a8bdc5` + 返工 `e47d08b`）** —— 以下是原文留档，便于日后核对：
 
 - 指南 §2.2 的 `schemaVersion` 示例 → `<现值 + 1>`，并补"⚠️ 禁止把版本号写小 + 后果链"与"⚠️ 改类型/改主键只能重建表，但重建被外键引用的表会级联删数据 → 停下报 `BLOCKED`"两段。
 - 指南 §7 与 `CONTRIBUTING` 的清单各补三条勾选项（`build_runner` / 补夹具 / 真机覆盖安装）。
@@ -324,7 +329,7 @@ flowchart LR
 | 2026-10-01 | `lead` | 首次跑 PG 门：`check_upload_safety.ps1 -All` → **BLOCK=0 / WARN=5 / INFO=40，退出码 0**。5 条 WARN 全部是既有二进制与预览图（`assets/icon/app_icon_source.png` 体积、4 张 `tool/**/out/*.png`），**本次新增的 14 个文件零命中**；40 条 INFO 是 `DEVELOPMENT.md` / `RELEASING.md` 里有意写明的工具链路径（§5.7 已注明这类属提示级）。新增 §8「已知文档缺陷（待建卡）」7 条 |
 | 2026-10-01 | `lead` | **组建 3 人最小编制团队**（手册 §3.4）：`lead` + `guardian` + `verifier`；新增 §0「团队编制」记录席位、写作用域、禁区与技能卡。`info-reviewer` 作为用户先前单独授权的推送门席位保留待命（超出 3 人档，已在 §0 注明）。派了两件**只读**首活：`verifier` 独立复测 G2 基线、`guardian` 复核「M3 不触发 MG 门」这个预判 |
 | 2026-10-01 | `lead` | **收两份首活回报**：`verifier` 交 `DONE`（两次复跑均 299/退出码 0、0 skip、零源码 diff → 基线成立；并指出 T01 scope 缺口）；`guardian` 交 `DONE_WITH_CONCERNS`（9 张卡逐卡判定**均不触发 MG 门**，"MG 预计不涉及"判定正确；追 drift 2.35.0 源码证明 row 2 的后果是「静默降 `user_version` + 修复版因重复加列打不开库」，**严重度上调为 🔴**；新发现 `M1-DATA-MODEL.md` 仍写 v6）。据此：§8 重写并新增 row 8/9 + 「已裁决」小节（CHANGELOG:297 属如实历史、Mermaid 示例不改）、§3 增 `M3-T10` 候选卡与 §3.1 三条卡片限定条件、§6 补基线口径两条澄清（基线取自 main 非 worktree、107 处 drift 警告的定性与未验证边界） |
-| 2026-10-01 | `lead` | **用户裁决三项**：① `info-reviewer` **保留为常驻第 4 席**；② 派 **M3-T00 / T01 / T10** 三张卡；③ 隔离方式**严格按手册 §5.4 建 worktree**。据此建 `feat/m3-intake` worktree（`<工程根目录上级>\BeanClick-m3-intake`，@ `4ec919c`），并拷贝 `sqlite3.dll` 与 `.dart_tool/hooks_runner/shared` 两个 gitignore 依赖 |
+| 2026-10-01 | `lead` | **用户裁决三项**：① `info-reviewer` **保留为常驻第 4 席**；② 派 **M3-T00 / T01 / T10** 三张卡；③ 隔离方式**严格按手册 §5.4 建 worktree**。据此建 `feat/m3-intake` worktree（`<工程根目录的父目录>\BeanClick-m3-intake`，@ `4ec919c`），并拷贝 `sqlite3.dll` 与 `.dart_tool/hooks_runner/shared` 两个 gitignore 依赖 |
 | 2026-10-01 | `verifier` | **G2 工作区就绪复核通过（task-5，`DONE`）**：worktree 内 `flutter pub get` / `dart format --output=none` 0 改动 / `flutter analyze` 0 问题 / `flutter test` **299 通过（退出码 0，0 skip）**；与 main **逐字节一致**（`database.dart`、`database.g.dart`、`pubspec.lock`、`test/drift/**`）；`git status --short` 空。未跑 `build_runner`（MG 未触发，且那是 guardian 独占资源）。据此 §3 增 `M3-T00` 卡、`M3-T01` 负责人改为 `lead`（依据技能卡的只读边界 + §4.1 的 `docs/**` 归属） |
 | 2026-10-01 | `lead` | **首批三张卡落盘**：T00 `2b6a4f8`（纳入 Agent Teams 文档 14 个文件）、T01 `5653d20`（实测 299 收口进 README 与 DEVELOPMENT §11）、T10 `0a8bdc5`（迁移文档裁决回写：`指南 §2.2` 的版本号示例 + 两段警告、§7 清单补三条、`M1-DATA-MODEL` v6→v7、`CONTRIBUTING` 5→7 步）。全部为文档改动，零源码 / 零测试 / 零 schema |
 | 2026-10-01 | `guardian` | **G4 规格审查（`DONE_WITH_CONCERNS`）**：T10 抄写忠实（两段警告逐字落地、未弱化），但打回两项 —— **C1**：`指南:126` 的 `if (from < 5)` 是 row 2 的**第二个入口**（现有用户全走 `from=7` → 迁移段不执行 → `no such column`），**C2**：我额外那句"v4→v5→v6→v7 全是加列/删列/改值"枚举不准（v5→v6 还建了新表、该区间没有删列）。另新发现 C3/C4 → 立 M3-T11 |
