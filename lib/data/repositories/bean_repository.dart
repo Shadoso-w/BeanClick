@@ -51,11 +51,11 @@ class AdjustStockResult {
 
   /// 请求的批次没找到时，实际落到哪个批次上。
   ///
-  /// 非 null 表示「发生了换批次扣减」，UI 应当明确提示用户，
-  /// 而不是静默扣到别的袋子上。
+  /// 非 null 表示「发生了换批次调整」，UI 应当明确提示用户，
+  /// 而不是静默换到别的批次上。
   final int? fallbackFromBatchId;
 
-  /// 是否发生了「指定批次不存在、改扣别的批次」。
+  /// 是否发生了「指定批次不存在、换到别的批次」。
   bool get usedFallbackBatch => fallbackFromBatchId != null;
 
   @override
@@ -279,10 +279,10 @@ class BeanRepository {
   ///
   /// **指定了 [batchId] 但那个批次不存在时**（已被删除），会退回到自动挑批次，
   /// 并在返回值里通过 [AdjustStockResult.fallbackFromBatchId] 明确告知，
-  /// 由 UI 提示「原批次已不在，改扣了别的批次」——不静默换扣。
+  /// 由 UI 提示「原来那一袋批次已不在，余量算到了别的批次上」——不静默换批次。
   ///
   /// 未指定 [batchId] 时自动挑：优先「有余量 + 烘焙日期最新」的；
-  /// 若全部用完则挑任意一个，好让扣减能落到 0。
+  /// 若全部用完则挑任意一个，好让这次调整有落点（扣减落到 0，回补退到某一袋）。
   ///
   /// 克数按 0.1g 归一写入，避免反复加减累积浮点误差。
   ///
@@ -341,7 +341,7 @@ class BeanRepository {
       }
 
       if (row == null) {
-        // 全用完了：挑任意一个，好让扣减能落到 0。
+        // 全用完了：挑任意一个，好让这次调整有落点（扣减落到 0，回补退到某一袋）。
         row =
             await (_db.select(batches)
                   ..where((t) => t.beanId.equals(beanId))

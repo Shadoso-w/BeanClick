@@ -37,9 +37,9 @@ class SaveBrewLogResult {
   bool get hasStockShortage =>
       stockAdjustments.any((adjustment) => adjustment.clamped);
 
-  /// 是否有记录里的批次已不存在、余量被扣到了别的批次上。
+  /// 是否有记录里的批次已不存在、余量算到了别的批次上。
   ///
-  /// UI 应当明确提示，而不是让用户以为扣的是那一袋。
+  /// UI 应当明确提示，而不是让用户以为调整的是那一袋。
   bool get hasBatchFallback =>
       stockAdjustments.any((adjustment) => adjustment.usedFallbackBatch);
 }

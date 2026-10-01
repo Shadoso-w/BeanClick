@@ -1,6 +1,7 @@
 import 'package:beanclick/core/widgets/swipe_actions.dart';
 import 'package:beanclick/data/providers.dart';
 import 'package:beanclick/domain/entities.dart';
+import 'package:beanclick/domain/enums.dart';
 import 'package:beanclick/features/record/brew_log_form_page.dart';
 import 'package:beanclick/features/record/record_page.dart';
 import 'package:flutter/material.dart';
@@ -337,5 +338,91 @@ void main() {
     expect((await logs()).single.isFavorite, isTrue);
 
     await harness.finish(tester);
+  });
+
+  group('M3-T29 自定义方法不能被显示成「其他」', () {
+    /// 自定义方法建模为「内置枚举 + `methodLabel`」：**生产表单把它归到
+    /// `BrewMethod.other`**（`brew_log_form_page.dart:343`），用户看到的是
+    /// 「拿铁」（`methodDisplay`）。建模必须与生产一致，否则「副标题不是
+    /// 『其他』」这条断言在修复前也会通过（那时显示的是枚举原始标签）。
+    /// 这条映射本身由走真实表单 UI 的 `batch2_ui_test.dart:74-76` 钉住
+    /// （`methodLabel == '拿铁'` / `method == BrewMethod.other`）。
+    Future<int> saveCustomMethodLog({
+      required int beanId,
+      required int batchId,
+      bool isFavorite = false,
+    }) async {
+      return (await harness.container
+              .read(brewLogRepositoryProvider)
+              .save(
+                makeLog(
+                  beanId: beanId,
+                  batchId: batchId,
+                  method: BrewMethod.other,
+                  methodLabel: '拿铁',
+                  isFavorite: isFavorite,
+                ),
+              ))
+          .brewLogId;
+    }
+
+    testWidgets('记录页搜索「拿铁」能搜到这条记录', (tester) async {
+      final a = await harness.addBeanWithBatch(name: '花魁');
+      await saveCustomMethodLog(beanId: a.beanId, batchId: a.batchId);
+
+      await pumpRecordPage(tester);
+      expect(find.text('花魁'), findsOneWidget, reason: '搜索前那条记录在时间线上');
+
+      await tester.enterText(find.byType(TextField), '拿铁');
+      await tester.pumpAndSettle();
+
+      expect(find.text('没有匹配的记录'), findsNothing, reason: '按自定义方法名搜索应命中，不该落到空态');
+      expect(find.text('花魁'), findsOneWidget);
+
+      // 负向对照：过滤网整体失效（查询被忽略、全量返回）时这条会红。
+      await tester.enterText(find.byType(TextField), '这个豆子不存在');
+      await tester.pumpAndSettle();
+
+      expect(find.text('花魁'), findsNothing);
+      expect(find.text('没有匹配的记录'), findsOneWidget);
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('收藏参数面板副标题显示「拿铁」而不是「其他」', (tester) async {
+      final a = await harness.addBeanWithBatch(name: '花魁');
+      final int favoriteId = await saveCustomMethodLog(
+        beanId: a.beanId,
+        batchId: a.batchId,
+        isFavorite: true,
+      );
+
+      await pumpForm(tester);
+      await tester.longPress(find.byKey(const Key('brew.copyLast')));
+      await tester.pumpAndSettle();
+
+      final Finder tile = find.byKey(Key('brew.favorite.$favoriteId'));
+      expect(tile, findsOneWidget);
+      // 判别力证明：这一条记录上「枚举原始标签」就是「其他」，而 `methodDisplay`
+      // 是「拿铁」——两者不同，所以下面两条断言真的能区分「读 label」与
+      // 「读 methodDisplay」两种实现（旧实现下副标题正是「其他」）。
+      final BrewLog saved = (await harness.container
+          .read(brewLogRepositoryProvider)
+          .getById(favoriteId))!;
+      expect(saved.method.label, '其他');
+      expect(saved.methodDisplay, '拿铁');
+      expect(
+        find.descendant(of: tile, matching: find.textContaining('拿铁')),
+        findsOneWidget,
+        reason: '副标题该用 methodDisplay',
+      );
+      expect(
+        find.descendant(of: tile, matching: find.textContaining('其他')),
+        findsNothing,
+        reason: '自定义方法不该显示成枚举原始标签',
+      );
+
+      await harness.finish(tester);
+    });
   });
 }

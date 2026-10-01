@@ -19,6 +19,26 @@ import 'batch_form_page.dart';
 const String _roastDateRequiredMessage = '请填写烘焙日期';
 const String _remainingRequiredMessage = '请填写剩余克数';
 
+/// 名称为空时，**保存路径**给的那条可见提示（M3-T35）。
+///
+/// 与名称框的行内文案（`请填写豆子名称`）故意不同：名称框在 `ListView` 里
+/// 可能根本没被构建、或者被滚出 cacheExtent 后连同它的 `FormField` 一起销毁
+/// —— 那时行内错误既不会渲染、也不会参与 `validate()`。文案不同还保证了
+/// 两者万一同屏（例如名称框可见但用户没填）时不会出现两个相同的 `Text`。
+const String _nameRequiredHint = '请先填写豆子名称';
+
+/// 「其它行内校验失败」的通用提示（M3-T33）。
+///
+/// `validate()` 只返回一个 bool，行内错误又可能落在视口之外；保存路径不能
+/// 无声 `return`，否则用户只会觉得「点了没反应」。
+const String _formInvalidHint = '表单还有未通过的校验，请检查标红提示';
+
+/// 新增豆子时「剩余克数 > 购入总重」的**保存路径**提示（G5-S1）。
+///
+/// 与行内那条（`剩余克数不能大于购入总重（X g）`）用词不同，理由同上面几条：
+/// 同屏时不会出现两个文案相同的 `Text`。
+const String _gramsOverInitialHint = '剩余克数不能大于购入总重，请核对第一袋的两个数字';
+
 /// 咖啡豆新增 / 编辑表单。
 ///
 /// 表单分三块：
@@ -161,21 +181,66 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     return null;
   }
 
+  /// 「剩余克数 ≤ 购入总重」的**保存路径**兜底（G5-S1）。
+  ///
+  /// 这条规则只挂在「第一袋」余量框的行内 validator 上。`ListView` 的构建窗口
+  /// （内容坐标）= `[offset - cacheExtent, offset + 视口高 + cacheExtent]`
+  /// （`SliverList` 的终点再叠加 `scrollOffset + cacheOrigin`，两者抵消后就是
+  /// 这个右端点）：列表停在顶部时窗口最小 —— 实测 320×568 下右端点只有 694，
+  /// 而「第一袋」段顶在 786 → 那一段整段不在窗口内、`FormField` 随之注销，
+  /// `validate()` 便会放行，于是「购入总重 200 / 剩余 250」会一路走到落库。
+  /// 所以这里直读两个控制器。
+  ///
+  /// 编辑路径没有「第一袋」，天然返回 null；两边都留空则交给前面几级。
+  String? _crossFieldGramsHint() {
+    if (_isEditing) return null;
+    final double? remaining = parseNumber(_remaining.text);
+    final double? initial = parseNumber(_initial.text);
+    if (remaining == null || initial == null) return null;
+    if (remaining > initial) return _gramsOverInitialHint;
+    return null;
+  }
+
+  /// 保存前的四条兜底，按优先级返回**唯一**一条给用户看的提示。
+  ///
+  /// 返回 null 表示「没有兜底要说的」——**不代表表单一定合法**，`formValid`
+  /// 由调用方在 `validate()` 之后传进来。四条的顺序就是优先级：
+  ///
+  /// 1. 「第一袋」缺项（`_firstBatchHint()`）——**不看 `validate()` 结果**：
+  ///    视口外那段的 `FormField` 可能压根没注册进 `Form`，`validate()` 会放行。
+  /// 2. 名称为空——同样不依赖 `Form` 的注册表，直接读控制器（M3-T35）：
+  ///    小屏上滚到「第一袋」时整段「基本信息」会被 `ListView` 销毁，名称框的
+  ///    `FormField` 随之注销，空名称会一路走到数据库的 `name` 约束上，用户看到
+  ///    的是 `保存失败：InvalidDataException…`。
+  /// 3. 其它行内错误（最典型：余量 > 购入总重）——`validate()` 只返回一个
+  ///    bool，行内错误又可能落在视口之外，无声 `return` 会被当成「点了没反应」
+  ///    （M3-T33）。
+  /// 4. 「剩余克数 > 购入总重」的 cross-field 兜底（`_crossFieldGramsHint()`，
+  ///    G5-S1）——同样直读控制器：这条行内 validator 就挂在「第一袋」里，那一段
+  ///    整段注销后 `validate()` 会返回 true，第 3 级因此也不会兜住它。
+  ///
+  /// 只返回一条，保存路径因此**只弹一条提示**；每条文案都与同字段的行内文案不同。
+  String? _blockingHint({required bool formValid}) {
+    final String? firstBatchHint = _firstBatchHint();
+    if (firstBatchHint != null) return firstBatchHint;
+    if (_name.text.trim().isEmpty) return _nameRequiredHint;
+    if (!formValid) return _formInvalidHint;
+    final String? crossFieldHint = _crossFieldGramsHint();
+    if (crossFieldHint != null) return crossFieldHint;
+    return null;
+  }
+
   Future<void> _save() async {
+    // `validate()` 必须最先跑：它负责在该段可见时把行内错误照常渲染出来，
+    // 抢在它前面 `return` 会让行内错误永不出现（M3-T31 的教训）。
     final bool formValid = _formKey.currentState?.validate() ?? false;
 
-    // **不依赖 `validate()` 结果**的兜底（照 T22 在冲煮表单里的做法）：
-    // 「第一袋」在视口外时它的 `FormField` 可能没注册进 `Form`（`ListView`
-    // 不构建视口外的控件）→ `validate()` 返回 true 并放行，等于把「日期 /
-    // 余量都没确认」静默存成「日期为空、余量 0 g」。所以这里直接读实例状态；
-    // `validate()` 只负责在该段可见时把行内错误照常渲染出来。
-    final String? firstBatchHint = _firstBatchHint();
-    if (firstBatchHint != null) {
-      _showMessage(firstBatchHint);
+    final String? blockingHint = _blockingHint(formValid: formValid);
+    if (blockingHint != null) {
+      _showMessage(blockingHint);
       return;
     }
 
-    if (!formValid) return;
     setState(() => _saving = true);
 
     final DateTime now = DateTime.now();
