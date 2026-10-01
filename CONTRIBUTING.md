@@ -65,14 +65,20 @@ CI 会在 PR 上自动跑分析与测试，未通过不予合并。
 
 改动 Drift 表结构时：
 
-1. 递增数据库 `schemaVersion`
-2. 在 `onUpgrade` 里写**逐列迁移**（**不要**删表重建，用户数据只有一份）
+1. 递增数据库 `schemaVersion`（**只往大写**：写小会让 drift 把 `user_version`
+   静默降回去，之后修好的版本再升级会因重复加列而打不开库）
+2. 在 `onUpgrade` 里写**逐列迁移**（**不要**删表重建，用户数据只有一份；
+   改类型 / 改主键属于另一类操作，且重建被外键引用的表会级联删数据 ——
+   遇到时**先停下问人**，见 [docs/添加新属性指南.md](添加新属性指南.md) §2.2）
 3. 重跑 `dart run build_runner build --delete-conflicting-outputs`
 4. 重新 dump schema 快照：
    `dart run drift_dev schema dump lib/data/database.dart test/drift/schemas`
    + `dart run drift_dev schema generate test/drift/schemas test/drift/generated`
    （忘了跑，`test/data/schema_snapshot_test.dart` 会红并点名差异）
-5. 在 PR 中说明迁移策略与回滚方式
+5. 为新版本在 `test/data/schema_snapshot_test.dart` 的 `_fixtures` 里**补一份
+   「旧库升上来」的夹具**（不补，守门用例会点名要你补）
+6. 真机**覆盖安装**验证：旧数据原样在、无 drift / SQLite 报错（**通过之前不对外发版**）
+7. 在 PR 中说明迁移策略与回滚方式
 
 细节见 [docs/DEVELOPMENT.md](DEVELOPMENT.md) §7.4。
 

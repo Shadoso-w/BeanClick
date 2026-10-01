@@ -220,12 +220,14 @@ deleteBrewLog(id):
 
 ## 7. schemaVersion 与迁移
 
-- v1 = 上述全部表，`schemaVersion = 1`。当前是 **v6**。
+- v1 = 上述全部表，`schemaVersion = 1`。当前是 **v7**。
 - 迁移策略：**逐列迁移**。v1 → v4（批次模型）的搬迁在
   `lib/data/database.dart` 的 `_upgradeToV4` 里，配套测试
   `test/data/migration_v1_to_v4_test.dart`；v4 → v5（记录收藏）、v5 → v6
-  （自定义方法原文 + 辅料表）都是纯新增，见 `_upgradeToV5` / `_upgradeToV6`。
-  注意 `schemaVersion` 只出现过 1 / 4 / 5 / 6，v2 / v3 从未存在过。
+  （自定义方法原文 + 辅料表）、v6 → v7（处理法改多选、磨豆机每 click 微米、
+  记录的零点与每圈 click 快照）都是纯新增 / 改写值，见
+  `_upgradeToV5` / `_upgradeToV6` / `_upgradeToV7`。
+  注意 `schemaVersion` 只出现过 1 / 4 / 5 / 6 / 7，v2 / v3 从未存在过。
 - 每次改表必须：递增 `schemaVersion` → 在 `onUpgrade` 里补**逐列迁移**
   （**不要**删表重建）→ 重跑 `build_runner` → 重新 dump schema 快照
   （`test/drift/schemas/`，忘了跑 `test/data/schema_snapshot_test.dart` 会红）
