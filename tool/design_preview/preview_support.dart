@@ -17,7 +17,7 @@
 /// 探测不到时**不抛异常**，但会在 stderr 说明缺的是哪一个（见 [loadPreviewFonts]）；
 /// 设计稿会因此渲染成方块，于是 golden 比对不匹配 —— 这就是"这台机器缺字体"的信号。
 ///
-/// 审核口径见 `docs/REVIEW-BEFORE-PUSH.md` §3C「必须外置」。
+/// 字体属于「因机器而异」的东西，所以只探测、不写死路径。
 library;
 
 import 'dart:io';

@@ -8,7 +8,7 @@ plugins {
 
 // 发布签名从 android/key.properties 读取，该文件不进仓库。
 // 没有它时回落到 debug 签名，保证新克隆的仓库与 CI 仍能构建。
-// 生成密钥与配置文件的方法见 docs/DEVELOPMENT.md「发布签名」。
+// 生成密钥库后，把口令写进 android/key.properties（该文件与密钥库都不入库）。
 val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 val hasReleaseKeystore = keystorePropertiesFile.exists()

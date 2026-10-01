@@ -76,27 +76,17 @@ app.*.map.json
 .widget_preview/
 
 # ============================================================================
-# 仅在本机保留的文档：**不进仓库、不参与上传**
+# 以下文件仅在本机保留，不入库、不参与上传
 # ============================================================================
-# 2026-10-01 用户裁决：仓库只保留「开发最小集」——
-# 能被别人构建/运行/贡献所需的最少内容（源码、测试、android 工程、资源、
-# README/LICENSE/CHANGELOG/PRIVACY、产品手册）。
+# 仓库只保留「开发最小集」：别人构建、运行、贡献所需的最少内容
+# （源码、测试、android 工程、资源、构建配置、README/CONTRIBUTING/LICENSE/
+#  CHANGELOG、隐私政策、产品手册）。其余一律留在本地。
 #
-# 下面这些文件**留在本地磁盘上**（代理工作流仍要用），但从 git 里彻底删除
-# （历史也已重写抹掉），并用 .gitignore 挡住，避免 `git add -A` 再把它们带上去：
+# 被忽略的是内部工作文档与环境说明 —— 它们是给本地协作用的，不需要公开。
+# 具体哪些文件见下面几行；**改这些文件不需要提交**。
 #
-#   docs/agent-teams/      代理团队手册 / 技能卡 / 进度看板 / 模板（AI 开发设定）
-#   docs/REVIEW-BEFORE-PUSH.md   推送前信息审核流程
-#   tool/check_upload_safety.ps1 本地扫描脚本
-#   docs/DEVELOPMENT.md    含本机工具链绝对路径（D:\devtools 等）
-#   RELEASING.md           同上
-#   docs/M1-DATA-MODEL.md  内部数据模型文档
-#   docs/M2.*.md           内部设计稿与评审
-#   docs/添加新属性指南.md   内部操作指南
-#
-# ⚠️ 改这些文件**不需要**提交；它们的存在只为本地协作。
-# 唯一例外：`docs/CHANGELOG.md`、`docs/PRIVACY.md`、`docs/BeanClick-开发手册-v0.2.md`
-# 属最小集，正常跟踪。
+# 唯一例外（属最小集、正常跟踪）：docs/CHANGELOG.md、docs/PRIVACY.md、
+# docs/BeanClick-开发手册-v0.2.md。
 /docs/agent-teams/
 /docs/REVIEW-BEFORE-PUSH.md
 /docs/DEVELOPMENT.md

@@ -10,7 +10,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%207%2B-3DDC84?logo=android)](https://developer.android.com)
 [![License](https://img.shields.io/badge/License-MIT-blue)](LICENSE)
 
-> 当前状态：**0.2.0**（= M0–M2.11，schema v7）。`flutter test` 实测 **299 通过**（2026-10-01，退出码 0）。内测 APK 见 [Releases](https://github.com/Shadoso-w/BeanClick/releases) 与 [RELEASING.md](RELEASING.md)。
+> 当前状态：**0.3.0**（= M0–M2.11 + 用户反馈第二轮修复，schema v7）。`flutter test` 实测 **343 通过**。内测 APK 见 [Releases](https://github.com/Shadoso-w/BeanClick/releases)。
 
 ---
 
@@ -60,8 +60,26 @@
 
 ## 开发
 
-开发环境搭建与工程结构见 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)。
-产品与数据模型规范见 [docs/BeanClick-开发手册-v0.2.md](docs/BeanClick-开发手册-v0.2.md)。
+### 环境要求
+
+- **Flutter**（stable）与 **Dart**；`flutter --version` 能跑通即可
+- **Android SDK**（只需 compileSdk 对应的 platform + build-tools）与 **JDK 17**
+- 建议把工具链装在工程之外的独立目录，用环境变量指向
+  （`JAVA_HOME` / `ANDROID_HOME` / `ANDROID_SDK_ROOT` / `GRADLE_USER_HOME`），
+  **不要**把本机路径写进仓库
+
+```powershell
+flutter pub get
+flutter test                              # 全量测试
+flutter run                               # 连真机/模拟器运行
+flutter build apk --release --split-per-abi
+```
+
+发布签名见 `android/app/build.gradle.kts`（口令文件放 `android/key.properties`，
+该文件与密钥库都不入库）。
+
+产品与数据模型规范见 [docs/BeanClick-开发手册-v0.2.md](docs/BeanClick-开发手册-v0.2.md)；
+版本变更见 [docs/CHANGELOG.md](docs/CHANGELOG.md)。
 
 ```bash
 flutter pub get

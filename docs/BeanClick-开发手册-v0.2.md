@@ -416,7 +416,7 @@ Then：表单预填上次参数，保存后生成新记录，原记录不变
 
 ```text
 /docs
-  DEVELOPMENT.md
+  BeanClick-开发手册-v0.2.md
   PRIVACY.md
   CHANGELOG.md
 /lib
@@ -429,6 +429,9 @@ README.md
 LICENSE
 CONTRIBUTING.md
 ```
+
+> 只放「开发最小集」：别人构建、运行、贡献所需的最少内容。
+> 内部设计稿、本机环境说明与一次性脚本留在本地、不进仓库（见 `.gitignore`）。
 
 工作流：
 

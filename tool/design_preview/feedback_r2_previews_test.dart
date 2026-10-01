@@ -21,7 +21,7 @@
 ///
 /// ⚠️ 渲染真页面时**必须问一遍有没有挂钟/随机/网络依赖**：本稿第一版就是漏了
 /// 「新建表单的冲煮时间取 `DateTime.now()`」，导致那张 golden 烙上渲染当时的那一分钟、
-/// 换时间重跑必红（由 PG 门抓到）。修法是给页面加 `initialBrewedAt` 注入缝。
+/// 换时间重跑必红。修法是给页面加 `initialBrewedAt` 注入缝。
 library;
 
 import 'package:beanclick/data/providers.dart';
@@ -109,7 +109,7 @@ void main() {
                     height: 2400,
                     // **冲煮时间必须注入固定值**：表单新建时默认取 `DateTime.now()`，
                     // 不注入的话这张 golden 会烙上"渲染当时的那一分钟"，
-                    // 换个时间重跑必然报红（PG 门正是这么抓到的）。
+                    // 换个时间重跑必然报红。
                     child: BrewLogFormPage(
                       existing: null,
                       initialBrewedAt: DateTime(2026, 1, 1, 13, 22),
