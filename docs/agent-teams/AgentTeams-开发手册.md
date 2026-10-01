@@ -247,7 +247,7 @@ flowchart LR
 
 ```powershell
 # 分支命名遵循 CONTRIBUTING：feat/ fix/ docs/ refactor/
-git worktree add <工程根目录上级>\<仓库名>-<slug> -b feat/<slug>
+git worktree add <工程根目录的父目录>\<仓库名>-<slug> -b feat/<slug>
 # 在新 worktree 里：
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
