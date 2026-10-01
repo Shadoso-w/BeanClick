@@ -18,7 +18,7 @@ void main() {
   setUpAll(loadPreviewFonts);
 
   testWidgets('第二批 UI 改稿', (WidgetTester tester) async {
-    tester.view.physicalSize = const Size(760, 4700);
+    tester.view.physicalSize = const Size(760, 12000);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
 
@@ -31,8 +31,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 内容一旦高过**视口**，超出部分不会进图 —— golden 会**静默**变短
+    // （本项目踩过：M2.10 稿的「⑧ 记录卡片」整段消失而测试全绿）。
+    // 注意要跟真实视口高比，不能跟写死的画布常量比 —— 后者在画布被调小时
+    // 依然会通过，等于没守住。见 previewSheetKey 的说明。
+    expect(
+      tester.getSize(find.byKey(previewSheetKey)).height,
+      lessThanOrEqualTo(
+        tester.view.physicalSize.height / tester.view.devicePixelRatio,
+      ),
+      reason: '内容已超过画布高度，请抬高 physicalSize —— 否则 golden 会被静默裁掉',
+    );
+
     await expectLater(
-      find.byType(_Batch2Sheet),
+      find.byKey(previewSheetKey),
       matchesGoldenFile('goldens/batch2_previews.png'),
     );
   });
@@ -50,6 +62,7 @@ class _Batch2Sheet extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          key: previewSheetKey,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const _Title('① [B1] 冲煮方法：内置 + 自定义 + ＋新建'),

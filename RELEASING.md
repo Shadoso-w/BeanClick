@@ -36,9 +36,9 @@
 手机开「开发者选项 → USB 调试」，插线后：
 
 ```powershell
-$env:Path = 'D:\Android\Sdk\platform-tools;' + $env:Path
+$env:Path = "$env:ANDROID_HOME\platform-tools;$env:Path"
 adb devices                       # 确认能看到设备
-adb install -r 'D:\BeanClick\dist\app-arm64-v8a-release.apk'
+adb install -r '.\dist\app-arm64-v8a-release.apk'
 ```
 
 `-r` 表示覆盖安装、保留数据；想彻底重来先 `adb uninstall com.beanclick.beanclick`。
@@ -90,7 +90,7 @@ adb install -r 'D:\BeanClick\dist\app-arm64-v8a-release.apk'
 
 ## 4. 请重点反馈什么
 
-这一版**已经在小米 11（Android 14）上覆盖安装并启动过**，
+这一版**已经在 Android 14 真机上覆盖安装并启动过**，
 v4 → v5 → v6 → v7 四次数据库迁移都在真机上跑过、旧数据保留。
 下面这些是静态检查与单元测试覆盖不到的地方，最需要实测：
 

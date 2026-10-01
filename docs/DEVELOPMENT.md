@@ -257,7 +257,7 @@ final rows = await db.customSelect(
 ```powershell
 Invoke-WebRequest 'https://www.sqlite.org/2026/sqlite-dll-win-x64-3530400.zip' -OutFile $env:TEMP\sqlite.zip
 Expand-Archive $env:TEMP\sqlite.zip -DestinationPath $env:TEMP\sqlite -Force
-Copy-Item $env:TEMP\sqlite\sqlite3.dll D:\BeanClick\sqlite3.dll -Force
+Copy-Item $env:TEMP\sqlite\sqlite3.dll .\sqlite3.dll -Force
 ```
 
 ### 8.2 widget 测试里关库要先拆树并让出若干帧
@@ -468,10 +468,9 @@ keytool -genkeypair -v `
 > M2.9 与 M2.8 基本持平（arm64 差 < 20 KB）：加的是列 / 一张小表 / 表单逻辑，
 > 没有引入新的原生依赖或资源。
 
-真机（小米 11 / Android 14，`M2011K2C`）：M2.8 两批都覆盖安装并启动过，
+真机（一台 Android 14 手机）：M2.8 两批都覆盖安装并启动过，
 logcat 无异常 —— 真机上跑通了 v4 → v5（加列）与 v5 → v6（加列 + 建表）两次迁移。
-M2.9 的 **v6 → v7 迁移也已上真机验证**（`firstInstallTime` 9-27 15:15，
-`lastUpdateTime` 9-28 22:54，即覆盖安装而非全新安装）：
+M2.9 的 **v6 → v7 迁移也已上真机验证**（覆盖安装而非全新安装）：
 
 - 安装一度被 MIUI 挡下（`INSTALL_FAILED_USER_RESTRICTED`）——解决方法是在
   开发者选项里打开「USB 安装」（可能还要登录小米账号），`adb install -r` 即可通过
@@ -638,4 +637,30 @@ kotlin.incremental=false
 > $c = $c.Replace('旧', '新')
 > [System.IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding($false)))
 > ```
+
+### 13.3 推送前必须过信息审核
+
+**规则（用户明确要求）：以后每次要把本地内容推到 GitHub 之前，
+都必须先经过信息审核，拿到修改意见再决定推不推。**
+
+- 审核范围三类：**必要性**（避免过度上传）、**本机信息**（路径 / 设备 /
+  凭据 / 代理 / 邮箱 / 真实个人数据）、**硬编码**（合理 / 建议提取 / 必须外置）。
+- 先跑脚本，再做脚本查不到的人工项（图片内容、语义判断）：
+
+  ```powershell
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\check_upload_safety.ps1 -All
+  # 退出码 0 = 无阻断项；1 = 有阻断项，停；2 = 脚本本身跑不起来
+  ```
+
+- 完整口径、严重度分级（阻断 / 警告 / 提示）、报告模板、图片人工检查清单、
+  以及"已经推上去的内容怎么补救"，全部见
+  [`docs/REVIEW-BEFORE-PUSH.md`](REVIEW-BEFORE-PUSH.md)。
+- 这个项目里由一个专职审核员（本项目的 AI 助手）承担这一步：
+  Lead 给范围 → 审核员只读检查并出意见 → Lead 决定并执行 → 审核员复核。
+  **范围一变（哪怕只是多加一张图）就要重审。**
+
+> 为什么要有这条：这个仓库是**公开**的，推上去就收不回来。
+> 而且"本机信息"很容易顺手带上去（一条 `<盘符>:\...` 路径、一张手机截图、
+> 一个写死的字体路径），事后清理历史的代价（全部 commit hash 变化、
+> tag 重建、别人重新 clone）远高于推之前花两分钟扫一遍。
 

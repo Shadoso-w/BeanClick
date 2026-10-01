@@ -58,5 +58,19 @@ app.*.map.json
 # 内测用的 APK 暂存目录（产物不入库，见 RELEASING.md）
 /dist/
 
+# 图标预览的中间产物：一条命令就能重生成，且没有任何文档/测试引用。
+# 保留的是「被引用、或本机才能重生成」的那几张（goldens、scheme2_sheet、
+# icon_review_keep82、icon_scale_candidates、app_icon_preview）。
+# 判定口径见 docs/REVIEW-BEFORE-PUSH.md §3A。
+/tool/out/icon_review_keep88.png
+/tool/out/icon_review_keep94.png
+/tool/design_preview/out/scheme2_A.png
+/tool/design_preview/out/scheme2_B.png
+/tool/design_preview/out/scheme2_C.png
+/tool/design_preview/out/scheme2_D.png
+
+# golden 比对失败时 flutter_test 写出的差异图
+/tool/design_preview/failures/
+
 # Widget Preview related
 .widget_preview/
