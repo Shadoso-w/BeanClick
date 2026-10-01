@@ -69,7 +69,7 @@ CI 会在 PR 上自动跑分析与测试，未通过不予合并。
    静默降回去，之后修好的版本再升级会因重复加列而打不开库）
 2. 在 `onUpgrade` 里写**逐列迁移**（**不要**删表重建，用户数据只有一份；
    改类型 / 改主键属于另一类操作，且重建被外键引用的表会级联删数据 ——
-   遇到时**先停下问人**，见 [docs/添加新属性指南.md](添加新属性指南.md) §2.2）
+   遇到时**先停下问人**）
 3. 重跑 `dart run build_runner build --delete-conflicting-outputs`
 4. 重新 dump schema 快照：
    `dart run drift_dev schema dump lib/data/database.dart test/drift/schemas`
@@ -80,35 +80,25 @@ CI 会在 PR 上自动跑分析与测试，未通过不予合并。
 6. 真机**覆盖安装**验证：旧数据原样在、无 drift / SQLite 报错（**通过之前不对外发版**）
 7. 在 PR 中说明迁移策略与回滚方式
 
-细节见 [docs/DEVELOPMENT.md](DEVELOPMENT.md) §7.4。
+## 仓库里放什么
 
-## 推送前：信息审核（硬要求）
+**只放「开发最小集」**：别人能构建、运行、贡献所需的最少内容 ——
+源码（`lib/`）、测试（`test/`）、Android 工程（`android/`）、资源（`assets/`）、
+构建配置（`pubspec.yaml`、`analysis_options.yaml`）、图标生成脚本（`tool/`）、
+以及 `README.md` / `CONTRIBUTING.md` / `LICENSE` / `CHANGELOG` / 隐私政策。
 
-**任何一次 `git push` / 建 PR / 发 Release 之前，都要先过一遍信息审核**，
-确认三件事：
+**不放**：内部设计稿与评审、本机工具链路径说明、一次性的排查脚本与草稿、
+以及任何**因机器而异**的东西（SDK/JDK 路径、字体路径、代理端口、设备型号）。
 
-1. **必要性** —— 这个文件别人开发/构建/理解时真的需要吗？（能一条命令重生成的
-   产物、一次性脚本、草稿默认不入库）
-2. **本机信息** —— 有没有把本机路径、设备型号/序列号、凭据、代理端口、
-   私人邮箱、真实个人数据带上去？（本仓库是公开的，推上去就收不回来）
-3. **硬编码** —— 每处硬编码是「合理 / 建议提取 / 必须外置」？
-   **因机器而异的东西必须外置**（本机字体路径、SDK/JDK 路径、代理端口）。
-
-```powershell
-# 一条命令先扫一遍；退出码 1 = 有阻断项，停。
-powershell -NoProfile -ExecutionPolicy Bypass -File .\tool\check_upload_safety.ps1 -All
-```
-
-判定口径、严重度分级、报告格式、图片人工检查、历史遗留处理，
-全部见 **[docs/REVIEW-BEFORE-PUSH.md](REVIEW-BEFORE-PUSH.md)**。
-脚本有盲区（图片内容、语义判断、git 历史），所以**脚本过了不等于审过了**。
+提交前自查一句话：**「这个文件别人开发和构建时真的需要吗？」**
+不需要的，直接留在本地、写进 `.gitignore`，不要 `git add`。
 
 ## UI 变更：先出设计稿
 
 **任何 UI 改动都要先给设计稿讨论定稿，再写代码。** 设计稿至少包含：
 目标、布局示意（线框图或真实渲染图）、关键尺寸与各种状态、
 与现状的差异（含受影响的测试）、以及 2~3 个待确认选项。
-细节与两种呈现形式见 [docs/DEVELOPMENT.md](DEVELOPMENT.md) §13.1。
+渲染脚手架在 `tool/design_preview/`（`flutter test tool/design_preview/<xxx>_test.dart --update-goldens`）。
 
 ## Issue
 
