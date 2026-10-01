@@ -368,6 +368,73 @@ void main() {
     });
   });
 
+  group('保存路径的兜底要覆盖面（M3-T35 / M3-T33）', () {
+    testWidgets('名称留空且名称框已被滚出销毁：被拦下、有提示、不落库、不出数据库异常', (tester) async {
+      // 320×568 是 iPhone SE 一代的逻辑尺寸（常用机型里最小的一档）。
+      // 这个尺寸下把表单滚到「第一袋」底部时，整段「基本信息」都落在 `ListView`
+      // 的 cacheExtent 之外 → 名称框连同它的 `FormField` 一起被销毁、不再注册进
+      // `Form`，`validate()` 直接放行（M3-T35 的复现条件）。
+      //
+      // ⚠️ 下面那条前置断言依赖「构建窗口」的具体数值（窗口公式与实测余量写在
+      // 本文件 G5-S1 那条用例的注释里）。**若它因前提变红，正确处置是重新测量
+      // 并调整视口 / 拖拽量，不是删掉前置断言** —— 删了这条用例就不再覆盖
+      // M3-T35 的缺口（会退化成一条永远绿的装饰）。
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpBeanForm(tester);
+      await pickRoastDate(tester);
+      await fill(tester, 'bean.remaining', '200');
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, -4000));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('bean.name'), skipOffstage: false),
+        findsNothing,
+        reason: '前置条件：名称框必须真的已被销毁，否则 validate() 会自己拦住',
+      );
+
+      await tapSave(tester);
+
+      expect(
+        find.textContaining('保存失败'),
+        findsNothing,
+        reason: '数据库异常不该端到用户面前（M3-T35）',
+      );
+      expect(find.text('请先填写豆子名称'), findsOneWidget);
+      expect(find.text('新增咖啡豆'), findsOneWidget, reason: '被拦下时表单不该被关掉');
+      expect(
+        await harness.container.read(beanRepositoryProvider).getAll(),
+        isEmpty,
+        reason: '名称为空时不应落库',
+      );
+
+      await harness.finish(tester);
+    });
+
+    testWidgets('其它行内校验失败（余量 > 购入总重）：保存也要给看得见的提示', (tester) async {
+      await pumpBeanForm(tester);
+      await fill(tester, 'bean.name', '花魁');
+      await pickRoastDate(tester);
+      await fill(tester, 'bean.initial', '200');
+      await fill(tester, 'bean.remaining', '250');
+      await tapSave(tester);
+
+      // 行内错误照常渲染；但保存路径不能只是无声 `return` —— 行内错误可能落在
+      // 视口之外，用户会以为「点了没反应」（M3-T33）。
+      expect(find.textContaining('剩余克数不能大于购入总重'), findsOneWidget);
+      expect(find.text('表单还有未通过的校验，请检查标红提示'), findsOneWidget);
+      expect(
+        await harness.container.read(beanRepositoryProvider).getAll(),
+        isEmpty,
+        reason: '校验不通过时不应落库',
+      );
+
+      await harness.finish(tester);
+    });
+  });
+
   group('新增豆子：烘焙日期与剩余克数必须主动确认（M3-T31）', () {
     testWidgets('只填名称就直接保存：被拦下并提示缺烘焙日期', (tester) async {
       await pumpBeanForm(tester);
@@ -401,8 +468,13 @@ void main() {
         reason: '没主动填写剩余克数时不应落库',
       );
       expect(find.text('请先填写第一袋的剩余克数'), findsOneWidget);
+      // 精确匹配兜底文案，而不是 `textContaining('请填写第一袋的烘焙日期')`：
+      // 后者在本仓**恒真**（兜底是「请**先**填写第一袋的烘焙日期」，`先` 插在
+      // `请` 后，不构成子串；行内文案又是「请填写烘焙日期」）。改成精确匹配后，
+      // 一旦兜底真把日期错报出来（`_firstBatchHint` 的 `noDate` 分支，
+      // 见 `bean_form_page.dart`）这条就会红。
       expect(
-        find.textContaining('请填写第一袋的烘焙日期'),
+        find.text('请先填写第一袋的烘焙日期'),
         findsNothing,
         reason: '日期已主动确认，不该被一起报出来',
       );
@@ -439,6 +511,76 @@ void main() {
       final BeanBatch batch = await onlyBatch(bean.id!);
       expect(batch.remainingGrams, 250);
       expect(batch.initialGrams, isNull, reason: '没确认过的「200 g」不该被当成购入总重落库');
+
+      await harness.finish(tester);
+    });
+  });
+
+  group('新增豆子：滚出视口后 cross-field 校验仍生效（G5-S1）', () {
+    testWidgets('小屏把「第一袋」滚出 cacheExtent：购入总重 200 / 剩余 250 仍被拦下', (
+      tester,
+    ) async {
+      // 320×568：小屏更容易把「第一袋」整段挤出 cacheExtent。
+      tester.view.physicalSize = const Size(320, 568);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await pumpBeanForm(tester);
+      await fill(tester, 'bean.name', '花魁');
+      await pickRoastDate(tester);
+      await fill(tester, 'bean.initial', '200');
+      await fill(tester, 'bean.remaining', '250');
+
+      // 取消焦点：聚焦中的 `EditableText` 会自己申请 keep-alive，那样这一段
+      // 滚走之后仍会被保留（等于用户还停在那个框里，不是本用例要覆盖的状态）。
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+
+      // 精确回到 offset 0，让「第一袋」（`ListView` 的第 2 个 child）落到
+      // cacheExtent 之外、连同它的 `FormField` 一起被销毁。
+      //
+      // 构建窗口（内容坐标，Flutter 3.47.5 实测）= `[offset - cacheExtent,
+      // offset + 视口高 + cacheExtent]`；`SliverList` 的终点再叠加
+      // `scrollOffset + cacheOrigin`，两者抵消后就是右端点表达式。
+      // 左沿的实测依据：320×568 下 offset=920 时「基本信息」段仍在树上、
+      // 1026（maxScroll）时已不在 → 左沿 1026-250=776 恰好越过该段底 ≈770。
+      //
+      // 两个必须注意的点：
+      // - **不能**用「滚到底部」：**当**「更多信息」段高 < 视口高 + 250 时
+      //   （当前 `extra_attributes` 注册表只有 5 个属性，实测成立），滚到
+      //   maxScroll 那一段照样留在窗口内。这个前提是**数据相关**的 ——
+      //   「加属性只改注册表」是设计目标，属性一多它就不成立了；
+      // - **不能**用 `tester.scrollTo(name)`：它内部的 `ensureVisible` 会把列表
+      //   停在 offset≈90；窗口下沿是 `offset + 视口高 + cacheExtent`，offset 一涨
+      //   就把那一段圈回来（实测 offset=0 时不在树上、offset=90 时又在）。
+      //   所以这里直接拖到顶。
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 4000));
+      await tester.pumpAndSettle();
+
+      // 前提（这条用例的意义所在）：那一段真的已经不在树上 —— 它挂着的
+      // 「剩余 ≤ 购入总重」行内 validator 因此不参与 `validate()`。
+      //
+      // ⚠️ 前提余量很窄（320×568 实测）：`ListView` 视口高 **444**、cacheExtent
+      // **250** → offset=0 时窗口右端点 = **694**；而「第一袋」那一段的起点在
+      // 内容坐标 **770–786**（标题文字顶实测 786，减去段内上留白约 16 → 段顶
+      // ≈770）→ **余量只有约 76–92px**。也就是说「基本信息」段只要再长这么多
+      // （加一行说明、换更高的控件），这条前提断言就会翻红。
+      // **变红时的正确处置：重新测量并调整视口 / 拖拽量，不是删掉前置断言**
+      // —— 删了它，本用例就退化成一条永远绿的装饰。
+      expect(
+        find.byKey(const Key('bean.remaining'), skipOffstage: false),
+        findsNothing,
+        reason: '前提：第一袋已整段销毁，覆盖的才是「注册表缺项」这条缺口',
+      );
+
+      await tapSave(tester);
+
+      expect(
+        await harness.container.read(beanRepositoryProvider).getAll(),
+        isEmpty,
+        reason: '购入总重 200、剩余 250 不该落库',
+      );
+      expect(find.text('剩余克数不能大于购入总重，请核对第一袋的两个数字'), findsOneWidget);
 
       await harness.finish(tester);
     });

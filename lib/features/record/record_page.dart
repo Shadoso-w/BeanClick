@@ -66,7 +66,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       );
   }
 
-  /// 右滑删除：先确认（与表单里的删除文案保持一致），删完不回补余量。
+  /// 右滑删除：先确认（与表单里的删除文案保持一致）；删完会把已扣的余量按原批次回补。
   Future<void> _confirmDelete(BrewLog log) async {
     final int? id = log.id;
     if (id == null) return;
@@ -122,7 +122,9 @@ class _RecordPageState extends ConsumerState<RecordPage> {
           final String haystack = <String>[
             // 拼配时 `beanLabel` 是「A + B」，只按主豆搜会漏掉第二支。
             log.beanLabel ?? beanNames[log.beanId] ?? '',
-            log.method.label,
+            // 必须用 `methodDisplay`：自定义方法（如「拿铁」）的枚举原始标签
+            // 一律是「其他」，用 `label` 会让它搜不到（M3-T29）。
+            log.methodDisplay,
             if (grinder != null) grinder.brand,
             if (grinder != null) grinder.model,
             log.notes ?? '',

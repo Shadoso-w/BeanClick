@@ -2310,7 +2310,8 @@ class _FavoritePickerSheet extends StatelessWidget {
   /// `手冲 · C40 22 · 15g / 240g · ★4 · 1月3日`。
   static String _favoriteSubtitle(BrewLog log) {
     final List<String> parts = <String>[
-      log.method.label,
+      // `methodDisplay` 而不是 `method.label`：自定义方法否则一律显示「其他」。
+      log.methodDisplay,
       if (log.grindSetting != null) '刻度 ${numberToText(log.grindSetting)}',
       if (log.doseGrams != null || log.waterGrams != null)
         '${numberToText(log.doseGrams)}g / ${numberToText(log.waterGrams)}g',
