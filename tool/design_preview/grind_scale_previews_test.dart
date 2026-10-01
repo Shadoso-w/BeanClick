@@ -18,8 +18,11 @@ void main() {
   setUpAll(loadPreviewFonts);
 
   testWidgets('M2.10 研磨刻度改稿', (WidgetTester tester) async {
-    // 画布高度必须够大：SingleChildScrollView 只截到视口，小了就只剩上半张。
-    tester.view.physicalSize = const Size(780, 5400);
+    // 画布高度要**大于内容高度**：超过视口的部分会被 SingleChildScrollView 裁掉，
+    // 而裁掉的内容 golden 永远比不出来（静默盲区 —— 上一版就是这样把「⑧ 记录卡片」
+    // 整段丢掉的）。截图目标是内容 Column 本身，它的高度 = 实际内容高度，
+    // 所以画布再高也不会在图里留下空白带。
+    tester.view.physicalSize = const Size(780, 12000);
     tester.view.devicePixelRatio = 2;
     addTearDown(tester.view.reset);
 
@@ -32,8 +35,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    // 内容一旦高过**视口**，超出部分不会进图 —— golden 会**静默**变短
+    // （本项目踩过：M2.10 稿的「⑧ 记录卡片」整段消失而测试全绿）。
+    // 注意要跟真实视口高比，不能跟写死的画布常量比 —— 后者在画布被调小时
+    // 依然会通过，等于没守住。见 previewSheetKey 的说明。
+    expect(
+      tester.getSize(find.byKey(previewSheetKey)).height,
+      lessThanOrEqualTo(
+        tester.view.physicalSize.height / tester.view.devicePixelRatio,
+      ),
+      reason: '内容已超过画布高度，请抬高 physicalSize —— 否则 golden 会被静默裁掉',
+    );
+
     await expectLater(
-      find.byType(_GrindSheet),
+      find.byKey(previewSheetKey),
       matchesGoldenFile('goldens/grind_scale_previews.png'),
     );
   });
@@ -51,6 +66,7 @@ class _GrindSheet extends StatelessWidget {
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
+          key: previewSheetKey,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             const _Title('M2.10 研磨刻度栏：圈 / click 输入 + 相对刻度'),
@@ -234,7 +250,7 @@ class _GrindSheet extends StatelessWidget {
                 children: <Widget>[
                   _CardRow(
                     first: '耶菲雪加  [拿铁]            ☆☆☆☆',
-                    second: 'mavo 巫师2 / 22 click + 15 click',
+                    second: 'JX-Pro / 22 click + 15 click',
                   ),
                   SizedBox(height: 12),
                   _CardRow(
@@ -250,7 +266,7 @@ class _GrindSheet extends StatelessWidget {
                 children: <Widget>[
                   _CardRow(
                     first: '耶菲雪加  [拿铁]          ☆☆☆☆',
-                    second: 'mavo 巫师2 · 相对刻度 75 click',
+                    second: 'JX-Pro · 相对刻度 75 click',
                   ),
                   SizedBox(height: 12),
                   _CardRow(

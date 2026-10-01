@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/app_info.dart';
 import '../../data/export_service.dart';
 import '../../data/providers.dart';
 import '../../data/repositories/settings_repository.dart';
@@ -140,8 +141,10 @@ class SettingsPage extends ConsumerWidget {
                 leading: const Icon(Icons.info_outline),
                 title: const Text('关于豆刻'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () =>
-                    _showMessage(context, '豆刻 BeanClick v0.1.0 · 本地优先，无追踪'),
+                onTap: () => _showMessage(
+                  context,
+                  '$kAppName v$kAppVersion · $kAppTagline',
+                ),
               ),
             ],
           ),
@@ -151,14 +154,14 @@ class SettingsPage extends ConsumerWidget {
           child: Column(
             children: <Widget>[
               Text(
-                '豆刻 BeanClick',
+                kAppName,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                'v0.1.0',
+                'v$kAppVersion',
                 style: Theme.of(context).textTheme.bodySmall
                     ?.copyWith(color: Theme.of(context).colorScheme.outline),
               ),

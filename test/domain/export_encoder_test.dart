@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:beanclick/core/app_info.dart';
 import 'package:beanclick/data/export_service.dart';
 import 'package:beanclick/domain/entities.dart';
 import 'package:beanclick/domain/enums.dart';
@@ -19,7 +20,7 @@ void main() {
       ) as Map<String, Object?>;
 
       expect(payload['schemaVersion'], ExportDocument.schemaVersion);
-      expect(payload['appVersion'], '0.1.0');
+      expect(payload['appVersion'], kAppVersion);
       expect(payload['exportedAt'], isA<String>());
       expect(payload['counts'], <String, int>{
         'beans': 1,
