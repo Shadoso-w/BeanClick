@@ -450,7 +450,7 @@ keytool -genkeypair -v `
 | `flutter analyze` | `No issues found!`，退出码 0 |
 | `dart format --output=none --set-exit-if-changed .` | 0 处改动，退出码 0（CI 同款检查） |
 | `dart run build_runner build --delete-conflicting-outputs` | 成功；生成物与仓库里的 `database.g.dart` 完全一致（无 diff） |
-| `flutter test` | **292 个测试全部通过**，退出码 0（M2.9：测评反馈 11 条） |
+| `flutter test` | **299 个测试全部通过**，退出码 0（2026-10-01 实测；由 `verifier` 独立复跑两次均 299、0 skip。此前这里记的 292 / README 记的 297 都已过期 —— 教训：**基线必须实测，不要照抄文档**） |
 | `flutter build apk --release --split-per-abi` | 成功，**1.25 分钟**（M2.8 第二批，release 签名） |
 
 包体（验收清单要求 < 30MB）：
