@@ -5,6 +5,42 @@
 
 ---
 
+## [Unreleased]
+
+### 修复
+
+- **应用版本号显示错误**：0.2.0 的包在「关于豆刻」里和导出的 JSON 备份里
+  都还自称 `0.1.0`（版本号散在三处，发版时全忘了改）。现在统一到
+  `lib/core/app_info.dart` 的 `kAppVersion`，并加了
+  `test/domain/app_info_test.dart` 把它和 `pubspec.yaml` 钉死 ——
+  只改 pubspec 而忘了改这里，测试会直接红
+- **本机字体路径改成自动探测**：`tool/design_preview/` 里写死的
+  `<盘符>:\Windows\Fonts\...` 与 Flutter 安装目录下的图标字体，
+  换机器就会加载不到（设计稿渲染成方块）。现在按候选列表探测 +
+  `BEANCLICK_PREVIEW_CJK_FONT` / `BEANCLICK_PREVIEW_ICON_FONT` 可覆盖；
+  `batch1_previews_test.dart` 里重复的一份字体加载代码也并回
+  `preview_support.dart`
+- **渲染稿被静默裁掉一整段**：M2.10 的渲染稿加了第 ⑥ 段之后内容超出视口，
+  「⑧ 记录卡片」被 `SingleChildScrollView` 裁掉 —— 而**被裁掉的内容 golden
+  永远比不出来**，所以测试一直全绿（当时交给你看的那版稿子也少了这一段）。
+  改成截内容 Column 本身（`previewSheetKey`），图高 = 内容高：以后加段不会再漏，
+  顺带把 batch1 / batch2 两稿底部多余的空白带去掉了
+
+### 变更
+
+- **新增推送前信息审核流程**：`docs/REVIEW-BEFORE-PUSH.md`（审核口径 + 报告模板 +
+  占位符约定）与 `tool/check_upload_safety.ps1`（一条命令扫 tracked/未跟踪文件，
+  有阻断项时退出码非 0）。规则写进 `CONTRIBUTING.md` 与 `DEVELOPMENT.md` §13.3
+- **泛化本机信息**：文档里的厂商内部型号串与真机安装时间戳改成
+  「一台 Android 14 手机」；`RELEASING.md` / `DEVELOPMENT.md` 里几条写死
+  工程根目录的命令改成相对路径
+- **不再入库 6 张可重生成的预览图**（`scheme2_A~D.png`、
+  `icon_review_keep88/94.png`，≈180 KB）：没有任何文档/测试引用，
+  一条命令就能重生成；被判据认定「承担留档职责」的几张（goldens、
+  `scheme2_sheet`、`icon_review_keep82` 等）继续保留
+
+---
+
 ## [0.2.0] - 2026-09-29
 
 ### 新增
@@ -36,8 +72,8 @@
 - **相对刻度算错方向**：0.1.0 的提示行是 `零点 + 圈 × 每圈 click + click`
   （**加**零点），按用户给的公式改成 **减**零点
   （`圈 × 每圈 click + click − 零点`）。零点不为 0 的磨豆机会看到读数变化
-- **记录卡片不再出现两段 click**：第二行由 `mavo 巫师2 / 22 click + 15 click`
-  改成 `mavo 巫师2 · 相对刻度 75 click`；第一行（豆名 + 方法 chip + 评分星）不动
+- **记录卡片不再出现两段 click**：第二行由 `JX-Pro / 22 click + 15 click`
+  改成 `JX-Pro · 相对刻度 75 click`；第一行（豆名 + 方法 chip + 评分星）不动
 
 ### 验证结果
 
@@ -47,7 +83,7 @@
 | `flutter analyze` | 0 问题 |
 | `flutter test` | **297 个测试全部通过**（0.1.0 是 292） |
 | `flutter build apk --release --split-per-abi` | 成功（约 2 分钟），`versionCode 2002` / `versionName 0.2.0` |
-| 真机（小米 11 / Android 14） | 覆盖安装启动正常，应用信息页显示版本 **0.2.0**；记录卡片第二行确认是「mavo 巫师2 · 相对刻度 31 click」 |
+| 真机（一台 Android 14 手机） | 覆盖安装启动正常，应用信息页显示版本 **0.2.0**；记录卡片第二行确认只给一个相对刻度值（不再是两段 click） |
 
 包体（验收要求 < 30MB）：
 
@@ -169,7 +205,7 @@
 | `flutter analyze` | 0 问题，退出码 0 |
 | `flutter test` | **292 个测试全部通过**，退出码 0 |
 | `flutter build apk --release --split-per-abi` | 成功（约 2 分钟） |
-| 真机（小米 11 / Android 14） | 覆盖安装启动正常；v4 → v5 → v6 → v7 的迁移都在真机上跑过，旧数据保留 |
+| 真机（一台 Android 14 手机） | 覆盖安装启动正常；v4 → v5 → v6 → v7 的迁移都在真机上跑过，旧数据保留 |
 
 包体（验收要求 < 30MB）：
 
@@ -365,7 +401,7 @@
 | `app-x86_64-release.apk` | 21.12 MB | 21.32 MB | 21.32 MB |
 
 > M2.7 与 M2.6 的包体只差几十字节（arm64 从 20,900,363 到 20,900,439），
-> 这次改的都是界面代码。M2.7 的 APK 已在小米 11（Android 14）上覆盖安装并启动，
+> 这次改的都是界面代码。M2.7 的 APK 已在一台 Android 14 手机上覆盖安装并启动，
 > logcat 无异常 —— 也就是真机上跑通了 v4 → v5 的加列迁移。
 
 #### 计划中

@@ -6,6 +6,7 @@ library;
 
 import 'dart:io';
 
+import 'package:beanclick/core/app_info.dart';
 import 'package:beanclick/data/database.dart';
 import 'package:beanclick/data/mappers.dart';
 import 'package:beanclick/data/providers.dart';
@@ -136,6 +137,8 @@ Future<ExportDocument> loadExportDocument(AppDatabase db) async {
 
   return ExportDocument(
     exportedAt: DateTime.now(),
+    // 显式带上版本号：备份文件里写的是哪个版本导出的，将来排查兼容性问题要看它。
+    appVersion: kAppVersion,
     beans: beanRows.map((row) => row.toEntity()).toList(growable: false),
     batches: batchRows.map((row) => row.toEntity()).toList(growable: false),
     grinders: grinderRows.map((row) => row.toEntity()).toList(growable: false),
