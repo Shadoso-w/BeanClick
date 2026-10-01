@@ -173,9 +173,17 @@ flowchart LR
 | `dart run build_runner build` | 会重写整个 `database.g.dart`，两个进程同时跑必然坏 | 只有 `guardian` 触发；跑之前 `git status` 必须干净 |
 | `dart format .`（全量） | 会顺手改别人的文件，污染 diff | **只格式化自己卡里的文件**；全量格式化由 Lead 在集成阶段单独做一次 |
 | `dart run drift_dev schema dump / generate` | 重写 `test/drift/**` | `guardian` 独占；dump 后**必须**补一份测试夹具（[§7.4](../DEVELOPMENT.md)） |
-| `flutter test` | 会加载工程根目录的 `sqlite3.dll`；并发跑多个实例会互相拖慢 | 一张卡一次；集成阶段由 `verifier` 统一跑一次全量 |
+| `flutter test` | 会加载工程根目录的 `sqlite3.dll`（gitignore 的）。**并发不是"变慢"而是直接报错** | 一张卡一次；集成阶段由 `verifier` 统一跑一次全量 |
 | `git add/commit/push` | 唯一历史 | **只有 `lead`**；subagent 一律不碰 git |
 | APK 构建 / 真机安装 | 依赖本机 Gradle 守护进程与设备 | `verifier` 独占；构建异常慢先查残留 `java` 进程 |
+
+> ⚠️ **`flutter test` 并发的真实症状（2026-10-01 实测，两条独立卡各撞一次）**：
+> 第二个进程会以
+> `Flutter failed to delete file at build\native_assets\windows\sqlite3.dll`
+> 之类的形式失败 —— 看起来像"构建坏了"，其实是**别人正在跑同一个 worktree 的测试**。
+> 遇到它先看同 worktree 有没有并行的卡，**不要**去删 `build/` 或重装依赖。
+> 这也意味着：**并行卡即使用户级文件不相交，也不能同时跑 `flutter test`**；
+> 各自的 RED/GREEN 循环要错开（或由 `lead` 明确排队）。
 
 ### 4.4 拆卡的三条判据
 
@@ -258,6 +266,49 @@ flutter test        # 记下通过数，这就是本次的回归基线
 * **基线必须先测**。不知道基线是多少，"测试全过"这句话就没有信息量（见 §10 反模式）。
   由 `verifier` 执行并把命令与数字落盘，`lead` 记录进 `PROGRESS.md`。
 * 一次性 / 只读的探索**不必**建 worktree；只要会写文件就该隔离。
+
+**同一批里有并行卡时，worktree 是"批"的、不是"卡"的**（2026-10-01 实测补）：
+
+* 本项目的默认做法是**一批一个 worktree**（省 G2 成本），靠 §4.4 判据 1 保证并行卡的文件**不相交**。
+* 代价：**`git status` 不再能证明"我只改了自己 scope 内的文件"** —— 并行期间它会同时列出别人的 WIP，
+  甚至别人的 RED 测试（本批实测：T14 收工时全量 `flutter test` 是 `+303 -4`，那 4 条红是**同 worktree 里
+  T12 尚未实现的 RED 测试**，不是 T14 的回归）。
+* 所以**每卡验收一律用 scoped diff**，不要用 `git status`：
+
+  ```powershell
+  git diff --stat -- <本卡 scope 的文件>      # 这才是"有没有越界"的证据
+  ```
+
+* 收工汇报里**必须写明"哪些改动不是我的"**，否则 `lead` 会把别人的红算到这张卡头上。
+* 卡里那条"DoD：`git status` 只应看到你 scope 内的文件"**只适用于串行批次**；并行批次里
+  它是不可能满足的，写卡时别照抄（本批第一版卡就是这么写错的，被 T14 当场指出）。
+
+**卡里必须写全"会被这次交互改动推翻的测试文件"**（2026-10-01 实测补）：
+
+* 本项目用**临时 subagent** 做实现，而**subagent 一旦开工就无法中途 steer**
+  （`send_message` 只对常驻 teammate 生效；本批实测对 subagent 直接报 `not found`）。
+  也就是说：**派单时漏掉的文件，只能等这张卡收工后再派一张后续卡**，白多一轮串行。
+* 本批真实代价：M3-T15 把"填占比 + 总粉量可编辑"改成"每支填克数"，而
+  `test/features/blend_form_test.dart` 有 5 条用例**直接建立在这个被推翻的交互上**
+  （写卡时我只列了 `grind_turns_test.dart` / `batch1_ui_test.dart`，漏了它）→
+  只能另立 `M3-T19` 补，且那一刻分支是全红的。
+* **规矩**：写卡时先 `grep` 一遍**要改的 Key / 字段 / 交互名**在 `test/` 下的全部引用，
+  把命中的测试文件一起写进 scope（§4.1 本来就规定"测试与实现同卡"，漏的通常是**别的**测试文件）。
+  例：改"填占比"这种交互，`grep 'brew.share\|brew.dose' test/` 就能一次找准。
+
+**并行批次下"一张卡 = 一次 commit"要打折扣**（2026-10-01 实测补）：
+
+* 手册 §3.3 / §6.1 的"一卡一 commit"隐含前提是**一张卡独占一个工作区**。本项目为了省 G2 成本
+  改成"**一批一个 worktree**"，于是同一批次里多张卡会**改同一个文件**（本批 `brew_log_form_page.dart`
+  被 T12 / T15 / T18 三张卡先后改过，且**全程没有 commit**）。
+* 结果：收工时那些改动在文件里**已经交织**，按卡拆 commit 需要逐 hunk 手术（易错、且会把
+  "谁改的"变成考古）。**结论**：
+  * 一批一个 commit 是**可接受的**，但 commit message **必须逐卡列出**：卡号、目标、关键改动、
+    验收证据（命令 + 通过数 + 退出码）、以及"哪张卡由谁审的"。
+  * 或者（更稳）：**同一热点的卡串行 + 每张卡收工即 commit**，代价是多几次 `flutter test`。
+  * 无论哪种，`PROGRESS.md` 的 §3 任务表都必须逐卡写清 commit 归属 —— 那是唯一的对账依据。
+* 反过来说：**能并行的是"文件不相交"的卡，但 `flutter test` 仍要排队**（见 §4.3），
+  所以并行的真正收益是"实现/思考"的并行，不是"跑测试"的并行。
 
 ### 5.5 G3 计划完备（任务卡）
 

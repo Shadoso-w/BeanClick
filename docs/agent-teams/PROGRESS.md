@@ -5,9 +5,9 @@
 >
 > | 项 | 值 |
 > |---|---|
-> | 最后更新 | 2026-10-01（首批 T00/T01/T10 落盘 + G4/G6 复核 + T10 返工） |
+> | 最后更新 | 2026-10-01（第二批：用户反馈修复 T12–T25 全部落盘；**G6 已过（343）、PG 门已过（可推送）**，待推送） |
 > | 更新人 | `lead` |
-> | 当前里程碑 | **M3 Android 内测**（首批 3 张卡已 `done`，等 G7/PG 与推送） |
+> | 当前里程碑 | **M3 Android 内测**（第一批文档 3 张卡 + 第二批反馈修复 10 张卡均已 `done`） |
 > | 已发布 | `v0.2.0`（= M0–M2.11，schema v7） |
 > | 回归基线 | ✅ **已实测（2026-10-01）**：`flutter test` = **299 通过 / 退出码 0**；`flutter analyze` = `No issues found!` / 退出码 0；`dart format --output=none --set-exit-if-changed .` = 0 处改动 / 退出码 0。Flutter 3.47.5 · Dart 3.13.4 |
 > | 工作分支 | `feat/m3-intake`（worktree = `<工程根目录的父目录>\BeanClick-m3-intake`）；`4ec919c` → T00 `2b6a4f8` → T01 `5653d20` → T10 `0a8bdc5` → T10 返工 `e47d08b` |
@@ -139,6 +139,67 @@ flowchart TD
 
 > **本表不含**「等内测反馈回来的修复任务」——那要等 T09 之后按真实 Issue 建卡，不许提前编。
 
+### 3.2 第二批：用户反馈修复（2026-10-01，`fix/feedback-round2`）
+
+> 用户第二轮反馈共 8 项真 bug + 3 项建议。其中 **5 项落在热点文件
+> `brew_log_form_page.dart`（真值 2075 行）** → 按 §4.2 只能一个写者，拆成 T12 / T15 **串行**；
+> 其余文件不相交，可并行。基线 **299**（`verifier` 在 worktree 内实测）。
+
+| ID | 目标（一句话，可判定） | 写作用域 | 依赖 | 状态 | 负责人 |
+|---|---|---|---|---|---|
+| M3-T12 | 方法行「＋」去重（一个 chip 画了两个加号）+ 辅料行三框对齐且数量框能显示 4 位数 + 四个核心参数加保守上下限 + 记录里豆子必填 | `brew_log_form_page.dart`、`test/features/*`（1 个） | 无 | **done**（`DONE_WITH_CONCERNS`，见下） | `impl-ui`（临时） |
+| M3-T13 | 版本号 `0.2.0+2` → `0.3.0+3`（pubspec 与 `kAppVersion` 两处同改，守卫测试已存在） | `pubspec.yaml`、`lib/core/app_info.dart` | 无 | **done**（299 未退化） | `impl-data`（临时） |
+| M3-T14 | 新增豆子时烘焙日期与剩余克数必填（编辑既有豆子不强制） | `lib/features/beans/bean_form_page.dart`、`test/features/bean_form_test.dart` | 无 | **done**（`DONE_WITH_CONCERNS`） | `impl-ui`（临时） |
+| M3-T15 | 拼配改成**直接填克数**（占比自动算、只读展示）+ 总时间改**分/秒两个框** + **相对刻度改用磨豆机当前校准**（当前零点 / 每圈 click，磨豆机缺失时回落记录快照） | `brew_log_form_page.dart`、`lib/features/record/record_page.dart` | **T12**（同热点文件） | **done**（`DONE_WITH_CONCERNS`，**未动 schema**） | `impl-ui`（临时） |
+| M3-T18 | **修正「豆子必填」的判定条件**：改为**仅当豆库非空**时才强制选豆（空库放行、允许存为"未指定"），并相应更新 `batch1_ui_test.dart` 里 T12 加的那条测试 + 新增"空库可保存"用例 | `brew_log_form_page.dart`、`test/features/batch1_ui_test.dart` | **T15**（同热点文件） | **done**（判定条件 +2 条测试） | `impl-ui`（临时） |
+| M3-T19 | **把被 T15 推翻交互的测试改到新口径**：`blend_form_test.dart` 5 条（填占比+总粉量可编辑 → 填克数+占比只读+总粉量求和；含"占比合计 100%"那条的处置）、`widget_test.dart:288`（`brew.totalTime == '120'` → 分/秒两框） | `test/features/blend_form_test.dart`、`test/widget_test.dart` | **T15** | **done**（5 红全修；条数不变 delta=0） | `impl-test`（临时） |
+| M3-T20 | **处置 G4 的 F1/F3/F4**：F1 修本批引入的回归（`_secondsText(0)` 返回空串 → 打开 0 秒旧记录再保存会把 0 写成"未记录"，1 行修法 + 往返测试）；F3 给拼配总分越界分支补测试（`60 + 60 = 120 g`，卡外新增但零覆盖）；F4 收紧豆子列表 loading 窗口（loading 且列表为空时拦下并提示，`hasError` 仍放行） | `brew_log_form_page.dart`、`test/features/blend_form_test.dart`、`test/features/batch1_ui_test.dart` | 无 | **done**（327 → 337） | `impl-ui`（临时） |
+| M3-T21 | **修 `entities.dart` 里与本批定稿相反的注释 + 死方法**：`Grinder.relativeClicks` 的文档仍写"用记录里的快照、重新校准零点不会重新解释历史读数"（现在行为正相反），且该实例方法**已无任何调用点** → 改注释（必要时删除死方法） | `lib/domain/entities.dart` | 无 | **done**（注释改成当前行为 + 删死方法，+13/−12） | `impl-data`（临时） |
+| M3-T22 | **处置 G5（rev-code）的阻断项 B1 与 S1/S2/S3**：①**上下限只对"本次改动过的值"生效**（值等于库里原值即放行），这样既能修 B1（既有 ≥3600 秒的记录不再被锁死），又能覆盖 `dose/water/waterTemp` 的同类历史数据；②`_validateMinutes` 上限 59 → **60**，让"总时间 ≤3600 秒"这个承诺真正可达（60:00），补 60:00 round-trip 测试；③**S1**：在 `_save()` 里补一层**不依赖控件**的范围兜底（`FormState.validate()` 只校验在册字段，滚出视口的输入框会被 ListView 销毁 → 越界值可静默存下）；④**S2**：`_removePick` 空克数不要写 `'0'`、极小粉量拆半不要预填 0；⑤**S3**：ⓘ 弹窗按"当前值 / 快照"分别措辞（别把快照说成"这台磨豆机"的值） | `brew_log_form_page.dart`、`test/features/batch1_ui_test.dart`、`test/features/blend_form_test.dart` | **T20**（同热点文件） | **done**（327 → **337**；S1 的漏洞经 RED 实证：字段真被销毁、`3001` 曾被静默存下） | `impl-ui`（临时） |
+| M3-T25 | **把 T22 的「原值放行」语义补到拼配路径**（G4 定点复核的 F1/F2）：**F2** 拼配总分与每支克数都没有"等于原值就放行"的豁免 → 旧拼配记录（总分 >100 g，如本批加限前记的 120 g）**打开不飘红、但一保存就被拦，连改备注都存不下去**；250/250 那种更旧的一打开就行内飘红 —— 而单支的同类记录是豁免的，属**单支/拼配语义不一致**。**F1** 拼配每支的「0.1–100 g」只在行内、保存路径完全不看 → 填 `0.05 g` 再把该行滚出视口（ListView 反注册）能落库。要求：给 `_BeanPick` 加 `originalGrams`、总分加原值豁免、`_validatePicks` 的每支检查提到与行内同口径（文案同一字符串） | `brew_log_form_page.dart`、`test/features/blend_form_test.dart`、`test/features/batch1_ui_test.dart` | **T22** | **done**（337 → **343**；拼配与单支共用同一入口 `_gramsRangeError`） | `impl-ui`（临时） |
+| M3-T23 | **【预存在，非本批引入】编辑路径的余量回补不带 batchId**：`brew_log_repository.dart` 的 `adjustStock(beanId, delta)` 不传批次 → 仓储自动挑"有余量+烘焙日期最新"的那袋，多袋同豆时回补可能落到**另一袋**（新建路径是带 batchId 的）。本批把"改克数"变成常用操作，风险放大 → 建议单开卡 | `lib/data/repositories/brew_log_repository.dart`（+ `BeanUsage` 侧映射） | 无 | todo | 待定 |
+| M3-T26 | **【可维护性】把核心参数的上下限抽成命名常量**（PG 门的 C 类发现）：`brew_log_form_page.dart` 里 `'0.1–100 g'` 出现 **4 次**、`'0–2000 g'`/`'0–100 ℃'`/`'0–59'`/`'0–60'` 各 2 次，`min:`/`max:` 数值每位点重写，且 `:539` 有一条**独立的消息字面量**没走 `_gramsRangeError`。`:2151` 的注释声称"范围与文案不会在两侧不一致"——那只对同一个 helper 成立，**值本身仍是复制的**。建议抽 `_NumRange` 值对象（label/range/min/max + errorFor），收益：11 处用户可见文案与**断言它们的那批测试**在调参时不会半改半不改。非阻断，提示级 | `lib/features/record/brew_log_form_page.dart` | 无 | todo | 待定 |
+| M3-T27 | **修 `docs/M2.10-研磨刻度设计稿.md` 的节号乱序**（`PROGRESS §8` row 7：`1.1 → 1.2 → 1.3 → **1.5** → 1.4`，`verifier` 第三轮复核时再次确认仍在）。本轮虽然改过该文件（+6 行"落地补充"），但**刻意不顺手改**——改了就作废 G6 的 16 文件哈希锚点 | `docs/M2.10-研磨刻度设计稿.md` | 无 | todo | 待定 |
+| M3-T24 | **【测试基础设施】`test/helpers/widget_harness.dart` 的覆盖会跨测试泄漏**：`useOverrides` 把 builder 存在 harness 实例上，`reset()` 每次又重新应用 → **前一个测试的 provider 覆盖会延续到后面的测试**。实证：`batch1_ui_test.dart` 末尾那组把 `beanListProvider` 覆盖成 error 之后，**任何追加在它后面的测试都会拿到空豆库**（M3-T22 的第一版 RED 因此全挂，它只能用局部 `setUp` 兜住）。这属**静默串味**，既可能造假红也可能造假绿 → 必须修 harness 本人。附带记录另一个测试坑：`fillField` 后只 `pump()` 一帧时，输入框获焦会带动 ListView 滚动动画，此刻按 key/tooltip 算出的坐标是中间帧 → `tap()` miss（需 `pumpAndSettle()`） | `test/helpers/widget_harness.dart` | 无 | todo | 待定 |
+
+
+| M3-T16 | 建议类（待排期、未开工）：辅料可填具体牌子、自定义收藏夹（记录组）、豆库/磨豆机按购买总量·消耗总量·花费·单价·复购次数排序 | 待定 | 无 | todo | 待定 |
+
+**用户对「豆子必填」的裁决（2026-10-01）**：**豆库为空时放行** —— 一支豆子都没有时允许以
+"未指定豆子"保存（首杯零阻力，符合手册 §8 快速记录）；一旦豆库已有豆子，就必须选一支。
+`lead` 已核实：T12 报告的 4 条被撞红的既有测试**全部运行在空豆库下**
+（`test/features/batch2_ui_test.dart` 里没有 `addBeanWithBatch`；`test/widget_test.dart` 的两条
+快速记录在首个建豆用例之前）→ **按新规则会自动恢复绿，不需要改这 4 条测试的夹具**。
+所以原本计划的"改夹具"卡（T17）**取消**，改为 T18 修正判定条件本身。
+
+**T12 的实现细节（留档）**：辅料行**统一 48dp 高**、数量框 **88dp**、单位框 **72dp**、删除按钮 compact；
+必须 48 的原因是实现者实测：名称 `InputDecorator` 自然高 44、`NumberField` 自然高 48，
+只套 `SizedBox` 时边框仍按自然高绘制、对不齐，故给两个 `InputDecorator` 加 `expands: true`。
+RED 证据里带原始尺寸 `name=Size(116.0, 44.0) amount=Size(58.0, 48.0)`。
+
+**T15 的 Key 变更清单（重要：后续卡与审查都要按这个表）**：
+
+| Key | 变更 |
+|---|---|
+| `brew.beanGrams.$i` | **新增**：拼配每支的克数输入框（suffix `g`） |
+| `brew.share.$i` | Key 名**保留**、**语义变更**：占比 % 可编辑框 → 同行**只读**占比文字（`占比 70%`），不能再 `fillField` |
+| `brew.totalTime` | **已删除** → 拆成 `brew.totalTimeMin` + `brew.totalTimeSec`（两个新 Key） |
+| `brew.dose` | **保留**：单支时仍是可编辑 `NumberField`；**拼配时是只读的自动求和展示**（同 Key，不再是 `EditableText`） |
+
+T15 还额外加了一处卡上没写的校验（已请 G4 认）：**拼配总分越界拦保存**（`粉量应在 0.1–100 g 之间`），
+原因是"总粉量不再可编辑后，原 `NumberField` 的上下限看不见它了"。
+另：`BrewLogBeans` 表**本来就没有占比列**（占比一直是算出来的）→ "直接填克数"**不需要改 schema**，已由实现者读列定义确认。
+
+> **M3-T15 的行为影响（用户已确认）**：相对刻度改用**当前**零点后，**历史记录卡片上显示的数字会变**
+> （记录里的 `圈/click` 不变，换算用的零点变成磨豆机现在的值）。这正是用户要的"与真实值一致"。
+
+> **本批踩到的环境陷阱（已写进 `docs/DEVELOPMENT.md` §13.2）**：本会话的 shell 是
+> **Windows PowerShell 5.1**，`Get-Content` / `Select-String` / `Measure-Object -Line`
+> **默认按 ANSI(GBK) 解码 UTF-8 中文** → 乱码、**行数系统性偏少**、中文注释搜不到。
+> 实测差：`brew_log_form_page.dart` 1941(错) / **2075(真)**、`entities.dart` 1309 / **1390**、
+> `widget_test.dart` 569 / **594**、`form_fields.dart` 698 / **750**。
+> 由 `verifier` 在 G2 复核时抓到（我建卡时写错了行数），本批所有实现卡都已带上"用 `-Encoding utf8` 定位"的须知。
+
 > **M3-T01 负责人从 `verifier` 改成 `lead`**（2026-10-01 裁决）：`verifier` 的技能卡把它的写作用域定为
 > **"只写验证报告"**，而 T01 要改 `README.md` / `docs/DEVELOPMENT.md` —— 那是 `docs/**`，按 §4.1 归
 > `lead` + 各任务作者。数字由 `verifier` 提供证据（已交：两次复跑 299），**落盘由 Lead 做**，
@@ -206,11 +267,11 @@ flowchart LR
     G2 --> G3["G3 计划完备<br/>in_progress 三张卡已派"]
     G3 --> G4["G4 规格符合<br/>done 打回 C1/C2 已修"]
     G4 --> G5["G5 代码质量<br/>done 文档卡无代码面"]
-    G5 --> G6["G6 集成验证<br/>done 299 = 基线"]
-    G6 --> G7["G7 信息审核与收尾<br/>in_progress PG 重跑中"]
+    G5 --> G6["G6 集成验证<br/>done 343 ≥ 基线 299"]
+    G6 --> G7["G7 信息审核与收尾<br/>done PG 已过 可推送"]
     DG["DG 设计稿门<br/>todo M3-T05 可能触发"]
     MG["MG 迁移门<br/>todo M3 预计不涉及"]
-    PG["PG 推送门<br/>todo T09 前必过"]
+    PG["PG 推送门<br/>done 本批已过"]
 
     DG -.-> G3
     MG -.-> G3
@@ -255,7 +316,7 @@ flowchart LR
 
 | 指标 | 基线 | 当前 | 阈值 |
 |---|---|---|---|
-| 测试通过数 | **299**（2026-10-01，`verifier` 独立复跑两次均 299，退出码 0，0 skip） | — | 不得低于基线 |
+| 测试通过数 | **299**（2026-10-01，`verifier` 独立复跑两次均 299，退出码 0，0 skip） | **343**（反馈第二轮 10 张卡；`verifier` 第三次 G6 复现两次均为 **343 / exit 0 / 0 skip**，逐文件净 Δ 全 ≥ 0） | 不得低于基线 |
 | APK 包体（arm64-v8a） | 21.0 MB（0.2.0，**本次未复测**） | — | < 30 MB |
 | 冷启动耗时 | 未采样 | — | < 1.5 s |
 
@@ -335,3 +396,12 @@ flowchart LR
 | 2026-10-01 | `guardian` | **G4 规格审查（`DONE_WITH_CONCERNS`）**：T10 抄写忠实（两段警告逐字落地、未弱化），但打回两项 —— **C1**：`指南:126` 的 `if (from < 5)` 是 row 2 的**第二个入口**（现有用户全走 `from=7` → 迁移段不执行 → `no such column`），**C2**：我额外那句"v4→v5→v6→v7 全是加列/删列/改值"枚举不准（v5→v6 还建了新表、该区间没有删列）。另新发现 C3/C4 → 立 M3-T11 |
 | 2026-10-01 | `verifier` | **G6 集成验证（`DONE_WITH_CONCERNS`）**：`git diff --name-only 4ec919c..HEAD` 自证 19 个文件**全是 `.md`**（禁区 `lib/` `test/` `android/` `pubspec.*` 零命中），`database.dart`/`database.g.dart`/`pubspec.lock` 与 G2 时逐字节相同 → 未越界；三条门禁全绿、**299 = 基线**、0 skip、工作区干净。唯一 concern：`PROGRESS.md` 在 HEAD 上与本批事实矛盾 8 处（本行以下即处置） |
 | 2026-10-01 | `lead` | **处置 G4/G6 的两个结论**：① T10 返工 `e47d08b`（修 C1/C2 —— 给 `onUpgrade` 示例补"5 只是示意、必须与 §2.2 新值一致"的注释与后果链；改正枚举措辞）；② 按 verifier 清单刷新本文件（表头里程碑与分支 SHA、§2 DAG 状态、§3 三张卡置 `done` 并新增 `M3-T11`、§5 门禁 G3–G6 置 `done`、§6 健康度、§8 row 1 关闭并新增 row 10/11、本节），PG 门因"范围变了"需在 `feat/m3-intake` 上重跑 |
+| 2026-10-01 | `lead` | **第二批（用户反馈修复）开工**：8 项真 bug 拆成 T12–T15 + T18/T19（热点文件 `brew_log_form_page.dart` 串行、其余并行），3 项建议立为 T16 待排期。G2 由 `verifier` 在 `fix/feedback-round2` 复核（299 基线），并**抓到 PS 5.1 编码陷阱**（`Get-Content` 按 GBK 解码 → 我建卡时写错的行数 1941/真值 2075），已写进 `DEVELOPMENT.md` §13.2 |
+| 2026-10-01 | `impl-*`（临时） | **T12–T15 + T18/T19 全部落盘**：方法行「＋」去重、辅料行统一 48dp（数量 88dp）、四个参数上下限、豆子必填（T18 修正为**仅豆库非空时强制**）、拼配改填克数（**未动 schema**）、总时间分/秒、**相对刻度改用当前校准**、新增豆子必填、版本号 `0.3.0+3`。全量 **299 → 322**（+23 条、0 删除） |
+| 2026-10-01 | `verifier` | **G6（`DONE_WITH_CONCERNS`）**：两次复跑 **322 / exit 0**、0 skip、`+23` 逐文件闭合（证明没静默删用例）；用 `git diff --name-only -- lib/data test/drift` **自证零 schema 改动**并追源码确认 `BrewLogBeans` 确实没有占比列；13 个文件留 SHA256 作锚点（未 commit 批次必须）。concern：本文件当时提前把 G6 标 `done` 且写 299 —— **已在本轮改为 322 ≥ 299** |
+| 2026-10-01 | `guardian` | **G4（`DONE_WITH_CONCERNS`）**：12 条用户原话**逐条判定全部符合**；拼配数据链它特意去读**未被本批改动的仓储**验证接线（新建按每支扣、编辑按 beanId 聚合求差），确认无"改了 doseGrams 余量没动"那类断线。发现 F1（**本批引入的回归**：0 秒记录被改写成"未记录"）、F3（卡外新增校验零覆盖）、F4（loading 窗口可绕过必填）、F5（`entities.dart` 注释仍写旧规则 + 死方法）、F2（本文件 T18/T19 未标 done）。**判定 T15 那处"卡外新增校验"为必要补丁**（60+60=120g 每支合法、总分越界） |
+| 2026-10-01 | `rev-code`（临时） | **G5（`DONE_WITH_CONCERNS`）**：**1 条阻断 B1** —— "总时间 0–3600 秒"这个承诺**不可达**（分/秒各 ≤59 → 最大 3599，`total > 3600` 是死代码），而既有 `totalTimeSeconds = 3600` 的记录打开后"分"预填 `60` → **报错、保存被拦、无任何合法表示**；同一类问题波及 `dose/water/waterTemp`（HEAD 原本无校验 ⇒ 库里可能存在越界值）。另 **S1**（`FormState.validate()` 只校验在册字段 + ListView 会销毁滚出视口的输入框 ⇒ 越界值可静默存下）、S2/S3/S5/S6/S7/S8/S9/S10。它同时逐条给出"查过没问题"的证据（零头手算、余量断言**走真库 `getBatch`**、Key 改名全仓零残留、dispose/mounted 配对） |
+| 2026-10-01 | `lead` | **处置 G4/G5**：① 立 **T20**（F1+F3+F4，已 `done`，全量 **327**）与 **T21**（F5 注释/死方法）、**T22**（B1+S1+S2+S3）、**T23**（S8 预存在问题）；② **B1 的解法**：上下限**只对"本次改动过的值"生效**（值等于库里原值即放行）+ `_validateMinutes` 上限 59 → **60** 让 3600 秒真正可达 —— 既保住用户要的上下限，又不锁死历史记录；③ 修 S5（`DEVELOPMENT.md` 行数表 2075→**2302**、594→**598**，并改成"认方法不认数字"）；④ S6/S7/S9/S10 记为已知项不在本批修 |
+| 2026-10-01 | `impl-*` / `verifier` / `guardian` | **T20–T25 收口**：T20 修 F1 回归（0 秒往返）+ F4 loading 收紧 + F3 补覆盖（327）；T21 修 `entities.dart` 旧注释 + 删死方法；T22 处置 **G5 阻断 B1**（上下限只对改动过的值生效、分上限 59→60 让 3600 可达、`_save()` 补不依赖控件的兜底、S2/S3）→ 337；**第二次 G6 `DONE`**（337 复现两次、新增用例双路径闭合 `T20+4 / T21+0 / T22+11 = +15`、逐文件净 Δ 全 ≥0、零 schema 改动）；**第二次 G4 `DONE_WITH_CONCERNS`**（证明"原值放行"没架空上下限、新建仍校验、严格数值相等不放大；但发现 **F2 拼配路径漏了同一豁免** → 旧 120 g 拼配记录改个备注都存不下去、**F1 每支范围只在行内**）→ 立 T25 |
+| 2026-10-01 | `impl-ui`（临时） | **T25 `DONE`**：拼配补齐与单支**同一套**「原值放行」（总分对 `brew_logs.doseGrams`、每支对 `brew_log_beans.doseGrams`），每支 0.1–100 g 收进保存兜底并与行内**收敛到同一入口** `_gramsRangeError`（同口径由结构保证）→ 全量 **343**。它自查纠了一个假绿（首版 RED 用 `logs().single` 读到 seed 行） |
+| 2026-10-01 | `lead` | 修 G4 的 F4（`docs/M2.10-研磨刻度设计稿.md` 仍引用已删除的 `Grinder.relativeClicks`）→ 补一段"落地补充"，说明现由 `relativeClicksWith` + `BrewLogFormPage.relativeClicks` 承担、且**零点取值口径已从"记录快照"改为"当前值优先"**；立 **T23**（预存在的回补不带 batchId）与 **T24**（harness 覆盖跨测试泄漏，会静默串味）|

@@ -637,6 +637,25 @@ kotlin.incremental=false
 > $c = $c.Replace('旧', '新')
 > [System.IO.File]::WriteAllText($f, $c, (New-Object System.Text.UTF8Encoding($false)))
 > ```
+>
+> ⚠️ **同一个坑的只读版本（2026-10-01 实测，比写坏更阴）**：`Get-Content` / `Select-String` /
+> `Measure-Object -Line` 在 **Windows PowerShell 5.1** 下**默认按系统 ANSI 代码页（简中机器上是 GBK）
+> 解码**，读 UTF-8 中文会乱码、**行数系统性偏少**、中文注释还搜不到 —— 不改文件，所以不会报错，
+> 但会让你**按错的行号定位、搜不到该搜的字符串**：
+>
+> | 文件 | PS 5.1 默认读 | 真值（UTF-8，2026-10-01 实测） |
+> |---|---|---|
+> | `lib/features/record/brew_log_form_page.dart` | 1941 行 | **2302 行** |
+> | `lib/domain/entities.dart` | 1309 行 | **1390 行** |
+> | `test/widget_test.dart` | 569 行 | **598 行** |
+> | `lib/core/widgets/form_fields.dart` | 698 行 | **750 行** |
+>
+> ⚠️ **认方法，不认数字**：右列会随每次改动漂移（上表第一行的 2075 → 2302 就是一次迭代造成的，
+> 由 code review 抓出来）。要用行号时**自己现算**，别引用这张表里的数字。
+>
+> **规矩**：查中文文件一律 `Get-Content -Encoding utf8`（或 `rg` / 编辑器的 read 工具），
+> **行号只认 UTF-8 解码的结果**；报"某文件 N 行"之前先用 `-Encoding utf8` 复核。
+> （本项目的 agent 手册 §4.2 要求改热点文件前"先只读定位行号"，踩的就是这个坑。）
 
 ### 13.3 推送前必须过信息审核
 
