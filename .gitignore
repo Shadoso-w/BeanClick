@@ -100,6 +100,9 @@ app.*.map.json
 # 且与「设计稿只在本地」的口径一致 → 不入库（免得仓库里留一份与冻结设计矛盾的稿）。
 /tool/design_preview/t36_sort_previews_test.dart
 /tool/design_preview/goldens/t36_sort_*.png
+# T37/T38 同理：裁决前的过程画稿（实现已完成，稿子已过期），且无任何 tracked 文件引用。
+/tool/design_preview/t37_t38_previews_test.dart
+/tool/design_preview/goldens/t3[78]_*.png
 /docs/添加新属性指南.md
 /tool/check_upload_safety.ps1
 /RELEASING.md

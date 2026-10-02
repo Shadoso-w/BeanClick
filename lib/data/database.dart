@@ -466,6 +466,14 @@ class BrewLogAddins extends Table {
   /// 辅料名快照，如「牛奶」。
   TextColumn get name => text().withLength(min: 1, max: 60)();
 
+  /// 牌子（v8 新增，T37）：如「Oatly」。可空 = 没记牌子。
+  ///
+  /// `withLength` 只是 **Dart 侧**校验，不生成 SQL `CHECK`（用 v7 快照的
+  /// `customConstraints: null` 对照布尔列的 `CHECK` 可证），
+  /// 所以给既有表 `addColumn` 一个带长度约束的可空列对旧行完全安全。
+  /// ⚠️ 但 `min: 1` 意味着空串 `''` 不合法 → 写入路径要把 `''` 归一成 `null`。
+  TextColumn get brand => text().withLength(min: 1, max: 60).nullable()();
+
   /// 数量；可空 = 只记「加了什么」没量。
   RealColumn get amount => real().nullable()();
 
@@ -481,6 +489,56 @@ class BrewLogAddins extends Table {
 
   /// 顺序。
   IntColumn get position => integer().withDefault(const Constant(0))();
+}
+
+/// 自定义收藏夹（组）——给「收藏的记录」分组（v8，T38）。
+///
+/// 与 [BrewLogs.isFavorite] 的分工：`isFavorite` 仍然是「是否收藏」的**唯一**判据；
+/// 本表只回答「这条收藏还放进了哪些夹」。**没有关联行 = 收藏了但没分组**，
+/// 不是「没收藏」——所以不要改成「有关联组才算收藏」。
+@DataClassName('FavoriteGroupRow')
+class FavoriteGroups extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  /// 用户起的组名，如「早餐配方」。与 [BrewLogAddins.name] 同量级。
+  TextColumn get name => text().withLength(min: 1, max: 60)();
+
+  /// 展示顺序，越小越靠前。
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+/// 记录 ↔ 收藏夹的**关联表**：一条记录可进多个夹（v8，T38；用户裁决 C=②）。
+///
+/// 为什么不是 `brew_logs` 上的可空列：可空列只能表达「进一个夹」。选关联表
+/// 还顺带绕开了「`addColumn` 不建索引」那个坑——新表的索引随建库一起产生。
+///
+/// ⚠️ **索引必须与 [AppDatabase._createIndexes] 里那三条手动语句一一对应**：
+/// drift 的 `Migrator.createTable` **只发 `CREATE TABLE`**，`@TableIndex` 的索引
+/// 是 `createAll()` 建的（见 drift `migration.dart` 的 `createAll` / `createTable`）。
+/// 也就是说**升级上来的旧库不会**因 `createTable` 得到索引，全靠 `_createIndexes`。
+@DataClassName('BrewLogFavoriteGroupRow')
+@TableIndex(
+  name: 'idx_brew_log_favorite_groups_brew_log_id',
+  columns: {#brewLogId},
+)
+@TableIndex(name: 'idx_brew_log_favorite_groups_group_id', columns: {#groupId})
+@TableIndex(
+  name: 'idx_brew_log_favorite_groups_unique',
+  columns: {#brewLogId, #groupId},
+  unique: true,
+)
+class BrewLogFavoriteGroups extends Table {
+  IntColumn get id => integer().autoIncrement()();
+
+  IntColumn get brewLogId =>
+      integer().references(BrewLogs, #id, onDelete: KeyAction.cascade)();
+
+  IntColumn get groupId =>
+      integer().references(FavoriteGroups, #id, onDelete: KeyAction.cascade)();
+
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
 /// 配方（设计稿 §4）。
@@ -603,6 +661,8 @@ class ExtraAttributes extends Table {
     BrewLogs,
     BrewLogBeans,
     BrewLogAddins,
+    FavoriteGroups,
+    BrewLogFavoriteGroups,
     Recipes,
     AppSettings,
     ExtraAttributes,
@@ -617,7 +677,7 @@ class AppDatabase extends _$AppDatabase {
   /// 打开指定文件的数据库。
   AppDatabase.file(File file) : super(NativeDatabase(file));
 
-  /// v7：处理法改多选、磨豆机加「每 click 微米」、记录存磨豆机零点快照。
+  /// v8：收藏夹组表 +「记录 ↔ 组」关联表、`brew_log_addins.brand`。
   ///
   /// 版本历史（**真实情况**，代码里出现过的版本号）：
   /// - v1：M1 的 5 张表
@@ -626,10 +686,11 @@ class AppDatabase extends _$AppDatabase {
   /// - v6：`brew_logs.methodLabel`、`brew_log_addins`
   /// - v7：`coffee_beans.process` 改多选、`grinders.micronsPerClick`、
   ///   `brew_logs.grinderZeroPointSnapshot` / `grinderClicksPerRevolutionSnapshot`
+  /// - v8：`favorite_groups` / `brew_log_favorite_groups`、`brew_log_addins.brand`
   ///
-  /// ⚠️ v2 / v3 从未出现过（`git log -L` 里是 1 → 4 → 5 → 6 → 7）。
+  /// ⚠️ v2 / v3 从未出现过（`git log -L` 里是 1 → 4 → 5 → 6 → 7 → 8）。
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -650,6 +711,9 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 7) {
         await _upgradeToV7(m);
+      }
+      if (from < 8) {
+        await _upgradeToV8(m);
       }
       // 索引与默认设置都是幂等的，迁移后统一兜一次：
       // 旧库没有索引（v1 一个都没建），而少了索引会让查批次、拉时间线全表扫描。
@@ -695,6 +759,48 @@ class AppDatabase extends _$AppDatabase {
     // 3) 记录：磨豆机零点与每圈 click 的快照。
     await m.addColumn(brewLogs, brewLogs.grinderZeroPointSnapshot);
     await m.addColumn(brewLogs, brewLogs.grinderClicksPerRevolutionSnapshot);
+  }
+
+  /// v7 → v8：T38 收藏夹分组（组表 + 关联表）+ T37 辅料牌子。
+  ///
+  /// 三句都是**纯新增**，一句数据搬迁都没有：旧行的 `brand` 自动为 NULL
+  /// （可空 ⇒ 长度校验也豁免），两张新表建出来就是空的，
+  /// `brew_logs.is_favorite` 一个字节都不动。
+  ///
+  /// 顺序仍然要紧（v6 那次只有加列+建表，本卡是"建两张互有外键的表 + 加列"）：
+  /// 关联表用 `REFERENCES favorite_groups(id)`，所以**组表必须先建**。
+  ///
+  /// ⚠️ 索引不在这里建：`m.createTable` 只发 `CREATE TABLE`，
+  /// `@TableIndex` 的索引由 `createAll()` 负责 —— 升级上来的库靠
+  /// `_createIndexes()` 那三条手动语句补齐（含唯一索引）。
+  ///
+  /// ⚠️ **`brand` 那一列必须先查再加**，这是本卡唯一一处不能照抄 `_upgradeToV6`
+  /// 的地方：`brew_log_addins` 是 **v6 那一步用 `createTable` 建的**，而
+  /// `createTable` 用的是**当前**表定义 —— 所以「从 v5 及更早升上来」时，
+  /// `_upgradeToV6` 建出的表**已经带 `brand`**，这里再 `addColumn` 会抛
+  /// `duplicate column name: brand`，整个迁移失败、库直接打不开。
+  /// （v6 / v7 的库不受影响：它们的表是旧的，没有这一列。）
+  /// 这一条是 `schema_snapshot_test` 的 v4 / v5 夹具抓出来的，不是推理出来的。
+  Future<void> _upgradeToV8(Migrator m) async {
+    // ① 先建组表（关联表要 REFERENCES 它）。
+    await m.createTable(favoriteGroups);
+    // ② 再建关联表（双外键都指向已存在的表）。
+    await m.createTable(brewLogFavoriteGroups);
+    // ③ 辅料 → 牌子。可空 ⇒ 旧行自动 NULL。
+    //    列已存在（从 v5 及更早升上来，v6 那步刚用当前定义建过表）就跳过。
+    if (!await _columnExists('brew_log_addins', 'brand')) {
+      await m.addColumn(brewLogAddins, brewLogAddins.brand);
+    }
+  }
+
+  /// [table] 上是否已经有 [column]。
+  ///
+  /// 给迁移里的幂等判断用：**早期迁移步 `createTable` 出来的表带的是当前表定义**，
+  /// 所以后来新增的列可能「已经被建好了」，此时 `addColumn` 会抛。
+  Future<bool> _columnExists(String table, String column) async {
+    final List<QueryRow> rows = await customSelect('PRAGMA table_info($table)')
+        .get();
+    return rows.any((QueryRow row) => row.read<String>('name') == column);
   }
 
   /// v4 → v5：给冲煮记录加「收藏」。
@@ -788,9 +894,13 @@ class AppDatabase extends _$AppDatabase {
 
   /// 建索引。
   ///
-  /// Drift 的 `@TableIndex` 会随 `createTable` / `createAll` 一起建，
-  /// 这里再显式保证一次（`IF NOT EXISTS`，幂等），
-  /// 免得**从 v1 升上来的旧库**漏建索引——v1 一个索引都没有。
+  /// ⚠️ **这里的每一条都必须与表定义上的 `@TableIndex` 一一对应。**
+  /// drift 的 `Migrator.createTable` **只发 `CREATE TABLE`**，`@TableIndex` 的索引
+  /// 是 `createAll()` 建的（drift `migration.dart` 的 `createAll` 注释即
+  /// "tables, triggers, views, **indexes** and everything else"）。
+  /// 也就是说：**全新安装**靠 `createAll` 就够，但**升级上来的旧库**
+  /// （`onCreate` 不走、只走 `_upgradeToV4…V8` 里的 `createTable`）只能靠这里补齐。
+  /// 本函数在 `onCreate` 与每次 `onUpgrade` 末尾都跑，`IF NOT EXISTS` 幂等。
   Future<void> _createIndexes() async {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_bean_batches_bean_id '
@@ -815,6 +925,22 @@ class AppDatabase extends _$AppDatabase {
     await customStatement(
       'CREATE INDEX IF NOT EXISTS idx_brew_log_addins_brew_log_id '
       'ON brew_log_addins (brew_log_id)',
+    );
+    // v8 关联表的三条：两条普通索引 + 一条**唯一**索引。
+    // 唯一那条必须是 `CREATE UNIQUE INDEX`——写成普通 `CREATE INDEX`
+    // 会在升级库上建出一个同名的**非唯一**索引（`IF NOT EXISTS` 不会纠正它），
+    // 「同一记录不重复进同一夹」就静默失效了。
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_brew_log_favorite_groups_brew_log_id '
+      'ON brew_log_favorite_groups (brew_log_id)',
+    );
+    await customStatement(
+      'CREATE INDEX IF NOT EXISTS idx_brew_log_favorite_groups_group_id '
+      'ON brew_log_favorite_groups (group_id)',
+    );
+    await customStatement(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_brew_log_favorite_groups_unique '
+      'ON brew_log_favorite_groups (brew_log_id, group_id)',
     );
   }
 

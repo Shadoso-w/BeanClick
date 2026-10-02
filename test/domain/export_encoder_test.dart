@@ -150,6 +150,22 @@ void main() {
       expect(csv, contains('2@30s:210g'));
     });
 
+    test('辅料列带牌子：牌子在前、与名字用空格分隔（v8 裁决 E）', () {
+      final String csv = ExportEncoder.encodeCsv(
+        _documentWithAddIns(const <BrewLogAddIn>[
+          BrewLogAddIn(name: '牛奶', brand: 'Oatly', amount: 150),
+          BrewLogAddIn(name: '豆奶', brand: 'Suntory'),
+          BrewLogAddIn(name: '冰块'),
+          BrewLogAddIn(name: '榛果糖浆', amount: 1, unit: AddInUnit.pump),
+        ]),
+      );
+
+      expect(csv, contains('Oatly 牛奶 150ml'), reason: '牌子在前');
+      expect(csv, contains('Suntory 豆奶'), reason: '有牌子但没数量时只写牌子与名字');
+      expect(csv, contains('冰块'), reason: '没牌子维持现状');
+      expect(csv, contains('榛果糖浆 1泵'), reason: '没牌子维持现状（含数量与单位）');
+    });
+
     group('csvCell 转义', () {
       test('含逗号的值加引号', () {
         expect(ExportEncoder.csvCell('耶加,雪菲'), '"耶加,雪菲"');
@@ -366,6 +382,17 @@ void main() {
     });
   });
 }
+
+/// 只带一条冲煮记录的导出快照，用来单独验某一列（例如辅料列）。
+ExportDocument _documentWithAddIns(List<BrewLogAddIn> addIns) => ExportDocument(
+  exportedAt: DateTime(2026, 3, 7, 9, 5),
+  beans: const <CoffeeBean>[],
+  grinders: const <Grinder>[],
+  brewLogs: <BrewLog>[
+    makeLog(brewedAt: DateTime(2026, 1, 1, 8), addIns: addIns),
+  ],
+  recipes: const <Recipe>[],
+);
 
 /// 造一份有代表性的导出快照。
 ExportDocument _sampleDocument({String? note}) {

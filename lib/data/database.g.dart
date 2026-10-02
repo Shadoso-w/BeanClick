@@ -5474,6 +5474,19 @@ class $BrewLogAddinsTable extends BrewLogAddins
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _brandMeta = const VerificationMeta('brand');
+  @override
+  late final GeneratedColumn<String> brand = GeneratedColumn<String>(
+    'brand',
+    aliasedName,
+    true,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 60,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _amountMeta = const VerificationMeta('amount');
   @override
   late final GeneratedColumn<double> amount = GeneratedColumn<double>(
@@ -5510,6 +5523,7 @@ class $BrewLogAddinsTable extends BrewLogAddins
     id,
     brewLogId,
     name,
+    brand,
     amount,
     unit,
     position,
@@ -5545,6 +5559,12 @@ class $BrewLogAddinsTable extends BrewLogAddins
     } else if (isInserting) {
       context.missing(_nameMeta);
     }
+    if (data.containsKey('brand')) {
+      context.handle(
+        _brandMeta,
+        brand.isAcceptableOrUnknown(data['brand']!, _brandMeta),
+      );
+    }
     if (data.containsKey('amount')) {
       context.handle(
         _amountMeta,
@@ -5578,6 +5598,10 @@ class $BrewLogAddinsTable extends BrewLogAddins
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      brand: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}brand'],
+      ),
       amount: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}amount'],
@@ -5614,6 +5638,14 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
   /// 辅料名快照，如「牛奶」。
   final String name;
 
+  /// 牌子（v8 新增，T37）：如「Oatly」。可空 = 没记牌子。
+  ///
+  /// `withLength` 只是 **Dart 侧**校验，不生成 SQL `CHECK`（用 v7 快照的
+  /// `customConstraints: null` 对照布尔列的 `CHECK` 可证），
+  /// 所以给既有表 `addColumn` 一个带长度约束的可空列对旧行完全安全。
+  /// ⚠️ 但 `min: 1` 意味着空串 `''` 不合法 → 写入路径要把 `''` 归一成 `null`。
+  final String? brand;
+
   /// 数量；可空 = 只记「加了什么」没量。
   final double? amount;
 
@@ -5626,6 +5658,7 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
     required this.id,
     required this.brewLogId,
     required this.name,
+    this.brand,
     this.amount,
     this.unit,
     required this.position,
@@ -5636,6 +5669,9 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
     map['id'] = Variable<int>(id);
     map['brew_log_id'] = Variable<int>(brewLogId);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || brand != null) {
+      map['brand'] = Variable<String>(brand);
+    }
     if (!nullToAbsent || amount != null) {
       map['amount'] = Variable<double>(amount);
     }
@@ -5653,6 +5689,9 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
       id: Value(id),
       brewLogId: Value(brewLogId),
       name: Value(name),
+      brand: brand == null && nullToAbsent
+          ? const Value.absent()
+          : Value(brand),
       amount: amount == null && nullToAbsent
           ? const Value.absent()
           : Value(amount),
@@ -5670,6 +5709,7 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
       id: serializer.fromJson<int>(json['id']),
       brewLogId: serializer.fromJson<int>(json['brewLogId']),
       name: serializer.fromJson<String>(json['name']),
+      brand: serializer.fromJson<String?>(json['brand']),
       amount: serializer.fromJson<double?>(json['amount']),
       unit: serializer.fromJson<AddInUnit?>(json['unit']),
       position: serializer.fromJson<int>(json['position']),
@@ -5682,6 +5722,7 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
       'id': serializer.toJson<int>(id),
       'brewLogId': serializer.toJson<int>(brewLogId),
       'name': serializer.toJson<String>(name),
+      'brand': serializer.toJson<String?>(brand),
       'amount': serializer.toJson<double?>(amount),
       'unit': serializer.toJson<AddInUnit?>(unit),
       'position': serializer.toJson<int>(position),
@@ -5692,6 +5733,7 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
     int? id,
     int? brewLogId,
     String? name,
+    Value<String?> brand = const Value.absent(),
     Value<double?> amount = const Value.absent(),
     Value<AddInUnit?> unit = const Value.absent(),
     int? position,
@@ -5699,6 +5741,7 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
     id: id ?? this.id,
     brewLogId: brewLogId ?? this.brewLogId,
     name: name ?? this.name,
+    brand: brand.present ? brand.value : this.brand,
     amount: amount.present ? amount.value : this.amount,
     unit: unit.present ? unit.value : this.unit,
     position: position ?? this.position,
@@ -5708,6 +5751,7 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
       id: data.id.present ? data.id.value : this.id,
       brewLogId: data.brewLogId.present ? data.brewLogId.value : this.brewLogId,
       name: data.name.present ? data.name.value : this.name,
+      brand: data.brand.present ? data.brand.value : this.brand,
       amount: data.amount.present ? data.amount.value : this.amount,
       unit: data.unit.present ? data.unit.value : this.unit,
       position: data.position.present ? data.position.value : this.position,
@@ -5720,6 +5764,7 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
           ..write('id: $id, ')
           ..write('brewLogId: $brewLogId, ')
           ..write('name: $name, ')
+          ..write('brand: $brand, ')
           ..write('amount: $amount, ')
           ..write('unit: $unit, ')
           ..write('position: $position')
@@ -5728,7 +5773,8 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
   }
 
   @override
-  int get hashCode => Object.hash(id, brewLogId, name, amount, unit, position);
+  int get hashCode =>
+      Object.hash(id, brewLogId, name, brand, amount, unit, position);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -5736,6 +5782,7 @@ class BrewLogAddInRow extends DataClass implements Insertable<BrewLogAddInRow> {
           other.id == this.id &&
           other.brewLogId == this.brewLogId &&
           other.name == this.name &&
+          other.brand == this.brand &&
           other.amount == this.amount &&
           other.unit == this.unit &&
           other.position == this.position);
@@ -5745,6 +5792,7 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
   final Value<int> id;
   final Value<int> brewLogId;
   final Value<String> name;
+  final Value<String?> brand;
   final Value<double?> amount;
   final Value<AddInUnit?> unit;
   final Value<int> position;
@@ -5752,6 +5800,7 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
     this.id = const Value.absent(),
     this.brewLogId = const Value.absent(),
     this.name = const Value.absent(),
+    this.brand = const Value.absent(),
     this.amount = const Value.absent(),
     this.unit = const Value.absent(),
     this.position = const Value.absent(),
@@ -5760,6 +5809,7 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
     this.id = const Value.absent(),
     required int brewLogId,
     required String name,
+    this.brand = const Value.absent(),
     this.amount = const Value.absent(),
     this.unit = const Value.absent(),
     this.position = const Value.absent(),
@@ -5769,6 +5819,7 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
     Expression<int>? id,
     Expression<int>? brewLogId,
     Expression<String>? name,
+    Expression<String>? brand,
     Expression<double>? amount,
     Expression<String>? unit,
     Expression<int>? position,
@@ -5777,6 +5828,7 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
       if (id != null) 'id': id,
       if (brewLogId != null) 'brew_log_id': brewLogId,
       if (name != null) 'name': name,
+      if (brand != null) 'brand': brand,
       if (amount != null) 'amount': amount,
       if (unit != null) 'unit': unit,
       if (position != null) 'position': position,
@@ -5787,6 +5839,7 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
     Value<int>? id,
     Value<int>? brewLogId,
     Value<String>? name,
+    Value<String?>? brand,
     Value<double?>? amount,
     Value<AddInUnit?>? unit,
     Value<int>? position,
@@ -5795,6 +5848,7 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
       id: id ?? this.id,
       brewLogId: brewLogId ?? this.brewLogId,
       name: name ?? this.name,
+      brand: brand ?? this.brand,
       amount: amount ?? this.amount,
       unit: unit ?? this.unit,
       position: position ?? this.position,
@@ -5812,6 +5866,9 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (brand.present) {
+      map['brand'] = Variable<String>(brand.value);
     }
     if (amount.present) {
       map['amount'] = Variable<double>(amount.value);
@@ -5833,9 +5890,624 @@ class BrewLogAddinsCompanion extends UpdateCompanion<BrewLogAddInRow> {
           ..write('id: $id, ')
           ..write('brewLogId: $brewLogId, ')
           ..write('name: $name, ')
+          ..write('brand: $brand, ')
           ..write('amount: $amount, ')
           ..write('unit: $unit, ')
           ..write('position: $position')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $FavoriteGroupsTable extends FavoriteGroups
+    with TableInfo<$FavoriteGroupsTable, FavoriteGroupRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $FavoriteGroupsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(
+      minTextLength: 1,
+      maxTextLength: 60,
+    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
+  @override
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, sortOrder, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'favorite_groups';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<FavoriteGroupRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  FavoriteGroupRow map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return FavoriteGroupRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $FavoriteGroupsTable createAlias(String alias) {
+    return $FavoriteGroupsTable(attachedDatabase, alias);
+  }
+}
+
+class FavoriteGroupRow extends DataClass
+    implements Insertable<FavoriteGroupRow> {
+  final int id;
+
+  /// 用户起的组名，如「早餐配方」。与 [BrewLogAddins.name] 同量级。
+  final String name;
+
+  /// 展示顺序，越小越靠前。
+  final int sortOrder;
+  final DateTime createdAt;
+  const FavoriteGroupRow({
+    required this.id,
+    required this.name,
+    required this.sortOrder,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['name'] = Variable<String>(name);
+    map['sort_order'] = Variable<int>(sortOrder);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  FavoriteGroupsCompanion toCompanion(bool nullToAbsent) {
+    return FavoriteGroupsCompanion(
+      id: Value(id),
+      name: Value(name),
+      sortOrder: Value(sortOrder),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory FavoriteGroupRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return FavoriteGroupRow(
+      id: serializer.fromJson<int>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'name': serializer.toJson<String>(name),
+      'sortOrder': serializer.toJson<int>(sortOrder),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  FavoriteGroupRow copyWith({
+    int? id,
+    String? name,
+    int? sortOrder,
+    DateTime? createdAt,
+  }) => FavoriteGroupRow(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  FavoriteGroupRow copyWithCompanion(FavoriteGroupsCompanion data) {
+    return FavoriteGroupRow(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FavoriteGroupRow(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, sortOrder, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is FavoriteGroupRow &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.sortOrder == this.sortOrder &&
+          other.createdAt == this.createdAt);
+}
+
+class FavoriteGroupsCompanion extends UpdateCompanion<FavoriteGroupRow> {
+  final Value<int> id;
+  final Value<String> name;
+  final Value<int> sortOrder;
+  final Value<DateTime> createdAt;
+  const FavoriteGroupsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  FavoriteGroupsCompanion.insert({
+    this.id = const Value.absent(),
+    required String name,
+    this.sortOrder = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  }) : name = Value(name);
+  static Insertable<FavoriteGroupRow> custom({
+    Expression<int>? id,
+    Expression<String>? name,
+    Expression<int>? sortOrder,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (sortOrder != null) 'sort_order': sortOrder,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  FavoriteGroupsCompanion copyWith({
+    Value<int>? id,
+    Value<String>? name,
+    Value<int>? sortOrder,
+    Value<DateTime>? createdAt,
+  }) {
+    return FavoriteGroupsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      sortOrder: sortOrder ?? this.sortOrder,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('FavoriteGroupsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('sortOrder: $sortOrder, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $BrewLogFavoriteGroupsTable extends BrewLogFavoriteGroups
+    with TableInfo<$BrewLogFavoriteGroupsTable, BrewLogFavoriteGroupRow> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $BrewLogFavoriteGroupsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'PRIMARY KEY AUTOINCREMENT',
+    ),
+  );
+  static const VerificationMeta _brewLogIdMeta = const VerificationMeta(
+    'brewLogId',
+  );
+  @override
+  late final GeneratedColumn<int> brewLogId = GeneratedColumn<int>(
+    'brew_log_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES brew_logs (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _groupIdMeta = const VerificationMeta(
+    'groupId',
+  );
+  @override
+  late final GeneratedColumn<int> groupId = GeneratedColumn<int>(
+    'group_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES favorite_groups (id) ON DELETE CASCADE',
+    ),
+  );
+  static const VerificationMeta _createdAtMeta = const VerificationMeta(
+    'createdAt',
+  );
+  @override
+  late final GeneratedColumn<DateTime> createdAt = GeneratedColumn<DateTime>(
+    'created_at',
+    aliasedName,
+    false,
+    type: DriftSqlType.dateTime,
+    requiredDuringInsert: false,
+    defaultValue: currentDateAndTime,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, brewLogId, groupId, createdAt];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'brew_log_favorite_groups';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<BrewLogFavoriteGroupRow> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    }
+    if (data.containsKey('brew_log_id')) {
+      context.handle(
+        _brewLogIdMeta,
+        brewLogId.isAcceptableOrUnknown(data['brew_log_id']!, _brewLogIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_brewLogIdMeta);
+    }
+    if (data.containsKey('group_id')) {
+      context.handle(
+        _groupIdMeta,
+        groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_groupIdMeta);
+    }
+    if (data.containsKey('created_at')) {
+      context.handle(
+        _createdAtMeta,
+        createdAt.isAcceptableOrUnknown(data['created_at']!, _createdAtMeta),
+      );
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  BrewLogFavoriteGroupRow map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return BrewLogFavoriteGroupRow(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      brewLogId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}brew_log_id'],
+      )!,
+      groupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}group_id'],
+      )!,
+      createdAt: attachedDatabase.typeMapping.read(
+        DriftSqlType.dateTime,
+        data['${effectivePrefix}created_at'],
+      )!,
+    );
+  }
+
+  @override
+  $BrewLogFavoriteGroupsTable createAlias(String alias) {
+    return $BrewLogFavoriteGroupsTable(attachedDatabase, alias);
+  }
+}
+
+class BrewLogFavoriteGroupRow extends DataClass
+    implements Insertable<BrewLogFavoriteGroupRow> {
+  final int id;
+  final int brewLogId;
+  final int groupId;
+  final DateTime createdAt;
+  const BrewLogFavoriteGroupRow({
+    required this.id,
+    required this.brewLogId,
+    required this.groupId,
+    required this.createdAt,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['brew_log_id'] = Variable<int>(brewLogId);
+    map['group_id'] = Variable<int>(groupId);
+    map['created_at'] = Variable<DateTime>(createdAt);
+    return map;
+  }
+
+  BrewLogFavoriteGroupsCompanion toCompanion(bool nullToAbsent) {
+    return BrewLogFavoriteGroupsCompanion(
+      id: Value(id),
+      brewLogId: Value(brewLogId),
+      groupId: Value(groupId),
+      createdAt: Value(createdAt),
+    );
+  }
+
+  factory BrewLogFavoriteGroupRow.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return BrewLogFavoriteGroupRow(
+      id: serializer.fromJson<int>(json['id']),
+      brewLogId: serializer.fromJson<int>(json['brewLogId']),
+      groupId: serializer.fromJson<int>(json['groupId']),
+      createdAt: serializer.fromJson<DateTime>(json['createdAt']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'brewLogId': serializer.toJson<int>(brewLogId),
+      'groupId': serializer.toJson<int>(groupId),
+      'createdAt': serializer.toJson<DateTime>(createdAt),
+    };
+  }
+
+  BrewLogFavoriteGroupRow copyWith({
+    int? id,
+    int? brewLogId,
+    int? groupId,
+    DateTime? createdAt,
+  }) => BrewLogFavoriteGroupRow(
+    id: id ?? this.id,
+    brewLogId: brewLogId ?? this.brewLogId,
+    groupId: groupId ?? this.groupId,
+    createdAt: createdAt ?? this.createdAt,
+  );
+  BrewLogFavoriteGroupRow copyWithCompanion(
+    BrewLogFavoriteGroupsCompanion data,
+  ) {
+    return BrewLogFavoriteGroupRow(
+      id: data.id.present ? data.id.value : this.id,
+      brewLogId: data.brewLogId.present ? data.brewLogId.value : this.brewLogId,
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BrewLogFavoriteGroupRow(')
+          ..write('id: $id, ')
+          ..write('brewLogId: $brewLogId, ')
+          ..write('groupId: $groupId, ')
+          ..write('createdAt: $createdAt')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, brewLogId, groupId, createdAt);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is BrewLogFavoriteGroupRow &&
+          other.id == this.id &&
+          other.brewLogId == this.brewLogId &&
+          other.groupId == this.groupId &&
+          other.createdAt == this.createdAt);
+}
+
+class BrewLogFavoriteGroupsCompanion
+    extends UpdateCompanion<BrewLogFavoriteGroupRow> {
+  final Value<int> id;
+  final Value<int> brewLogId;
+  final Value<int> groupId;
+  final Value<DateTime> createdAt;
+  const BrewLogFavoriteGroupsCompanion({
+    this.id = const Value.absent(),
+    this.brewLogId = const Value.absent(),
+    this.groupId = const Value.absent(),
+    this.createdAt = const Value.absent(),
+  });
+  BrewLogFavoriteGroupsCompanion.insert({
+    this.id = const Value.absent(),
+    required int brewLogId,
+    required int groupId,
+    this.createdAt = const Value.absent(),
+  }) : brewLogId = Value(brewLogId),
+       groupId = Value(groupId);
+  static Insertable<BrewLogFavoriteGroupRow> custom({
+    Expression<int>? id,
+    Expression<int>? brewLogId,
+    Expression<int>? groupId,
+    Expression<DateTime>? createdAt,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (brewLogId != null) 'brew_log_id': brewLogId,
+      if (groupId != null) 'group_id': groupId,
+      if (createdAt != null) 'created_at': createdAt,
+    });
+  }
+
+  BrewLogFavoriteGroupsCompanion copyWith({
+    Value<int>? id,
+    Value<int>? brewLogId,
+    Value<int>? groupId,
+    Value<DateTime>? createdAt,
+  }) {
+    return BrewLogFavoriteGroupsCompanion(
+      id: id ?? this.id,
+      brewLogId: brewLogId ?? this.brewLogId,
+      groupId: groupId ?? this.groupId,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (brewLogId.present) {
+      map['brew_log_id'] = Variable<int>(brewLogId.value);
+    }
+    if (groupId.present) {
+      map['group_id'] = Variable<int>(groupId.value);
+    }
+    if (createdAt.present) {
+      map['created_at'] = Variable<DateTime>(createdAt.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('BrewLogFavoriteGroupsCompanion(')
+          ..write('id: $id, ')
+          ..write('brewLogId: $brewLogId, ')
+          ..write('groupId: $groupId, ')
+          ..write('createdAt: $createdAt')
           ..write(')'))
         .toString();
   }
@@ -6750,6 +7422,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $BrewLogsTable brewLogs = $BrewLogsTable(this);
   late final $BrewLogBeansTable brewLogBeans = $BrewLogBeansTable(this);
   late final $BrewLogAddinsTable brewLogAddins = $BrewLogAddinsTable(this);
+  late final $FavoriteGroupsTable favoriteGroups = $FavoriteGroupsTable(this);
+  late final $BrewLogFavoriteGroupsTable brewLogFavoriteGroups =
+      $BrewLogFavoriteGroupsTable(this);
   late final $AppSettingsTable appSettings = $AppSettingsTable(this);
   late final $ExtraAttributesTable extraAttributes = $ExtraAttributesTable(
     this,
@@ -6774,6 +7449,18 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     'idx_brew_log_addins_brew_log_id',
     'CREATE INDEX idx_brew_log_addins_brew_log_id ON brew_log_addins (brew_log_id)',
   );
+  late final Index idxBrewLogFavoriteGroupsBrewLogId = Index(
+    'idx_brew_log_favorite_groups_brew_log_id',
+    'CREATE INDEX idx_brew_log_favorite_groups_brew_log_id ON brew_log_favorite_groups (brew_log_id)',
+  );
+  late final Index idxBrewLogFavoriteGroupsGroupId = Index(
+    'idx_brew_log_favorite_groups_group_id',
+    'CREATE INDEX idx_brew_log_favorite_groups_group_id ON brew_log_favorite_groups (group_id)',
+  );
+  late final Index idxBrewLogFavoriteGroupsUnique = Index(
+    'idx_brew_log_favorite_groups_unique',
+    'CREATE UNIQUE INDEX idx_brew_log_favorite_groups_unique ON brew_log_favorite_groups (brew_log_id, group_id)',
+  );
   late final Index idxExtraOwner = Index(
     'idx_extra_owner',
     'CREATE INDEX idx_extra_owner ON extra_attributes (owner_type, owner_id)',
@@ -6790,6 +7477,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     brewLogs,
     brewLogBeans,
     brewLogAddins,
+    favoriteGroups,
+    brewLogFavoriteGroups,
     appSettings,
     extraAttributes,
     idxBeanBatchesBeanId,
@@ -6797,6 +7486,9 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     idxBrewLogBeansBrewLogId,
     idxBrewLogBeansBeanId,
     idxBrewLogAddinsBrewLogId,
+    idxBrewLogFavoriteGroupsBrewLogId,
+    idxBrewLogFavoriteGroupsGroupId,
+    idxBrewLogFavoriteGroupsUnique,
     idxExtraOwner,
   ];
   @override
@@ -6856,6 +7548,24 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('brew_log_addins', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'brew_logs',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('brew_log_favorite_groups', kind: UpdateKind.delete),
+      ],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'favorite_groups',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [
+        TableUpdate('brew_log_favorite_groups', kind: UpdateKind.delete),
+      ],
     ),
   ]);
 }
@@ -9029,6 +9739,31 @@ final class $$BrewLogsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<
+    $BrewLogFavoriteGroupsTable,
+    List<BrewLogFavoriteGroupRow>
+  >
+  _brewLogFavoriteGroupsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.brewLogFavoriteGroups,
+        aliasName: 'brew_logs__id__brew_log_favorite_groups__brew_log_id',
+      );
+
+  $$BrewLogFavoriteGroupsTableProcessedTableManager
+  get brewLogFavoriteGroupsRefs {
+    final manager = $$BrewLogFavoriteGroupsTableTableManager(
+      $_db,
+      $_db.brewLogFavoriteGroups,
+    ).filter((f) => f.brewLogId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _brewLogFavoriteGroupsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$BrewLogsTableFilterComposer
@@ -9336,6 +10071,32 @@ class $$BrewLogsTableFilterComposer
                 $removeJoinBuilderFromRootComposer,
           ),
     );
+    return f(composer);
+  }
+
+  Expression<bool> brewLogFavoriteGroupsRefs(
+    Expression<bool> Function($$BrewLogFavoriteGroupsTableFilterComposer f) f,
+  ) {
+    final $$BrewLogFavoriteGroupsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.brewLogFavoriteGroups,
+          getReferencedColumn: (t) => t.brewLogId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BrewLogFavoriteGroupsTableFilterComposer(
+                $db: $db,
+                $table: $db.brewLogFavoriteGroups,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
     return f(composer);
   }
 }
@@ -9865,6 +10626,32 @@ class $$BrewLogsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> brewLogFavoriteGroupsRefs<T extends Object>(
+    Expression<T> Function($$BrewLogFavoriteGroupsTableAnnotationComposer a) f,
+  ) {
+    final $$BrewLogFavoriteGroupsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.brewLogFavoriteGroups,
+          getReferencedColumn: (t) => t.brewLogId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BrewLogFavoriteGroupsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.brewLogFavoriteGroups,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
 }
 
 class $$BrewLogsTableTableManager
@@ -9886,6 +10673,7 @@ class $$BrewLogsTableTableManager
             bool recipeId,
             bool brewLogBeansRefs,
             bool brewLogAddinsRefs,
+            bool brewLogFavoriteGroupsRefs,
           })
         > {
   $$BrewLogsTableTableManager(_$AppDatabase db, $BrewLogsTable table)
@@ -10078,12 +10866,14 @@ class $$BrewLogsTableTableManager
                 recipeId = false,
                 brewLogBeansRefs = false,
                 brewLogAddinsRefs = false,
+                brewLogFavoriteGroupsRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (brewLogBeansRefs) db.brewLogBeans,
                     if (brewLogAddinsRefs) db.brewLogAddins,
+                    if (brewLogFavoriteGroupsRefs) db.brewLogFavoriteGroups,
                   ],
                   addJoins:
                       <
@@ -10181,6 +10971,27 @@ class $$BrewLogsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (brewLogFavoriteGroupsRefs)
+                        await $_getPrefetchedData<
+                          BrewLogRow,
+                          $BrewLogsTable,
+                          BrewLogFavoriteGroupRow
+                        >(
+                          currentTable: table,
+                          referencedTable: $$BrewLogsTableReferences
+                              ._brewLogFavoriteGroupsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$BrewLogsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).brewLogFavoriteGroupsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.brewLogId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -10207,6 +11018,7 @@ typedef $$BrewLogsTableProcessedTableManager =
         bool recipeId,
         bool brewLogBeansRefs,
         bool brewLogAddinsRefs,
+        bool brewLogFavoriteGroupsRefs,
       })
     >;
 typedef $$BrewLogBeansTableCreateCompanionBuilder =
@@ -10753,6 +11565,7 @@ typedef $$BrewLogAddinsTableCreateCompanionBuilder =
       Value<int> id,
       required int brewLogId,
       required String name,
+      Value<String?> brand,
       Value<double?> amount,
       Value<AddInUnit?> unit,
       Value<int> position,
@@ -10762,6 +11575,7 @@ typedef $$BrewLogAddinsTableUpdateCompanionBuilder =
       Value<int> id,
       Value<int> brewLogId,
       Value<String> name,
+      Value<String?> brand,
       Value<double?> amount,
       Value<AddInUnit?> unit,
       Value<int> position,
@@ -10810,6 +11624,11 @@ class $$BrewLogAddinsTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get brand => $composableBuilder(
+    column: $table.brand,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10872,6 +11691,11 @@ class $$BrewLogAddinsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get brand => $composableBuilder(
+    column: $table.brand,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get amount => $composableBuilder(
     column: $table.amount,
     builder: (column) => ColumnOrderings(column),
@@ -10925,6 +11749,9 @@ class $$BrewLogAddinsTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get brand =>
+      $composableBuilder(column: $table.brand, builder: (column) => column);
 
   GeneratedColumn<double> get amount =>
       $composableBuilder(column: $table.amount, builder: (column) => column);
@@ -10990,6 +11817,7 @@ class $$BrewLogAddinsTableTableManager
                 Value<int> id = const Value.absent(),
                 Value<int> brewLogId = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String?> brand = const Value.absent(),
                 Value<double?> amount = const Value.absent(),
                 Value<AddInUnit?> unit = const Value.absent(),
                 Value<int> position = const Value.absent(),
@@ -10997,6 +11825,7 @@ class $$BrewLogAddinsTableTableManager
                 id: id,
                 brewLogId: brewLogId,
                 name: name,
+                brand: brand,
                 amount: amount,
                 unit: unit,
                 position: position,
@@ -11006,6 +11835,7 @@ class $$BrewLogAddinsTableTableManager
                 Value<int> id = const Value.absent(),
                 required int brewLogId,
                 required String name,
+                Value<String?> brand = const Value.absent(),
                 Value<double?> amount = const Value.absent(),
                 Value<AddInUnit?> unit = const Value.absent(),
                 Value<int> position = const Value.absent(),
@@ -11013,6 +11843,7 @@ class $$BrewLogAddinsTableTableManager
                 id: id,
                 brewLogId: brewLogId,
                 name: name,
+                brand: brand,
                 amount: amount,
                 unit: unit,
                 position: position,
@@ -11081,6 +11912,698 @@ typedef $$BrewLogAddinsTableProcessedTableManager =
       (BrewLogAddInRow, $$BrewLogAddinsTableReferences),
       BrewLogAddInRow,
       PrefetchHooks Function({bool brewLogId})
+    >;
+typedef $$FavoriteGroupsTableCreateCompanionBuilder =
+    FavoriteGroupsCompanion Function({
+      Value<int> id,
+      required String name,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+    });
+typedef $$FavoriteGroupsTableUpdateCompanionBuilder =
+    FavoriteGroupsCompanion Function({
+      Value<int> id,
+      Value<String> name,
+      Value<int> sortOrder,
+      Value<DateTime> createdAt,
+    });
+
+final class $$FavoriteGroupsTableReferences
+    extends
+        BaseReferences<_$AppDatabase, $FavoriteGroupsTable, FavoriteGroupRow> {
+  $$FavoriteGroupsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<
+    $BrewLogFavoriteGroupsTable,
+    List<BrewLogFavoriteGroupRow>
+  >
+  _brewLogFavoriteGroupsRefsTable(_$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(
+        db.brewLogFavoriteGroups,
+        aliasName: 'favorite_groups__id__brew_log_favorite_groups__group_id',
+      );
+
+  $$BrewLogFavoriteGroupsTableProcessedTableManager
+  get brewLogFavoriteGroupsRefs {
+    final manager = $$BrewLogFavoriteGroupsTableTableManager(
+      $_db,
+      $_db.brewLogFavoriteGroups,
+    ).filter((f) => f.groupId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(
+      _brewLogFavoriteGroupsRefsTable($_db),
+    );
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$FavoriteGroupsTableFilterComposer
+    extends Composer<_$AppDatabase, $FavoriteGroupsTable> {
+  $$FavoriteGroupsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> brewLogFavoriteGroupsRefs(
+    Expression<bool> Function($$BrewLogFavoriteGroupsTableFilterComposer f) f,
+  ) {
+    final $$BrewLogFavoriteGroupsTableFilterComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.brewLogFavoriteGroups,
+          getReferencedColumn: (t) => t.groupId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BrewLogFavoriteGroupsTableFilterComposer(
+                $db: $db,
+                $table: $db.brewLogFavoriteGroups,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$FavoriteGroupsTableOrderingComposer
+    extends Composer<_$AppDatabase, $FavoriteGroupsTable> {
+  $$FavoriteGroupsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$FavoriteGroupsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $FavoriteGroupsTable> {
+  $$FavoriteGroupsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  Expression<T> brewLogFavoriteGroupsRefs<T extends Object>(
+    Expression<T> Function($$BrewLogFavoriteGroupsTableAnnotationComposer a) f,
+  ) {
+    final $$BrewLogFavoriteGroupsTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.id,
+          referencedTable: $db.brewLogFavoriteGroups,
+          getReferencedColumn: (t) => t.groupId,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$BrewLogFavoriteGroupsTableAnnotationComposer(
+                $db: $db,
+                $table: $db.brewLogFavoriteGroups,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return f(composer);
+  }
+}
+
+class $$FavoriteGroupsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $FavoriteGroupsTable,
+          FavoriteGroupRow,
+          $$FavoriteGroupsTableFilterComposer,
+          $$FavoriteGroupsTableOrderingComposer,
+          $$FavoriteGroupsTableAnnotationComposer,
+          $$FavoriteGroupsTableCreateCompanionBuilder,
+          $$FavoriteGroupsTableUpdateCompanionBuilder,
+          (FavoriteGroupRow, $$FavoriteGroupsTableReferences),
+          FavoriteGroupRow,
+          PrefetchHooks Function({bool brewLogFavoriteGroupsRefs})
+        > {
+  $$FavoriteGroupsTableTableManager(
+    _$AppDatabase db,
+    $FavoriteGroupsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$FavoriteGroupsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$FavoriteGroupsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$FavoriteGroupsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => FavoriteGroupsCompanion(
+                id: id,
+                name: name,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required String name,
+                Value<int> sortOrder = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => FavoriteGroupsCompanion.insert(
+                id: id,
+                name: name,
+                sortOrder: sortOrder,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<$FavoriteGroupsTable, FavoriteGroupRow>(table),
+                  $$FavoriteGroupsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({brewLogFavoriteGroupsRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (brewLogFavoriteGroupsRefs) db.brewLogFavoriteGroups,
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (brewLogFavoriteGroupsRefs)
+                    await $_getPrefetchedData<
+                      FavoriteGroupRow,
+                      $FavoriteGroupsTable,
+                      BrewLogFavoriteGroupRow
+                    >(
+                      currentTable: table,
+                      referencedTable: $$FavoriteGroupsTableReferences
+                          ._brewLogFavoriteGroupsRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$FavoriteGroupsTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).brewLogFavoriteGroupsRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.groupId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$FavoriteGroupsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $FavoriteGroupsTable,
+      FavoriteGroupRow,
+      $$FavoriteGroupsTableFilterComposer,
+      $$FavoriteGroupsTableOrderingComposer,
+      $$FavoriteGroupsTableAnnotationComposer,
+      $$FavoriteGroupsTableCreateCompanionBuilder,
+      $$FavoriteGroupsTableUpdateCompanionBuilder,
+      (FavoriteGroupRow, $$FavoriteGroupsTableReferences),
+      FavoriteGroupRow,
+      PrefetchHooks Function({bool brewLogFavoriteGroupsRefs})
+    >;
+typedef $$BrewLogFavoriteGroupsTableCreateCompanionBuilder =
+    BrewLogFavoriteGroupsCompanion Function({
+      Value<int> id,
+      required int brewLogId,
+      required int groupId,
+      Value<DateTime> createdAt,
+    });
+typedef $$BrewLogFavoriteGroupsTableUpdateCompanionBuilder =
+    BrewLogFavoriteGroupsCompanion Function({
+      Value<int> id,
+      Value<int> brewLogId,
+      Value<int> groupId,
+      Value<DateTime> createdAt,
+    });
+
+final class $$BrewLogFavoriteGroupsTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $BrewLogFavoriteGroupsTable,
+          BrewLogFavoriteGroupRow
+        > {
+  $$BrewLogFavoriteGroupsTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static $BrewLogsTable _brewLogIdTable(_$AppDatabase db) => db.brewLogs
+      .createAlias('brew_log_favorite_groups__brew_log_id__brew_logs__id');
+
+  $$BrewLogsTableProcessedTableManager get brewLogId {
+    final $_column = $_itemColumn<int>('brew_log_id')!;
+
+    final manager = $$BrewLogsTableTableManager(
+      $_db,
+      $_db.brewLogs,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_brewLogIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $FavoriteGroupsTable _groupIdTable(_$AppDatabase db) => db
+      .favoriteGroups
+      .createAlias('brew_log_favorite_groups__group_id__favorite_groups__id');
+
+  $$FavoriteGroupsTableProcessedTableManager get groupId {
+    final $_column = $_itemColumn<int>('group_id')!;
+
+    final manager = $$FavoriteGroupsTableTableManager(
+      $_db,
+      $_db.favoriteGroups,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_groupIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+}
+
+class $$BrewLogFavoriteGroupsTableFilterComposer
+    extends Composer<_$AppDatabase, $BrewLogFavoriteGroupsTable> {
+  $$BrewLogFavoriteGroupsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  $$BrewLogsTableFilterComposer get brewLogId {
+    final $$BrewLogsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableFilterComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$FavoriteGroupsTableFilterComposer get groupId {
+    final $$FavoriteGroupsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.favoriteGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FavoriteGroupsTableFilterComposer(
+            $db: $db,
+            $table: $db.favoriteGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogFavoriteGroupsTableOrderingComposer
+    extends Composer<_$AppDatabase, $BrewLogFavoriteGroupsTable> {
+  $$BrewLogFavoriteGroupsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<int> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<DateTime> get createdAt => $composableBuilder(
+    column: $table.createdAt,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  $$BrewLogsTableOrderingComposer get brewLogId {
+    final $$BrewLogsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableOrderingComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$FavoriteGroupsTableOrderingComposer get groupId {
+    final $$FavoriteGroupsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.favoriteGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FavoriteGroupsTableOrderingComposer(
+            $db: $db,
+            $table: $db.favoriteGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogFavoriteGroupsTableAnnotationComposer
+    extends Composer<_$AppDatabase, $BrewLogFavoriteGroupsTable> {
+  $$BrewLogFavoriteGroupsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<int> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<DateTime> get createdAt =>
+      $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$BrewLogsTableAnnotationComposer get brewLogId {
+    final $$BrewLogsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.brewLogId,
+      referencedTable: $db.brewLogs,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$BrewLogsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.brewLogs,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$FavoriteGroupsTableAnnotationComposer get groupId {
+    final $$FavoriteGroupsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.groupId,
+      referencedTable: $db.favoriteGroups,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$FavoriteGroupsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.favoriteGroups,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+}
+
+class $$BrewLogFavoriteGroupsTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $BrewLogFavoriteGroupsTable,
+          BrewLogFavoriteGroupRow,
+          $$BrewLogFavoriteGroupsTableFilterComposer,
+          $$BrewLogFavoriteGroupsTableOrderingComposer,
+          $$BrewLogFavoriteGroupsTableAnnotationComposer,
+          $$BrewLogFavoriteGroupsTableCreateCompanionBuilder,
+          $$BrewLogFavoriteGroupsTableUpdateCompanionBuilder,
+          (BrewLogFavoriteGroupRow, $$BrewLogFavoriteGroupsTableReferences),
+          BrewLogFavoriteGroupRow,
+          PrefetchHooks Function({bool brewLogId, bool groupId})
+        > {
+  $$BrewLogFavoriteGroupsTableTableManager(
+    _$AppDatabase db,
+    $BrewLogFavoriteGroupsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$BrewLogFavoriteGroupsTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$BrewLogFavoriteGroupsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$BrewLogFavoriteGroupsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                Value<int> brewLogId = const Value.absent(),
+                Value<int> groupId = const Value.absent(),
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => BrewLogFavoriteGroupsCompanion(
+                id: id,
+                brewLogId: brewLogId,
+                groupId: groupId,
+                createdAt: createdAt,
+              ),
+          createCompanionCallback:
+              ({
+                Value<int> id = const Value.absent(),
+                required int brewLogId,
+                required int groupId,
+                Value<DateTime> createdAt = const Value.absent(),
+              }) => BrewLogFavoriteGroupsCompanion.insert(
+                id: id,
+                brewLogId: brewLogId,
+                groupId: groupId,
+                createdAt: createdAt,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable<
+                    $BrewLogFavoriteGroupsTable,
+                    BrewLogFavoriteGroupRow
+                  >(table),
+                  $$BrewLogFavoriteGroupsTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({brewLogId = false, groupId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins:
+                  <
+                    T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic
+                    >
+                  >(state) {
+                    if (brewLogId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.brewLogId,
+                        referencedTable: $$BrewLogFavoriteGroupsTableReferences
+                            ._brewLogIdTable(db),
+                        referencedColumn: $$BrewLogFavoriteGroupsTableReferences
+                            ._brewLogIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+                    if (groupId) {
+                      state = state.withJoin(
+                        currentTable: table,
+                        currentColumn: table.groupId,
+                        referencedTable: $$BrewLogFavoriteGroupsTableReferences
+                            ._groupIdTable(db),
+                        referencedColumn: $$BrewLogFavoriteGroupsTableReferences
+                            ._groupIdTable(db)
+                            .id,
+                      ) as T;
+                    }
+
+                    return state;
+                  },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$BrewLogFavoriteGroupsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $BrewLogFavoriteGroupsTable,
+      BrewLogFavoriteGroupRow,
+      $$BrewLogFavoriteGroupsTableFilterComposer,
+      $$BrewLogFavoriteGroupsTableOrderingComposer,
+      $$BrewLogFavoriteGroupsTableAnnotationComposer,
+      $$BrewLogFavoriteGroupsTableCreateCompanionBuilder,
+      $$BrewLogFavoriteGroupsTableUpdateCompanionBuilder,
+      (BrewLogFavoriteGroupRow, $$BrewLogFavoriteGroupsTableReferences),
+      BrewLogFavoriteGroupRow,
+      PrefetchHooks Function({bool brewLogId, bool groupId})
     >;
 typedef $$AppSettingsTableCreateCompanionBuilder =
     AppSettingsCompanion Function({
@@ -11582,6 +13105,10 @@ class $AppDatabaseManager {
       $$BrewLogBeansTableTableManager(_db, _db.brewLogBeans);
   $$BrewLogAddinsTableTableManager get brewLogAddins =>
       $$BrewLogAddinsTableTableManager(_db, _db.brewLogAddins);
+  $$FavoriteGroupsTableTableManager get favoriteGroups =>
+      $$FavoriteGroupsTableTableManager(_db, _db.favoriteGroups);
+  $$BrewLogFavoriteGroupsTableTableManager get brewLogFavoriteGroups =>
+      $$BrewLogFavoriteGroupsTableTableManager(_db, _db.brewLogFavoriteGroups);
   $$AppSettingsTableTableManager get appSettings =>
       $$AppSettingsTableTableManager(_db, _db.appSettings);
   $$ExtraAttributesTableTableManager get extraAttributes =>

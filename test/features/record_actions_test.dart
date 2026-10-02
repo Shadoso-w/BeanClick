@@ -76,6 +76,12 @@ void main() {
     await tester.tap(swipeAction('收藏'));
     await tester.pumpAndSettle();
 
+    // v8 / T38 裁决 D=②：收藏后弹「加入哪个收藏夹」多选面板（一个新夹都不建
+    // 时它就是"收藏但未分组"）—— 交互路径变了，但下面每条断言都还在。
+    expect(find.text('加入哪个收藏夹？'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('record.groupPickDone')));
+    await tester.pumpAndSettle();
+
     expect(
       (await harness.container.read(brewLogRepositoryProvider).getById(logId))!
           .isFavorite,

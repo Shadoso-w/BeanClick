@@ -55,8 +55,8 @@ void main() {
       );
     });
 
-    test('schemaVersion 为 7', () {
-      expect(db.schemaVersion, 7);
+    test('schemaVersion 为 8', () {
+      expect(db.schemaVersion, 8);
     });
 
     test('外键约束已开启（SQLite 默认关闭）', () async {

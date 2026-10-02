@@ -171,4 +171,150 @@ void main() {
       expect(recent, hasLength(2), reason: '同名的只出现一次');
     });
   });
+
+  // -------------------------------------------------------------------------
+  // v8（T37）：辅料「牌子」
+  // -------------------------------------------------------------------------
+  group('v8 辅料牌子', () {
+    test('brand 往返：写进去读得回来；没填牌子读回 null', () async {
+      final int id = (await harness.logs.save(
+        makeLog(
+          addIns: const <BrewLogAddIn>[
+            BrewLogAddIn(name: '牛奶', brand: 'Oatly', amount: 150),
+            BrewLogAddIn(name: '冰块'),
+          ],
+        ),
+      )).brewLogId;
+
+      final BrewLog log = (await harness.logs.getById(id))!;
+      expect(log.addIns[0].name, '牛奶');
+      expect(log.addIns[0].brand, 'Oatly');
+      expect(log.addIns[1].brand, isNull, reason: '没填牌子是 null，不是空串');
+    });
+
+    test('brand 参与 JSON 往返', () {
+      final BrewLog log = makeLog(
+        addIns: const <BrewLogAddIn>[
+          BrewLogAddIn(name: '牛奶', brand: 'Oatly', amount: 150),
+        ],
+      );
+
+      final BrewLog restored = BrewLog.fromJson(log.toJson());
+
+      expect(restored.addIns.single.brand, 'Oatly');
+      expect(restored, log, reason: '往返后整体相等');
+    });
+
+    test('空串/纯空白归一：传进去不抛，读回来是 null', () async {
+      // `brand` 是 `withLength(min: 1)`，而 drift 的 `withLength` **不生成 SQL 约束**、
+      // 只在 Dart 侧校验 → 写入 `Value('')` 会抛 InvalidDataException。
+      // 所以写入路径必须把「空 」归一成 null：这正是下面这条用例钉住的东西。
+      final int id = (await harness.logs.save(
+        makeLog(
+          addIns: const <BrewLogAddIn>[
+            BrewLogAddIn(name: '牛奶', brand: ''),
+            BrewLogAddIn(name: '燕麦奶', brand: '   '),
+          ],
+        ),
+      )).brewLogId;
+
+      final BrewLog log = (await harness.logs.getById(id))!;
+      expect(log.addIns[0].brand, isNull, reason: '空串应归一成 null');
+      expect(log.addIns[1].brand, isNull, reason: '纯空白也算没填');
+    });
+
+    test('编辑成空牌子能存下去（回归：清空牌子再保存不该炸）', () async {
+      final int id = (await harness.logs.save(
+        makeLog(
+          addIns: const <BrewLogAddIn>[
+            BrewLogAddIn(name: '牛奶', brand: 'Oatly'),
+          ],
+        ),
+      )).brewLogId;
+      expect((await harness.logs.getById(id))!.addIns.single.brand, 'Oatly');
+
+      final BrewLog saved = (await harness.logs.getById(id))!;
+      await harness.logs.save(
+        saved.copyWith(
+          addIns: <BrewLogAddIn>[saved.addIns.single.copyWith(brand: '')],
+        ),
+      );
+
+      expect((await harness.logs.getById(id))!.addIns.single.brand, isNull);
+    });
+
+    test('getRecentAddIns 按 name + brand 去重（同名不同牌是两条）', () async {
+      await harness.logs.save(
+        makeLog(
+          brewedAt: DateTime(2026, 1, 1, 8),
+          addIns: const <BrewLogAddIn>[
+            BrewLogAddIn(name: '牛奶', brand: 'Oatly'),
+          ],
+        ),
+      );
+      await harness.logs.save(
+        makeLog(
+          brewedAt: DateTime(2026, 1, 2, 8),
+          addIns: const <BrewLogAddIn>[
+            BrewLogAddIn(name: '牛奶', brand: 'Suntory'),
+          ],
+        ),
+      );
+      // 又用了一次 Oatly 牛奶 → 它最近用过；同名同牌仍只算一条。
+      await harness.logs.save(
+        makeLog(
+          brewedAt: DateTime(2026, 1, 3, 8),
+          addIns: const <BrewLogAddIn>[
+            BrewLogAddIn(name: '牛奶', brand: 'Oatly'),
+          ],
+        ),
+      );
+
+      final List<RecentAddIn> recent = await harness.logs.getRecentAddIns();
+
+      expect(recent, hasLength(2), reason: '同名不同牌两条、同名同牌合并成一条');
+      expect(recent.first.name, '牛奶');
+      expect(recent.first.brand, 'Oatly', reason: '最近一次用的是 Oatly 牛奶');
+      expect(
+        recent.map((RecentAddIn addIn) => addIn.brand),
+        containsAll(<String?>['Oatly', 'Suntory']),
+      );
+    });
+
+    test('getRecentAddIns 把「没牌子」与「有牌子」算两条', () async {
+      await harness.logs.save(
+        makeLog(
+          brewedAt: DateTime(2026, 1, 1, 8),
+          addIns: const <BrewLogAddIn>[BrewLogAddIn(name: '牛奶')],
+        ),
+      );
+      await harness.logs.save(
+        makeLog(
+          brewedAt: DateTime(2026, 1, 2, 8),
+          addIns: const <BrewLogAddIn>[
+            BrewLogAddIn(name: '牛奶', brand: 'Oatly'),
+          ],
+        ),
+      );
+
+      final List<RecentAddIn> recent = await harness.logs.getRecentAddIns();
+
+      expect(recent, hasLength(2));
+      expect(recent.first.brand, 'Oatly');
+      expect(recent.last.brand, isNull);
+    });
+
+    test('getRecentAddIns 的 limit 生效', () async {
+      for (int i = 0; i < 4; i++) {
+        await harness.logs.save(
+          makeLog(
+            brewedAt: DateTime(2026, 1, 1 + i, 8),
+            addIns: <BrewLogAddIn>[BrewLogAddIn(name: '辅料$i')],
+          ),
+        );
+      }
+
+      expect(await harness.logs.getRecentAddIns(limit: 2), hasLength(2));
+    });
+  });
 }

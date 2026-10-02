@@ -189,8 +189,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   /// 这条记录加的辅料（牛奶、糖浆…）。
   late final List<_AddIn> _addIns;
 
-  /// 弹一次「选择辅料」面板用的历史项（最近用过）。
-  List<String> _recentAddInNames = const <String>[];
+  /// 弹一次「选择辅料」面板用的历史项（最近用过：名字 + 品牌，v8 / T37）。
+  List<RecentAddIn> _recentAddIns = const <RecentAddIn>[];
 
   /// 时分是否已被确认过（编辑旧记录算已确认）。
   ///
@@ -255,7 +255,13 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     _methodLabel = source?.methodLabel;
     _addIns = <_AddIn>[
       for (final BrewLogAddIn addIn in source?.addIns ?? const <BrewLogAddIn>[])
-        _AddIn(name: addIn.name, amount: addIn.amount, unit: addIn.unit),
+        _AddIn(
+          name: addIn.name,
+          // v8 / T37：品牌必须一起带过来，否则「编辑旧记录 → 保存」会把品牌写回 null。
+          brand: addIn.brand,
+          amount: addIn.amount,
+          unit: addIn.unit,
+        ),
     ];
     _picks = _initialPicks(source);
     _grinderId = source?.grinderId;
@@ -1377,83 +1383,118 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        // 三个框居中对齐（名字/数量/单位）。
-        crossAxisAlignment: CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Expanded(
-            child: InkWell(
-              key: Key('brew.addInName.$index'),
-              onTap: _saving ? null : () => _renameAddIn(index),
-              child: SizedBox(
+          // v8 / T37 裁决 A=②：两排。
+          // 第一排「名字 + 品牌」各占一半 —— 320 dp 下可用宽 256 dp，各 ≈124 dp；
+          // 若四框挤在一排，名字框会只剩 20 dp（改前更是只有 ≈28 dp）。
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              Expanded(
+                child: InkWell(
+                  key: Key('brew.addInName.$index'),
+                  onTap: _saving ? null : () => _renameAddIn(index),
+                  child: SizedBox(
+                    height: _addInBoxHeight,
+                    child: InputDecorator(
+                      decoration: _addInBoxDecoration,
+                      expands: true,
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          addIn.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 品牌：行内真输入框（用户裁决：hint 用「品牌」，不是「牌子」）。
+              Expanded(
+                child: SizedBox(
+                  height: _addInBoxHeight,
+                  child: TextField(
+                    key: Key('brew.addInBrand.$index'),
+                    controller: addIn.brand,
+                    enabled: !_saving,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      hintText: '品牌',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          // 第二排：数量 88 + 单位 84 + 删除（88/84 是 T12/T28 的既有契约，不动）。
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              // 数量框给固定宽度：以前只占 6 份里的 2 份，去掉单位与删除按钮后
+              // 实测只剩 58dp，`1000` 这种四位数就显示不全（第二轮反馈）。
+              SizedBox(
+                width: 88,
+                height: _addInBoxHeight,
+                child: NumberField(
+                  key: Key('brew.addInAmount.$index'),
+                  controller: addIn.amount,
+                  hintText: '数量',
+                ),
+              ),
+              const SizedBox(width: 8),
+              // 单位：ml / g / 泵 / 份。
+              // 外面套 SizedBox 给个确定宽度：InputDecorator 在无界宽度下会断言失败；
+              // 高度与装饰和左边的名称框完全一致，边框才对得齐。
+              //
+              // 宽度 84 而不是更窄：DropdownButton 还要占掉右侧的箭头（约 24dp），
+              // 72dp 时 `ml` 会被截成 `m`（渲染稿抓到的回归），84dp 才放得下单位文字 + 箭头。
+              SizedBox(
+                width: 84,
                 height: _addInBoxHeight,
                 child: InputDecorator(
                   decoration: _addInBoxDecoration,
                   expands: true,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(addIn.name, overflow: TextOverflow.ellipsis),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<AddInUnit>(
+                      key: Key('brew.addInUnit.$index'),
+                      value: addIn.unit,
+                      isDense: true,
+                      isExpanded: true,
+                      items: <DropdownMenuItem<AddInUnit>>[
+                        for (final AddInUnit unit in AddInUnit.selectable)
+                          DropdownMenuItem<AddInUnit>(
+                            value: unit,
+                            child: Text(unit.label),
+                          ),
+                      ],
+                      onChanged: _saving
+                          ? null
+                          : (AddInUnit? value) {
+                              if (value == null) return;
+                              setState(() => addIn.unit = value);
+                            },
+                    ),
                   ),
                 ),
               ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // 数量框给固定宽度：以前只占 6 份里的 2 份，去掉单位与删除按钮后
-          // 实测只剩 58dp，`1000` 这种四位数就显示不全（第二轮反馈）。
-          SizedBox(
-            width: 88,
-            height: _addInBoxHeight,
-            child: NumberField(
-              key: Key('brew.addInAmount.$index'),
-              controller: addIn.amount,
-              hintText: '数量',
-            ),
-          ),
-          const SizedBox(width: 8),
-          // 单位：ml / g / 泵 / 份。
-          // 外面套 SizedBox 给个确定宽度：InputDecorator 在无界宽度下会断言失败；
-          // 高度与装饰和左边的名称框完全一致，边框才对得齐。
-          //
-          // 宽度 84 而不是更窄：DropdownButton 还要占掉右侧的箭头（约 24dp），
-          // 72dp 时 `ml` 会被截成 `m`（渲染稿抓到的回归），84dp 才放得下单位文字 + 箭头。
-          SizedBox(
-            width: 84,
-            height: _addInBoxHeight,
-            child: InputDecorator(
-              decoration: _addInBoxDecoration,
-              expands: true,
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<AddInUnit>(
-                  key: Key('brew.addInUnit.$index'),
-                  value: addIn.unit,
-                  isDense: true,
-                  isExpanded: true,
-                  items: <DropdownMenuItem<AddInUnit>>[
-                    for (final AddInUnit unit in AddInUnit.selectable)
-                      DropdownMenuItem<AddInUnit>(
-                        value: unit,
-                        child: Text(unit.label),
-                      ),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (AddInUnit? value) {
-                          if (value == null) return;
-                          setState(() => addIn.unit = value);
-                        },
-                ),
+              const Spacer(),
+              IconButton(
+                tooltip: '删掉这一项',
+                // 紧凑一点，把宽度让给数量框。
+                visualDensity: VisualDensity.compact,
+                onPressed: _saving
+                    ? null
+                    : () => setState(() => _addIns.removeAt(index).dispose()),
+                icon: const Icon(Icons.close, size: 18),
               ),
-            ),
-          ),
-          IconButton(
-            tooltip: '删掉这一项',
-            // 紧凑一点，把宽度让给数量框。
-            visualDensity: VisualDensity.compact,
-            onPressed: _saving
-                ? null
-                : () => setState(() => _addIns.removeAt(index).dispose()),
-            icon: const Icon(Icons.close, size: 18),
+            ],
           ),
         ],
       ),
@@ -1472,28 +1513,35 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
       '焦糖酱',
       '糖',
     ];
-    final List<String> recent = await ref
+    final List<RecentAddIn> recent = await ref
         .read(brewLogRepositoryProvider)
-        .getRecentAddInNames();
+        .getRecentAddIns();
     if (!mounted) return;
-    _recentAddInNames = recent
-        .where((String name) => !common.contains(name))
+    // 只挡「同名且**同牌**」的重复 —— 否则「牛奶 · Oatly」这种常用名的品牌变体
+    // 会被整条丢掉（B1 修好之后它才真的能被带回行里）。
+    _recentAddIns = recent
+        .where(
+          (RecentAddIn addIn) =>
+              !common.contains(addIn.name) || addIn.brand != null,
+        )
         .toList(growable: false);
 
-    final String? name = await showModalBottomSheet<String>(
+    final RecentAddIn? picked = await showModalBottomSheet<RecentAddIn>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
       builder: (BuildContext context) =>
-          _AddInPickerSheet(common: common, recent: _recentAddInNames),
+          _AddInPickerSheet(common: common, recent: _recentAddIns),
     );
-    if (name == null || !mounted) return;
-    setState(() => _addIns.add(_AddIn(name: name)));
+    if (picked == null || !mounted) return;
+    // 面板是新增辅料的唯一入口：**必须把品牌一起带回来**，否则用户按面板
+    // 文案点了「香草糖浆 · Monin」却只拿到名字（静默丢品牌）。
+    setState(() => _addIns.add(_AddIn(name: picked.name, brand: picked.brand)));
   }
 
   /// 改这一行的名字（复用选择面板）。
   Future<void> _renameAddIn(int index) async {
-    final String? name = await showModalBottomSheet<String>(
+    final RecentAddIn? picked = await showModalBottomSheet<RecentAddIn>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -1508,12 +1556,13 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
           '焦糖酱',
           '糖',
         ],
-        recent: _recentAddInNames,
+        recent: _recentAddIns,
         title: '换一种辅料',
       ),
     );
-    if (name == null || !mounted) return;
-    setState(() => _addIns[index].name = name);
+    if (picked == null || !mounted) return;
+    // 改名只换名字：**不动**这一行已有的品牌（品牌在那个行内框里单独编辑）。
+    setState(() => _addIns[index].name = picked.name);
   }
 
   /// 「圈」框里的整数圈数：空串 → null（= 0 圈）。
@@ -2363,21 +2412,36 @@ class _NoFavoriteSheet extends StatelessWidget {
 /// 名字在写入记录时成为**文本快照**（见 `BrewLogAddIn`），
 /// 所以这里不需要引用任何「辅料表」——辅料库是从历史记录聚合出来的。
 class _AddIn {
-  _AddIn({required this.name, double? amount, this.unit = AddInUnit.ml})
-    : amount = TextEditingController(text: numberToText(amount));
+  _AddIn({
+    required this.name,
+    String? brand,
+    double? amount,
+    this.unit = AddInUnit.ml,
+  }) : brand = TextEditingController(text: brand ?? ''),
+       amount = TextEditingController(text: numberToText(amount));
 
   String name;
+
+  /// 品牌（v8 / T37）：行内**真输入框**，可为空。
+  ///
+  /// 写入时过 [normalizeAddInBrand]（空串/纯空白 → null）；**不 trim 其它值**
+  /// （`' Oatly '` 原样存，改用户数据要有理由）。
+  final TextEditingController brand;
   final TextEditingController amount;
   AddInUnit unit;
 
   BrewLogAddIn toEntity(int position) => BrewLogAddIn(
     name: name,
+    brand: normalizeAddInBrand(brand.text),
     amount: parseNumber(amount.text),
     unit: unit,
     position: position,
   );
 
-  void dispose() => amount.dispose();
+  void dispose() {
+    brand.dispose();
+    amount.dispose();
+  }
 }
 
 /// 给任意 widget 套一个长按（`ChoiceChip` 自己没有 `onLongPress`）。
@@ -2449,7 +2513,9 @@ class _AddInPickerSheet extends StatefulWidget {
   });
 
   final List<String> common;
-  final List<String> recent;
+
+  /// 最近用过：**名字 + 品牌**（v8 / T37 裁决 B）。
+  final List<RecentAddIn> recent;
   final String title;
 
   @override
@@ -2468,14 +2534,21 @@ class _AddInPickerSheetState extends State<_AddInPickerSheet> {
   void _submit() {
     final String name = _controller.text.trim();
     if (name.isEmpty) return;
-    Navigator.of(context).pop(name);
+    // 面板里手写的名字没有品牌（品牌在行内框里填）。
+    Navigator.of(context).pop((name: name, brand: null));
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
 
-    Widget group(String title, List<String> items) {
+    // 一组辅料 chip：常用（只有名字）/ 最近用过（名字 + 品牌）。
+    //
+    // **key 必须能区分同名不同牌**（数据层按 `(name, brand)` 去重，所以
+    // 「抹茶粉·A / 抹茶粉·B」会同时出现）：同层两个相同 key 会触发
+    // `Duplicate keys found` 断言；品牌为空时仍退回**纯名字**的 key，
+    // 这样既有的 `brew.addInOption.<名字>` 断言不受影响。
+    Widget group(String title, List<RecentAddIn> items) {
       if (items.isEmpty) return const SizedBox.shrink();
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -2486,10 +2559,20 @@ class _AddInPickerSheetState extends State<_AddInPickerSheet> {
             spacing: 8,
             runSpacing: 8,
             children: <Widget>[
-              for (final String item in items)
+              for (final RecentAddIn item in items)
                 ActionChip(
-                  key: Key('brew.addInOption.$item'),
-                  label: Text(item),
+                  key: Key(
+                    item.brand == null || item.brand!.isEmpty
+                        ? 'brew.addInOption.${item.name}'
+                        : 'brew.addInOption.${item.name}·${item.brand}',
+                  ),
+                  // 品牌为空时只显示名字（裁决 B）。
+                  label: Text(
+                    item.brand == null || item.brand!.isEmpty
+                        ? item.name
+                        : '${item.name} · ${item.brand}',
+                  ),
+                  // B1：把**整条**（名字 + 品牌）弹回去，别只弹名字。
                   onPressed: () => Navigator.of(context).pop(item),
                 ),
             ],
@@ -2498,6 +2581,10 @@ class _AddInPickerSheetState extends State<_AddInPickerSheet> {
         ],
       );
     }
+
+    List<RecentAddIn> asRecent(List<String> names) => <RecentAddIn>[
+      for (final String name in names) (name: name, brand: null),
+    ];
 
     return SafeArea(
       child: Padding(
@@ -2519,7 +2606,7 @@ class _AddInPickerSheetState extends State<_AddInPickerSheet> {
               ),
             ),
             const SizedBox(height: 12),
-            group('常用', widget.common),
+            group('常用', asRecent(widget.common)),
             group('最近用过', widget.recent),
             Text('新建', style: theme.textTheme.labelMedium),
             const SizedBox(height: 6),

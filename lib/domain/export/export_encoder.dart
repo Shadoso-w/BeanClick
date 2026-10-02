@@ -413,13 +413,20 @@ abstract final class ExportEncoder {
         .join(' + ');
   }
 
-  /// 辅料列：`牛奶 150ml、榛果糖浆 1泵`；没填数量的只写名字。
+  /// 辅料列：`Oatly 牛奶 150ml、榛果糖浆 1泵`。
+  ///
+  /// 牌子在前、与名字用空格分隔（v8 / T37，裁决 E，与 JSON 自动带牌子一致）；
+  /// **牌子为空时维持原样**（`牛奶 150ml`），没填数量的只写名字（`冰块`）。
   static String _addInsLabel(List<BrewLogAddIn> addIns) {
     if (addIns.isEmpty) return '';
     return addIns
         .map((BrewLogAddIn addIn) {
-          if (addIn.amount == null) return addIn.name;
-          return '${addIn.name} ${number(addIn.amount)}${addIn.unit.label}';
+          final String? brand = addIn.brand;
+          final String name = brand == null
+              ? addIn.name
+              : '$brand ${addIn.name}';
+          if (addIn.amount == null) return name;
+          return '$name ${number(addIn.amount)}${addIn.unit.label}';
         })
         .join('、');
   }

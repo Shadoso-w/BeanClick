@@ -577,6 +577,25 @@ class Grinder {
   String toString() => 'Grinder(id: $id, ${displayName()})';
 }
 
+/// 把「辅料牌子」归一：**空串 / 纯空白 → null**。
+///
+/// 为什么必须归一：库里 `brew_log_addins.brand` 是
+/// `text().withLength(min: 1, max: 60).nullable()()`，而 drift 的 `withLength`
+/// **不生成 SQL 约束**、只在 Dart 侧校验 —— 写入 `Value('')` 会抛
+/// `InvalidDataException`，`Value(null)` 不会。所以写入前必须过这里。
+///
+/// 只把「空」变 null，**不动其它值**（`' Oatly '` 原样存：改用户数据要有理由）。
+String? normalizeAddInBrand(String? brand) {
+  if (brand == null) return null;
+  return brand.trim().isEmpty ? null : brand;
+}
+
+/// 「最近用过」的一条辅料：名字 + 牌子（v8 / T37，裁决 B）。
+///
+/// 去重口径是 `(name, brand)`：同名不同牌是两条，同名同牌合并成一条。
+/// 用记录类型而不是小类，是为了让仓储与 UI 都不必为一个投影多引一个类型。
+typedef RecentAddIn = ({String name, String? brand});
+
 /// 一条记录里加的一种辅料（牛奶、榛果糖浆、冰块…）。
 ///
 /// 与 [BeanUsage] 同构：**每条记录多行**，名字存文本快照（不建名字表），
@@ -585,6 +604,7 @@ class BrewLogAddIn {
   const BrewLogAddIn({
     this.id,
     required this.name,
+    this.brand,
     this.amount,
     this.unit = AddInUnit.ml,
     this.position = 0,
@@ -595,6 +615,11 @@ class BrewLogAddIn {
   /// 辅料名，如「牛奶」。
   final String name;
 
+  /// 牌子（v8 / T37），如「Oatly」。可空 = 没记牌子。
+  ///
+  /// 空串会被 [normalizeAddInBrand] 在写入前归一成 null。
+  final String? brand;
+
   /// 数量；**可以为空**，表示「只记加了什么、没量」。
   final double? amount;
 
@@ -604,13 +629,16 @@ class BrewLogAddIn {
   BrewLogAddIn copyWith({
     int? id,
     String? name,
+    String? brand,
     double? amount,
     AddInUnit? unit,
     int? position,
     bool clearAmount = false,
+    bool clearBrand = false,
   }) => BrewLogAddIn(
     id: id ?? this.id,
     name: name ?? this.name,
+    brand: clearBrand ? null : (brand ?? this.brand),
     amount: clearAmount ? null : (amount ?? this.amount),
     unit: unit ?? this.unit,
     position: position ?? this.position,
@@ -619,6 +647,7 @@ class BrewLogAddIn {
   Map<String, Object?> toJson() => {
     'id': id,
     'name': name,
+    'brand': brand,
     'amount': amount,
     'unit': unit.name,
     'position': position,
@@ -627,6 +656,8 @@ class BrewLogAddIn {
   factory BrewLogAddIn.fromJson(Map<String, Object?> json) => BrewLogAddIn(
     id: (json['id'] as num?)?.toInt(),
     name: (json['name'] as String?) ?? '',
+    // 备份里可能是空串（清过牌子的记录），统一归一成 null。
+    brand: normalizeAddInBrand(json['brand'] as String?),
     amount: (json['amount'] as num?)?.toDouble(),
     unit: AddInUnit.fromName(json['unit'] as String?) ?? AddInUnit.ml,
     position: (json['position'] as num?)?.toInt() ?? 0,
@@ -638,15 +669,18 @@ class BrewLogAddIn {
       other is BrewLogAddIn &&
           other.id == id &&
           other.name == name &&
+          other.brand == brand &&
           other.amount == amount &&
           other.unit == unit &&
           other.position == position;
 
   @override
-  int get hashCode => Object.hash(id, name, amount, unit, position);
+  int get hashCode => Object.hash(id, name, brand, amount, unit, position);
 
   @override
-  String toString() => 'BrewLogAddIn($name, $amount ${unit.name})';
+  String toString() =>
+      'BrewLogAddIn(${brand == null ? name : '$brand $name'}, '
+      '$amount ${unit.name})';
 }
 
 /// 一条冲煮记录用到的其中一支豆子。
@@ -782,6 +816,7 @@ class BrewLog {
     this.yieldGrams,
     this.preheatUpperChamber,
     this.beanUsages = const [],
+    this.favoriteGroupIds = const <int>[],
     this.addIns = const [],
     this.methodLabel,
     required this.createdAt,
@@ -852,6 +887,19 @@ class BrewLog {
 
   /// 这条记录用到的豆子（多支 = 拼配）。由 Repository 联表填充。
   final List<BeanUsage> beanUsages;
+
+  /// 这条记录被放进了哪些收藏夹（v8 / T38）。
+  ///
+  /// **附着字段**（与 [beanUsages] 同风格）：由 Repository 联表填充；
+  /// 成员关系**不走 `save()`**，走 `BrewLogRepository.setFavoriteGroups`。
+  /// 空列表 = 收藏了但没分组 —— 不是「没收藏」，那看 [isFavorite]。
+  ///
+  /// ⚠️ **分组关系待导出契约定稿后再序列化（见导出卡）**：`favorite_groups`
+  /// 表目前**不在**导出文档里，若把它写进 `toJson`，导出再导入会整块丢分组；
+  /// 更糟的是夹 id 自增，将来导进新库会「同号不同组」静默错配。
+  /// 所以它**不进 [`toJson`] / [`fromJson`]**（`fromJson(toJson())` 两边都不带，
+  /// 对称性成立）。
+  final List<int> favoriteGroupIds;
 
   /// 这条记录加的辅料（牛奶、糖浆…）。可以没有。
   final List<BrewLogAddIn> addIns;
@@ -935,6 +983,7 @@ class BrewLog {
     'yieldGrams': yieldGrams,
     'preheatUpperChamber': preheatUpperChamber,
     'beanUsages': beanUsages.map((e) => e.toJson()).toList(growable: false),
+    // `favoriteGroupIds` **故意不序列化**：见字段上的说明（导出契约未定稿）。
     'addIns': addIns.map((e) => e.toJson()).toList(growable: false),
     'methodLabel': methodLabel,
     'createdAt': createdAt.toIso8601String(),
@@ -987,6 +1036,7 @@ class BrewLog {
     beanUsages: (json['beanUsages'] as List<Object?>? ?? const [])
         .map((e) => BeanUsage.fromJson((e as Map).cast<String, Object?>()))
         .toList(growable: false),
+    // `favoriteGroupIds` **故意不反序列化**：见字段上的说明（导出契约未定稿）。
     addIns: (json['addIns'] as List<Object?>? ?? const [])
         .map((e) => BrewLogAddIn.fromJson((e as Map).cast<String, Object?>()))
         .toList(growable: false),
@@ -1032,6 +1082,7 @@ class BrewLog {
     double? yieldGrams,
     bool? preheatUpperChamber,
     List<BeanUsage>? beanUsages,
+    List<int>? favoriteGroupIds,
     List<BrewLogAddIn>? addIns,
     String? methodLabel,
     DateTime? createdAt,
@@ -1118,6 +1169,7 @@ class BrewLog {
         ? null
         : (preheatUpperChamber ?? this.preheatUpperChamber),
     beanUsages: beanUsages ?? this.beanUsages,
+    favoriteGroupIds: favoriteGroupIds ?? this.favoriteGroupIds,
     addIns: addIns ?? this.addIns,
     methodLabel: clearMethodLabel ? null : (methodLabel ?? this.methodLabel),
     createdAt: createdAt ?? this.createdAt,
@@ -1165,6 +1217,7 @@ class BrewLog {
           other.yieldGrams == yieldGrams &&
           other.preheatUpperChamber == preheatUpperChamber &&
           _listEquals(other.beanUsages, beanUsages) &&
+          _listEquals(other.favoriteGroupIds, favoriteGroupIds) &&
           _listEquals(other.addIns, addIns) &&
           other.methodLabel == methodLabel &&
           other.createdAt == createdAt &&
@@ -1206,6 +1259,7 @@ class BrewLog {
     yieldGrams,
     preheatUpperChamber,
     Object.hashAll(beanUsages),
+    Object.hashAll(favoriteGroupIds),
     Object.hashAll(addIns),
     methodLabel,
     createdAt,
@@ -1352,6 +1406,73 @@ class Recipe {
 
   @override
   String toString() => 'Recipe(id: $id, name: $name)';
+}
+
+/// 一个自定义收藏夹（组）—— 把「收藏的记录」归类（v8 / T38）。
+///
+/// 与 [BrewLog.isFavorite] 的分工（设计稿 §2「关键决定 1」）：
+/// `isFavorite` 仍然是「是否收藏」的**唯一**判据；本实体只回答
+/// 「这条收藏还放进了哪些夹」。**不属于任何夹 ≠ 没收藏。**
+class FavoriteGroup {
+  const FavoriteGroup({
+    this.id,
+    required this.name,
+    this.sortOrder = 0,
+    required this.createdAt,
+  });
+
+  final int? id;
+
+  /// 用户起的组名，如「早餐配方」。
+  final String name;
+
+  /// 展示顺序，越小越靠前。
+  final int sortOrder;
+
+  final DateTime createdAt;
+
+  FavoriteGroup copyWith({
+    int? id,
+    String? name,
+    int? sortOrder,
+    DateTime? createdAt,
+  }) => FavoriteGroup(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    sortOrder: sortOrder ?? this.sortOrder,
+    createdAt: createdAt ?? this.createdAt,
+  );
+
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'name': name,
+    'sortOrder': sortOrder,
+    'createdAt': createdAt.toIso8601String(),
+  };
+
+  factory FavoriteGroup.fromJson(Map<String, Object?> json) => FavoriteGroup(
+    id: (json['id'] as num?)?.toInt(),
+    name: (json['name'] as String?) ?? '',
+    sortOrder: (json['sortOrder'] as num?)?.toInt() ?? 0,
+    // 时间坏掉时不抛，回落到纪元（与其它实体的宽容解码一致）。
+    createdAt:
+        _date(json['createdAt']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+  );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is FavoriteGroup &&
+          other.id == id &&
+          other.name == name &&
+          other.sortOrder == sortOrder &&
+          other.createdAt == createdAt;
+
+  @override
+  int get hashCode => Object.hash(id, name, sortOrder, createdAt);
+
+  @override
+  String toString() => 'FavoriteGroup(id: $id, name: $name)';
 }
 
 /// 克数的存储精度：0.1g。
