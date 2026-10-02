@@ -27,11 +27,9 @@ const String _remainingRequiredMessage = '请填写剩余克数';
 /// 两者万一同屏（例如名称框可见但用户没填）时不会出现两个相同的 `Text`。
 const String _nameRequiredHint = '请先填写豆子名称';
 
-/// 「其它行内校验失败」的通用提示（M3-T33）。
-///
-/// `validate()` 只返回一个 bool，行内错误又可能落在视口之外；保存路径不能
-/// 无声 `return`，否则用户只会觉得「点了没反应」。
-const String _formInvalidHint = '表单还有未通过的校验，请检查标红提示';
+/// 「其它行内校验失败」的通用提示走 `form_fields.dart` 的 [kFormInvalidHint]
+/// （三个表单页共用一份字面量）。本页它是**可达**的第 3 级：任何不在前两级与
+/// 第 4 级（cross-field）覆盖范围内的行内错误都落到它（M3-T33）。
 
 /// 新增豆子时「剩余克数 > 购入总重」的**保存路径**提示（G5-S1）。
 ///
@@ -224,7 +222,7 @@ class _BeanFormPageState extends ConsumerState<BeanFormPage> {
     final String? firstBatchHint = _firstBatchHint();
     if (firstBatchHint != null) return firstBatchHint;
     if (_name.text.trim().isEmpty) return _nameRequiredHint;
-    if (!formValid) return _formInvalidHint;
+    if (!formValid) return kFormInvalidHint;
     final String? crossFieldHint = _crossFieldGramsHint();
     if (crossFieldHint != null) return crossFieldHint;
     return null;

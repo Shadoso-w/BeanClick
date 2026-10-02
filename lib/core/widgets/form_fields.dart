@@ -7,6 +7,15 @@ library;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+/// `validate()` 整体失败时的**通用**保存路径提示（三个表单页共用，M3-T39）。
+///
+/// `FormState.validate()` 只返回一个 bool，行内错误又可能渲染在视口之外，
+/// 所以保存路径不能无声 `return`，否则用户只会觉得「点了没反应」。
+///
+/// ⚠️ **字面量不要改**：`test/features/bean_form_test.dart` 里有精确匹配钉着它
+/// （`_blockingHint` 的通用分支）；改了三页的措辞会一起变，但只有那一处会红。
+const String kFormInvalidHint = '表单还有未通过的校验，请检查标红提示';
+
 /// 表单分组卡片，带可选标题与说明。
 class FormSection extends StatelessWidget {
   const FormSection({
