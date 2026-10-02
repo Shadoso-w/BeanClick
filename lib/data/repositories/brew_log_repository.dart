@@ -441,24 +441,6 @@ class BrewLogRepository {
         .toList(growable: false);
   }
 
-  /// **兼容壳，P3 迁移完成后删除。**
-  ///
-  /// P3 把「选择辅料」面板切到 [getRecentAddIns] 之后删掉本方法。
-  ///
-  /// 语义与 v8 之前保持一致：**按名字**去重、最近用过的在前。
-  /// 之所以要再按名字去重一次（底层已按 name + brand 分组）：老面板只显示名字，
-  /// 若把「同名不同牌」原样返回，用户会看到两条一模一样的条目。
-  /// 副作用（可接受，仅限兼容期）：最近若干条若都是同名不同牌，
-  /// 返回的条数会少于 [limit]。
-  Future<List<String>> getRecentAddInNames({int limit = 8}) async {
-    final rows = await getRecentAddIns(limit: limit);
-    final seen = <String>{};
-    return <String>[
-      for (final RecentAddIn addIn in rows)
-        if (seen.add(addIn.name)) addIn.name,
-    ];
-  }
-
   // -------------------------------------------------------------------------
   // 收藏夹分组（v8 / T38）
   //

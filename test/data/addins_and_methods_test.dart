@@ -144,7 +144,7 @@ void main() {
       expect(rows, isEmpty);
     });
 
-    test('getRecentAddInNames 按最近使用去重倒序', () async {
+    test('getRecentAddIns 按最近使用去重倒序', () async {
       // 先牛奶、再糖浆、最后又加了一次牛奶 → 牛奶最近用过。
       await harness.logs.save(
         makeLog(
@@ -165,9 +165,9 @@ void main() {
         ),
       );
 
-      final List<String> recent = await harness.logs.getRecentAddInNames();
-      expect(recent.first, '牛奶', reason: '最近一次用到的是牛奶');
-      expect(recent, contains('榛果糖浆'));
+      final List<RecentAddIn> recent = await harness.logs.getRecentAddIns();
+      expect(recent.first.name, '牛奶', reason: '最近一次用到的是牛奶');
+      expect(recent.map((RecentAddIn addIn) => addIn.name), contains('榛果糖浆'));
       expect(recent, hasLength(2), reason: '同名的只出现一次');
     });
   });
