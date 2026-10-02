@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:beanclick/data/database.dart';
 import 'package:beanclick/domain/entities.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -42,16 +44,22 @@ void main() {
     });
 
     test('watchFavoriteGroups 会推送变化', () async {
-      final List<List<FavoriteGroup>> emissions = <List<FavoriteGroup>>[];
-      final subscription = harness.logs.watchFavoriteGroups().listen(
-        emissions.add,
+      // 确定性写法：不用 `sleep(50ms)` + `emissions.last`（慢机上是假红），
+      // 而是要求"推送里出现过新建的那个组"。
+      final Future<void> expectation = expectLater(
+        harness.logs.watchFavoriteGroups(),
+        emitsThrough(
+          predicate<List<FavoriteGroup>>(
+            (List<FavoriteGroup> groups) =>
+                groups.any((FavoriteGroup group) => group.name == '早餐配方'),
+            'watchFavoriteGroups 推送出新建的组',
+          ),
+        ),
       );
 
       await harness.logs.createFavoriteGroup('早餐配方');
-      await Future<void>.delayed(const Duration(milliseconds: 50));
-      await subscription.cancel();
 
-      expect(emissions.last.single.name, '早餐配方');
+      await expectation;
     });
 
     test('改名', () async {
@@ -109,6 +117,75 @@ void main() {
       // 空集合 = 取消分组（但**不等于取消收藏**）。
       await harness.logs.setFavoriteGroups(logId, const <int>{});
       expect(await harness.logs.getFavoriteGroupIdsOf(logId), isEmpty);
+    });
+
+    test('写分组会让 watchAll() 重发（否则 UI 改完分组不刷新）', () async {
+      final int logId = await newLog();
+      final int groupId = await harness.logs.createFavoriteGroup('早餐');
+
+      // 为什么不用 `expectLater(stream, emitsThrough(...))` 一句话搞定：
+      // 订阅是异步的，若"第一帧"在写入之后才算出来，那个写法会被第一帧
+      // 直接满足 → **测试恒绿、什么也没证明**（我第一版就踩了这个坑）。
+      //
+      // 所以这里分两步，靠**帧序**而不是靠 sleep：
+      //   1. 先等到第一帧（必须是"还没分组"的旧状态）——证明流已经跑起来了；
+      //   2. 再写分组，然后要求"出现过带新分组的帧"。
+      // 第 2 步用有界 timeout：行为缺失时它会超时变红，而不是假绿。
+      final Completer<void> firstFrame = Completer<void>();
+      final Completer<void> frameWithGroup = Completer<void>();
+      List<BrewLog>? first;
+
+      final StreamSubscription<List<BrewLog>> subscription = harness.logs
+          .watchAll()
+          .listen((List<BrewLog> logs) {
+            first ??= logs;
+            if (!firstFrame.isCompleted) firstFrame.complete();
+            final bool hasGroup = logs
+                .where((BrewLog log) => log.id == logId)
+                .any((BrewLog log) => log.favoriteGroupIds.contains(groupId));
+            if (hasGroup && !frameWithGroup.isCompleted) {
+              frameWithGroup.complete();
+            }
+          });
+
+      await firstFrame.future;
+      expect(
+        first!.single.favoriteGroupIds,
+        isEmpty,
+        reason: '起点必须确实没分组，否则这条用例证明不了"重发"',
+      );
+
+      await harness.logs.setFavoriteGroups(logId, <int>{groupId});
+      await frameWithGroup.future.timeout(
+        const Duration(seconds: 10),
+        onTimeout: () => fail('setFavoriteGroups 之后 watchAll() 一直没有重发出带新分组的帧'),
+      );
+
+      await subscription.cancel();
+    });
+
+    test('JSON 不带分组关系（导出契约未定稿），其余字段仍逐项往返', () {
+      final BrewLog log = makeLog().copyWith(favoriteGroupIds: <int>[7, 9]);
+      final Map<String, Object?> json = log.toJson();
+
+      expect(
+        json.containsKey('favoriteGroupIds'),
+        isFalse,
+        reason: 'favorite_groups 表还没进导出文档，序列化分组 id 会导致"同号不同组"错配',
+      );
+      expect(
+        BrewLog.fromJson(json).toJson().containsKey('favoriteGroupIds'),
+        isFalse,
+        reason: '撤下后两边都不带它 → toJson/fromJson 对称',
+      );
+      expect(log.favoriteGroupIds, <int>[
+        7,
+        9,
+      ], reason: '字段本身还在：数据层与 UI 要用，只是不进备份');
+
+      // 除分组外，其它字段必须逐项往返（`copyWith` 补回分组后整体相等）。
+      final BrewLog restored = BrewLog.fromJson(json);
+      expect(restored.copyWith(favoriteGroupIds: log.favoriteGroupIds), log);
     });
 
     test('读记录时附着 favoriteGroupIds；未分组是空列表不是 null', () async {

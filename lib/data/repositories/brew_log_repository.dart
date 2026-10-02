@@ -527,7 +527,10 @@ class BrewLogRepository {
       await (_db.delete(
         _db.brewLogFavoriteGroups,
       )..where((t) => t.brewLogId.equals(brewLogId))).go();
-      for (final int groupId in groupIds) {
+      // 防御性 `.toSet()`：参数是 `Set<int>`，但调用方很容易把
+      // `BrewLog.favoriteGroupIds`（`List<int>`）直接递进来；一旦哪天放宽成
+      // `Iterable<int>`，重复元素会撞唯一索引并让**整个事务回滚**。
+      for (final int groupId in groupIds.toSet()) {
         await _db
             .into(_db.brewLogFavoriteGroups)
             .insert(
@@ -537,6 +540,14 @@ class BrewLogRepository {
               ),
             );
       }
+      // 顺手碰一下 `brew_logs`：`watchAll()` 只跟踪它自己的表（`brew_logs`），
+      // 关联表不在其中，而 `_attachBeans` 里的夹查询是一次性 `.get()`。
+      // 不写这一下，改完分组后**列表流不会重发**，UI 上的收藏夹 chip 不会刷新
+      // （由 `favorite_groups_test.dart` 的确定性用例钉住；也正因为如此，
+      // 这个保证不能只依赖外面那层 `transaction`）。
+      // 做法与 [setFavorite] 一致。
+      await (_db.update(_db.brewLogs)..where((t) => t.id.equals(brewLogId)))
+          .write(BrewLogsCompanion(updatedAt: Value(DateTime.now())));
     });
   }
 

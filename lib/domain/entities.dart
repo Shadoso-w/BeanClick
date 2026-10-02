@@ -893,6 +893,12 @@ class BrewLog {
   /// **附着字段**（与 [beanUsages] 同风格）：由 Repository 联表填充；
   /// 成员关系**不走 `save()`**，走 `BrewLogRepository.setFavoriteGroups`。
   /// 空列表 = 收藏了但没分组 —— 不是「没收藏」，那看 [isFavorite]。
+  ///
+  /// ⚠️ **分组关系待导出契约定稿后再序列化（见导出卡）**：`favorite_groups`
+  /// 表目前**不在**导出文档里，若把它写进 `toJson`，导出再导入会整块丢分组；
+  /// 更糟的是夹 id 自增，将来导进新库会「同号不同组」静默错配。
+  /// 所以它**不进 [`toJson`] / [`fromJson`]**（`fromJson(toJson())` 两边都不带，
+  /// 对称性成立）。
   final List<int> favoriteGroupIds;
 
   /// 这条记录加的辅料（牛奶、糖浆…）。可以没有。
@@ -977,7 +983,7 @@ class BrewLog {
     'yieldGrams': yieldGrams,
     'preheatUpperChamber': preheatUpperChamber,
     'beanUsages': beanUsages.map((e) => e.toJson()).toList(growable: false),
-    'favoriteGroupIds': favoriteGroupIds,
+    // `favoriteGroupIds` **故意不序列化**：见字段上的说明（导出契约未定稿）。
     'addIns': addIns.map((e) => e.toJson()).toList(growable: false),
     'methodLabel': methodLabel,
     'createdAt': createdAt.toIso8601String(),
@@ -1030,9 +1036,7 @@ class BrewLog {
     beanUsages: (json['beanUsages'] as List<Object?>? ?? const [])
         .map((e) => BeanUsage.fromJson((e as Map).cast<String, Object?>()))
         .toList(growable: false),
-    favoriteGroupIds: (json['favoriteGroupIds'] as List<Object?>? ?? const [])
-        .map((e) => (e as num).toInt())
-        .toList(growable: false),
+    // `favoriteGroupIds` **故意不反序列化**：见字段上的说明（导出契约未定稿）。
     addIns: (json['addIns'] as List<Object?>? ?? const [])
         .map((e) => BrewLogAddIn.fromJson((e as Map).cast<String, Object?>()))
         .toList(growable: false),
