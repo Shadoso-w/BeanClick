@@ -92,6 +92,14 @@ app.*.map.json
 /docs/DEVELOPMENT.md
 /docs/M1-DATA-MODEL.md
 /docs/M2.*.md
+# 内部设计稿：M2.* 与 M3 的 UI/数据设计稿都是本地协作产物，不进仓库。
+# 注意两种命名都在用：`M2.10-xxx.md`（带点）与 `M3-T36-xxx.md`（带卡号），所以两条都要。
+/docs/M3.*.md
+/docs/M3-*.md
+# T36 排序设计稿的渲染 mock：它是**裁决前**的过程输入（已被真实实现取代），
+# 且与「设计稿只在本地」的口径一致 → 不入库（免得仓库里留一份与冻结设计矛盾的稿）。
+/tool/design_preview/t36_sort_previews_test.dart
+/tool/design_preview/goldens/t36_sort_*.png
 /docs/添加新属性指南.md
 /tool/check_upload_safety.ps1
 /RELEASING.md
