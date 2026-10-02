@@ -415,21 +415,129 @@ class BrewLogRepository {
 
   /// 「选择辅料」面板里的「最近用过」：从本机记录里聚合，按最近使用倒序。
   ///
-  /// 名字不单独建表，所以这里直接从历史记录里取（去重靠 GROUP BY）。
+  /// 去重口径是 **(name, brand)**（v8 / T37，裁决 B）：同名不同牌算两条，
+  /// 同名同牌合并成一条。名字与牌子都不单独建表，所以直接从历史记录里取，
+  /// **一条 `GROUP BY` 查询**取完（不要退化成 N+1）。
+  ///
   /// 取不到就返回空列表，面板只显示内置的「常用」。
-  Future<List<String>> getRecentAddInNames({int limit = 8}) async {
-    final name = _db.brewLogAddins.name;
-    final id = _db.brewLogAddins.id;
-    final query = _db.selectOnly(_db.brewLogAddins)
-      ..addColumns(<Expression<Object>>[name, id.max()])
-      ..groupBy(<Expression<Object>>[name])
-      ..orderBy(<OrderingTerm>[OrderingTerm.desc(id.max())])
+  Future<List<RecentAddIn>> getRecentAddIns({int limit = 8}) async {
+    final addIns = _db.brewLogAddins;
+    final query = _db.selectOnly(addIns)
+      ..addColumns(<Expression<Object>>[
+        addIns.name,
+        addIns.brand,
+        addIns.id.max(),
+      ])
+      ..groupBy(<Expression<Object>>[addIns.name, addIns.brand])
+      ..orderBy(<OrderingTerm>[OrderingTerm.desc(addIns.id.max())])
       ..limit(limit);
     final rows = await query.get();
     return rows
-        .map((row) => row.read(name)!)
-        .where((String value) => value.isNotEmpty)
+        .map(
+          (row) =>
+              (name: row.read(addIns.name)!, brand: row.read(addIns.brand)),
+        )
+        .where((RecentAddIn addIn) => addIn.name.isNotEmpty)
         .toList(growable: false);
+  }
+
+  /// **兼容壳，P3 迁移完成后删除。**
+  ///
+  /// P3 把「选择辅料」面板切到 [getRecentAddIns] 之后删掉本方法。
+  ///
+  /// 语义与 v8 之前保持一致：**按名字**去重、最近用过的在前。
+  /// 之所以要再按名字去重一次（底层已按 name + brand 分组）：老面板只显示名字，
+  /// 若把「同名不同牌」原样返回，用户会看到两条一模一样的条目。
+  /// 副作用（可接受，仅限兼容期）：最近若干条若都是同名不同牌，
+  /// 返回的条数会少于 [limit]。
+  Future<List<String>> getRecentAddInNames({int limit = 8}) async {
+    final rows = await getRecentAddIns(limit: limit);
+    final seen = <String>{};
+    return <String>[
+      for (final RecentAddIn addIn in rows)
+        if (seen.add(addIn.name)) addIn.name,
+    ];
+  }
+
+  // -------------------------------------------------------------------------
+  // 收藏夹分组（v8 / T38）
+  //
+  // 与 setFavorite / getFavorites 的分工：`isFavorite` 仍是「是否收藏」的**唯一**
+  // 判据；这里只维护「这条收藏还放进了哪些夹」。**没有夹 ≠ 没收藏。**
+  // -------------------------------------------------------------------------
+
+  /// 全部收藏夹：`sortOrder` 小的在前，同序按 id（保证顺序稳定）。
+  Stream<List<FavoriteGroup>> watchFavoriteGroups() {
+    final query = _db.select(_db.favoriteGroups)
+      ..orderBy([
+        (t) => OrderingTerm(expression: t.sortOrder),
+        (t) => OrderingTerm(expression: t.id),
+      ]);
+    return query.watch().map(
+      (rows) => rows.map((row) => row.toEntity()).toList(growable: false),
+    );
+  }
+
+  /// 新建一个收藏夹，返回新 id。`sortOrder` 取当前最大值 +1，新夹排在最后。
+  Future<int> createFavoriteGroup(String name) {
+    return _db.transaction(() async {
+      final maxOrder = _db.favoriteGroups.sortOrder.max();
+      final row = await (_db.selectOnly(
+        _db.favoriteGroups,
+      )..addColumns(<Expression<Object>>[maxOrder])).getSingle();
+      final int nextOrder = (row.read(maxOrder) ?? -1) + 1;
+      return _db
+          .into(_db.favoriteGroups)
+          .insert(
+            FavoriteGroupsCompanion.insert(
+              name: name,
+              sortOrder: Value(nextOrder),
+            ),
+          );
+    });
+  }
+
+  /// 改名：只动名字，不动 id 与顺序。
+  Future<void> renameFavoriteGroup(int id, String name) async {
+    await (_db.update(_db.favoriteGroups)..where((t) => t.id.equals(id))).write(
+      FavoriteGroupsCompanion(name: Value(name)),
+    );
+  }
+
+  /// 删一个收藏夹。它的关联行由 `ON DELETE CASCADE` 一并清掉
+  /// （要求 `PRAGMA foreign_keys = ON`，见 `AppDatabase.migration` 的 `beforeOpen`）。
+  Future<void> deleteFavoriteGroup(int id) async {
+    await (_db.delete(_db.favoriteGroups)..where((t) => t.id.equals(id))).go();
+  }
+
+  /// 某条记录当前属于哪些夹。
+  Future<Set<int>> getFavoriteGroupIdsOf(int brewLogId) async {
+    final rows = await (_db.select(
+      _db.brewLogFavoriteGroups,
+    )..where((t) => t.brewLogId.equals(brewLogId))).get();
+    return rows.map((row) => row.groupId).toSet();
+  }
+
+  /// **替换式**写入某条记录的夹归属（照 [_replaceAddIns] 的先删后插）。
+  ///
+  /// 空集合 = 取消分组 —— **不等于取消收藏**，收藏开关是 [setFavorite]。
+  /// 传不存在的 `groupId` 会被外键拒绝（这是有意的：不在夹里就不该有归属行）。
+  Future<void> setFavoriteGroups(int brewLogId, Set<int> groupIds) async {
+    await _db.transaction(() async {
+      await (_db.delete(
+        _db.brewLogFavoriteGroups,
+      )..where((t) => t.brewLogId.equals(brewLogId))).go();
+      for (final int groupId in groupIds) {
+        await _db
+            .into(_db.brewLogFavoriteGroups)
+            .insert(
+              BrewLogFavoriteGroupsCompanion.insert(
+                brewLogId: brewLogId,
+                groupId: groupId,
+              ),
+            );
+      }
+    });
   }
 
   /// 给一批记录补上各自的豆子用量与辅料，避免逐条查询。
@@ -446,6 +554,12 @@ class BrewLogRepository {
         await (_db.select(_db.brewLogAddins)
               ..where((t) => t.brewLogId.isIn(ids))
               ..orderBy([(t) => OrderingTerm(expression: t.position)]))
+            .get();
+    // 收藏夹归属：一次查完，避免逐条 N+1（按 groupId 排序保证结果稳定）。
+    final groupRows =
+        await (_db.select(_db.brewLogFavoriteGroups)
+              ..where((t) => t.brewLogId.isIn(ids))
+              ..orderBy([(t) => OrderingTerm(expression: t.groupId)]))
             .get();
 
     // 一次查出用到的豆子名（已删除的豆子跳过，靠快照名显示）。
@@ -478,11 +592,17 @@ class BrewLogRepository {
           .add(row.toEntity());
     }
 
+    final groupIdsByLog = <int, List<int>>{};
+    for (final row in groupRows) {
+      groupIdsByLog.putIfAbsent(row.brewLogId, () => <int>[]).add(row.groupId);
+    }
+
     return rows
         .map(
           (row) => row.toEntity(
             beanUsages: usagesByLog[row.id] ?? const <BeanUsage>[],
             addIns: addInsByLog[row.id] ?? const <BrewLogAddIn>[],
+            favoriteGroupIds: groupIdsByLog[row.id] ?? const <int>[],
           ),
         )
         .toList(growable: false);

@@ -65,10 +65,11 @@ extension GrinderRowMapper on GrinderRow {
 }
 
 extension BrewLogRowMapper on BrewLogRow {
-  /// [beanUsages] / [addIns] 由调用方联表填充；不传则视为未关联。
+  /// [beanUsages] / [addIns] / [favoriteGroupIds] 由调用方联表填充；不传则视为未关联。
   BrewLog toEntity({
     List<BeanUsage> beanUsages = const [],
     List<BrewLogAddIn> addIns = const [],
+    List<int> favoriteGroupIds = const <int>[],
   }) => BrewLog(
     id: id,
     beanId: beanId,
@@ -108,6 +109,7 @@ extension BrewLogRowMapper on BrewLogRow {
     yieldGrams: yieldGrams,
     preheatUpperChamber: preheatUpperChamber,
     beanUsages: beanUsages,
+    favoriteGroupIds: favoriteGroupIds,
     addIns: addIns,
     createdAt: createdAt,
     updatedAt: updatedAt,
@@ -118,6 +120,7 @@ extension BrewLogAddInRowMapper on BrewLogAddInRow {
   BrewLogAddIn toEntity() => BrewLogAddIn(
     id: id,
     name: name,
+    brand: brand,
     amount: amount,
     // 认不出的单位回落到 ml（宽容解码，不会崩）。
     unit: unit ?? AddInUnit.ml,
@@ -127,15 +130,41 @@ extension BrewLogAddInRowMapper on BrewLogAddInRow {
 
 extension BrewLogAddInCompanionMapper on BrewLogAddIn {
   /// [newId] 为空时由调用方给出（新建记录时列表才知道 brewLogId）。
+  ///
+  /// ⚠️ `brand` 必须过 [normalizeAddInBrand]：列是 `withLength(min: 1)`，
+  /// 但 drift 的 `withLength` **不生成 SQL 约束**、只在 Dart 侧校验，
+  /// `Value('')` 会在写入时抛 `InvalidDataException`。这里是**写入的唯一咽喉**，
+  /// 所以归一放在这里，仓储的每条写入路径都自动受保护。
   BrewLogAddinsCompanion toCompanion(int brewLogId, {int? newId}) =>
       BrewLogAddinsCompanion(
         id: newId == null ? const Value.absent() : Value(newId),
         brewLogId: Value(brewLogId),
         name: Value(name),
+        brand: Value(normalizeAddInBrand(brand)),
         amount: Value(amount),
         unit: Value(unit),
         position: Value(position),
       );
+}
+
+extension FavoriteGroupRowMapper on FavoriteGroupRow {
+  FavoriteGroup toEntity() => FavoriteGroup(
+    id: id,
+    name: name,
+    sortOrder: sortOrder,
+    createdAt: createdAt,
+  );
+}
+
+extension FavoriteGroupCompanionMapper on FavoriteGroup {
+  /// 新建时 `id` 由数据库分配（`id == null` → 不下发），
+  /// 显式带 id 的写入（导入 / 替换）才把 id 一起写下去。
+  FavoriteGroupsCompanion toCompanion() => FavoriteGroupsCompanion(
+    id: id == null ? const Value.absent() : Value(id!),
+    name: Value(name),
+    sortOrder: Value(sortOrder),
+    createdAt: Value(createdAt),
+  );
 }
 
 extension BeanUsageRowMapper on BeanUsageRow {
