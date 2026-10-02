@@ -104,7 +104,36 @@ final Map<int, _VersionFixture> _fixtures = <int, _VersionFixture>{
     insert: _insertV7Fixture,
     validate: _validateV7Fixture,
   ),
+  8: const _VersionFixture(
+    insert: _insertV8Fixture,
+    validate: _validateV8Fixture,
+  ),
 };
+
+/// v8 = v7 那份数据 + 一个收藏夹 + 一条「记录进夹」关联行 + 给辅料补上牌子。
+///
+/// **为什么新表也塞数据**：只建表不写行的话，「升级后数据仍在」这条用例对
+/// 两张新表毫无判别力（空表查出来是空，忘了 `createTable` 也是查不出来）。
+/// 塞一行进去，`_validateFixture` 里的 `hasLength(1)` + 字段断言才真的在证明
+/// 「v8 写下的东西 v8 读得回来」。
+void _insertV8Fixture(Batch batch, GeneratedDatabase db) {
+  _insertV7Fixture(batch, db);
+  const int t = 1767319445; // 与 v4 夹具同一个时间戳（Unix 秒）
+  // v8 新增：收藏夹组。
+  batch.customStatement(
+    'INSERT INTO favorite_groups (id, name, sort_order, created_at) '
+    "VALUES (1, '早餐配方', 0, $t)",
+  );
+  // v8 新增：记录 1 进组 1（双外键都指向已存在的行）。
+  batch.customStatement(
+    'INSERT INTO brew_log_favorite_groups '
+    '(id, brew_log_id, group_id, created_at) VALUES (1, 1, 1, $t)',
+  );
+  // v8 新增：辅料牌子（v7 及更早的行是 NULL）。
+  batch.customStatement(
+    "UPDATE brew_log_addins SET brand = 'Oatly' WHERE id = 1",
+  );
+}
 
 /// v7 = v6 那份数据 + 处理法多选 + 磨豆机微米 + 记录上的磨豆机零点快照。
 void _insertV7Fixture(Batch batch, GeneratedDatabase db) {
@@ -246,11 +275,25 @@ Future<void> _validateV6Fixture(AppDatabase db) =>
 Future<void> _validateV7Fixture(AppDatabase db) =>
     _validateFixture(db, expectFavorite: true, expectAddIns: true);
 
+/// v8 升上来后：v7 的全部内容 + 收藏夹 / 关联行 / 辅料牌子都要在。
+///
+/// （v8 就是当前版本，这条覆盖的是「v8 写下、v8 读回」的一致性；
+/// 「老库升到 v8 后两张新表存在」由 v4–v7 那四条各自保证。）
+Future<void> _validateV8Fixture(AppDatabase db) => _validateFixture(
+  db,
+  expectFavorite: true,
+  expectAddIns: true,
+  expectFavoriteGroups: true,
+  expectAddInBrand: 'Oatly',
+);
+
 /// 升到当前版本后逐项校验上面的数据。
 Future<void> _validateFixture(
   AppDatabase db, {
   required bool expectFavorite,
   bool expectAddIns = false,
+  bool expectFavoriteGroups = false,
+  String? expectAddInBrand,
 }) async {
   // --- 豆子与批次 ---
   final List<CoffeeBeanRow> beans = await (db.select(
@@ -292,8 +335,32 @@ Future<void> _validateFixture(
     expect(addInRows[0].unit, AddInUnit.ml);
     expect(addInRows[1].name, '榛果糖浆');
     expect(addInRows[1].unit, AddInUnit.pump);
+    // v8 加的「牌子」：v6 / v7 的夹具没写过 ⇒ 必须是 NULL；
+    // v8 的夹具写了 'Oatly'。这条同时证明 **旧库升级后这一列真的存在**
+    // （忘了 `addColumn` 的话，上面那句 select 就会抛 no such column）。
+    expect(addInRows[0].brand, expectAddInBrand);
+    expect(addInRows[1].brand, isNull);
   } else {
     expect(addInRows, isEmpty);
+  }
+
+  // --- v8 的两张新表 ---
+  // 对**每个**历史版本都查一次：老库升级上来时若 `_upgradeToV8` 漏了
+  // `createTable`，select 会直接抛 "no such table"（比列级差异更早暴露）。
+  final List<FavoriteGroupRow> groupRows = await db
+      .select(db.favoriteGroups)
+      .get();
+  expect(groupRows, hasLength(expectFavoriteGroups ? 1 : 0));
+  final List<BrewLogFavoriteGroupRow> linkRows = await db
+      .select(db.brewLogFavoriteGroups)
+      .get();
+  expect(linkRows, hasLength(expectFavoriteGroups ? 1 : 0));
+  if (expectFavoriteGroups) {
+    expect(groupRows.single.name, '早餐配方');
+    expect(groupRows.single.sortOrder, 0);
+    // 关联行指向的正是那条记录与那个夹（双外键都是 CASCADE）。
+    expect(linkRows.single.brewLogId, logs.single.id);
+    expect(linkRows.single.groupId, groupRows.single.id);
   }
 
   final List<BeanUsageRow> usages = await (db.select(

@@ -15,8 +15,8 @@ void main() {
   tearDown(() => harness.dispose());
 
   group('schema v4', () {
-    test('schemaVersion 为 7，且 extra_attributes 表存在', () async {
-      expect(harness.db.schemaVersion, 7);
+    test('schemaVersion 为 8，且 extra_attributes 表存在', () async {
+      expect(harness.db.schemaVersion, 8);
 
       final rows = await harness.db
           .customSelect(
