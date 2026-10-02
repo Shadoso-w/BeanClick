@@ -9,6 +9,21 @@ import '../../domain/entities.dart';
 import '../../domain/enums.dart';
 import '../../domain/extra_attributes.dart';
 
+/// 「剩余克数 > 购入总重」的**保存路径**提示（M3-T39）。
+///
+/// 与行内那条（`剩余克数不能大于购入总重（X g）`）用词不同：同一个字段不会在
+/// 同一屏上出现两个文案相同的 `Text`（T31 的教训）。
+///
+/// ⚠️ **本页禁止用 `textContaining('剩余克数不能大于购入总重')` 写断言**：
+/// 这句话的前缀就是行内那条；字段可见时行内红字与 SnackBar **同屏**，任何
+/// 子串匹配都会命中 2。要断言就用精确 `find.text`（本卡用例就是这么写的）。
+const String _gramsOverInitialHint = '剩余克数不能大于购入总重，请核对这两个数字';
+
+/// 「其它行内校验失败」的通用提示走 `form_fields.dart` 的 [kFormInvalidHint]
+/// （三个表单页共用一份字面量）。本页它是**防御性**分支、今天不可达：唯一的
+/// validator 是 cross-field 那条，已被上面的分支先吃掉 —— 保留是为了以后加
+/// validator 时不会再出现「点了没反应」。
+
 /// 批次新增 / 编辑表单。
 ///
 /// 批次承载「这一次购买」的信息：烘焙日期、烘焙度、余量、购入总重、价格。
@@ -104,8 +119,34 @@ class _BatchFormPageState extends ConsumerState<BatchFormPage> {
     super.dispose();
   }
 
+  /// 保存前的兜底：**直读控制器**，不看 `validate()` 的结果（M3-T39）。
+  ///
+  /// 表单在 `ListView` 里，视口外那一段可能整段被销毁、它的 `FormField` 随之
+  /// 注销 —— 那时 `validate()` 会放行，越界值会一路落库；即使没被销毁，行内红字
+  /// 也可能渲染在首屏之外，用户只会觉得「点了没反应」。返回 null 表示没有兜底
+  /// 要说的，**不代表表单一定合法**。
+  String? _blockingHint({required bool formValid}) {
+    final double? remaining = parseNumber(_remaining.text);
+    final double? initial = parseNumber(_initial.text);
+    if (remaining != null && initial != null && remaining > initial) {
+      return _gramsOverInitialHint;
+    }
+    if (!formValid) return kFormInvalidHint;
+    return null;
+  }
+
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    // `validate()` 仍排第一：它负责在该段可见时把行内错误照常渲染出来。
+    final bool formValid = _formKey.currentState?.validate() ?? false;
+
+    final String? blockingHint = _blockingHint(formValid: formValid);
+    if (blockingHint != null) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(blockingHint)));
+      return;
+    }
+
     setState(() => _saving = true);
 
     final DateTime now = DateTime.now();

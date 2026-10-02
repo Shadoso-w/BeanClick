@@ -6,6 +6,17 @@ import '../../data/providers.dart';
 import '../../domain/entities.dart';
 import '../../domain/enums.dart';
 
+/// 必填项（品牌 / 型号 / 每圈 click）缺失时的**保存路径**提示（M3-T39）。
+///
+/// 与三条行内文案（`请填写品牌` / `请填写型号` / `请填写每圈 click（正整数）`）
+/// 用词都不同：同一屏上不会出现两个文案相同的 `Text`（T31 的教训）。
+const String _requiredHint = '必填项还没填完，请检查标红提示';
+
+/// 「其它行内校验失败」的通用提示走 `form_fields.dart` 的 [kFormInvalidHint]
+/// （三个表单页共用一份字面量）。本页它是**防御性**分支、今天不可达：三条
+/// validator（品牌 / 型号 / 每圈 click）都被上面的必填分支先吃掉 —— 保留是为了
+/// 以后加 validator 时不会再出现「点了没反应」。
+
 /// 磨豆机新增 / 编辑表单（手册 §7「手磨 / 磨豆机」）。
 ///
 /// 通过 [GrinderFormPage.show] 打开，返回 `true` 表示已保存或删除。
@@ -84,8 +95,32 @@ class _GrinderFormPageState extends ConsumerState<GrinderFormPage> {
     super.dispose();
   }
 
+  /// 保存前的兜底：**直读控制器**，不看 `validate()` 的结果（M3-T39）。
+  ///
+  /// 品牌 / 型号在数据库上有 `checkTextLength(min:1)`，而它们所在的整段「机型」
+  /// 滚出视口后 `FormField` 会一起注销 → `validate()` 放行 → 空值一路撞到 DB，
+  /// 用户看到的是 `保存失败：InvalidDataException…`（实测原文见 M3-T39 报告）。
+  /// 返回 null 表示没有兜底要说的，**不代表表单一定合法**。
+  String? _blockingHint({required bool formValid}) {
+    final bool brandMissing = _brand.text.trim().isEmpty;
+    final bool modelMissing = _model.text.trim().isEmpty;
+    final bool clicksMissing =
+        (int.tryParse(_clicksPerRevolution.text.trim()) ?? 0) <= 0;
+    if (brandMissing || modelMissing || clicksMissing) return _requiredHint;
+    if (!formValid) return kFormInvalidHint;
+    return null;
+  }
+
   Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    // `validate()` 仍排第一：它负责在该段可见时把行内错误照常渲染出来。
+    final bool formValid = _formKey.currentState?.validate() ?? false;
+
+    final String? blockingHint = _blockingHint(formValid: formValid);
+    if (blockingHint != null) {
+      _showMessage(blockingHint);
+      return;
+    }
+
     setState(() => _saving = true);
 
     final DateTime now = DateTime.now();
