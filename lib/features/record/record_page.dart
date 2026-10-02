@@ -18,14 +18,6 @@ class RecordPage extends ConsumerStatefulWidget {
   ConsumerState<RecordPage> createState() => _RecordPageState();
 }
 
-/// 收藏夹列表（v8 / T38）。
-///
-/// 数据层没有在 `lib/data/providers.dart` 里加它（P2 的 scope），本卡的写作用域
-/// 又只有 `lib/features/**` —— 所以先放在这里；将来搬进 `providers.dart` 是一行平移。
-final _favoriteGroupsProvider = StreamProvider<List<FavoriteGroup>>(
-  (ref) => ref.watch(brewLogRepositoryProvider).watchFavoriteGroups(),
-);
-
 class _RecordPageState extends ConsumerState<RecordPage> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
@@ -67,8 +59,8 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   /// 收藏 / 取消收藏 / 加入收藏夹（v8 / T38 裁决 D=②）。
   ///
   /// 未收藏 → 先标收藏，再弹「加入哪个收藏夹」多选面板（可以一个都不选 =
-  /// 收藏但未分组）；已收藏 → 取消收藏，并**同时退出所有夹**
-  /// （否则夹里会留下一条"没收藏"的记录，与 chip 行的语义打架）。
+  /// 收藏但未分组）；已收藏 → 取消收藏，**归属保留**，未收藏的记录靠读侧
+  /// 不变量不再出现在夹里（见 [_applyFilter]）。
   Future<void> _toggleFavorite(BrewLog log) async {
     final int? id = log.id;
     if (id == null) return;
@@ -369,7 +361,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
   /// - 夹多了要**能横滑**（`管理` 随行滚动，用户选定）。
   Widget _buildFilterChips() {
     final List<FavoriteGroup> groups =
-        ref.watch(_favoriteGroupsProvider).value ?? const <FavoriteGroup>[];
+        ref.watch(favoriteGroupsProvider).value ?? const <FavoriteGroup>[];
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -445,8 +437,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
       // 选中某个收藏夹时的空态（`_favoritesOnly` 的两种文案**保持原样**）。
       final FavoriteGroup? group = _groupId == null
           ? null
-          : (ref.watch(_favoriteGroupsProvider).value ??
-                    const <FavoriteGroup>[])
+          : (ref.watch(favoriteGroupsProvider).value ?? const <FavoriteGroup>[])
                 .where((FavoriteGroup g) => g.id == _groupId)
                 .firstOrNull;
       // 空状态也要能下拉刷新，所以塞进可滚动区域而不是直接返回 Center。
@@ -517,7 +508,7 @@ class _RecordPageState extends ConsumerState<RecordPage> {
             beanName: beanNames[log.beanId],
             grinder: grinders[log.grinderId],
             onTap: () => BrewLogFormPage.show(context, existing: log),
-            onFavoriteTap: () => _pickGroupsFor(log),
+            onStarTap: () => _pickGroupsFor(log),
           ),
         );
       },
@@ -532,7 +523,7 @@ class _BrewLogCard extends StatelessWidget {
     required this.beanName,
     required this.grinder,
     required this.onTap,
-    required this.onFavoriteTap,
+    required this.onStarTap,
   });
 
   final BrewLog log;
@@ -541,7 +532,7 @@ class _BrewLogCard extends StatelessWidget {
   final VoidCallback onTap;
 
   /// 点星标 = 改这条记录的分组归属（B3：不取消收藏也能改）。
-  final VoidCallback onFavoriteTap;
+  final VoidCallback onStarTap;
 
   @override
   Widget build(BuildContext context) {
@@ -567,14 +558,20 @@ class _BrewLogCard extends StatelessWidget {
                 children: <Widget>[
                   if (log.isFavorite) ...<Widget>[
                     // B3：星标可点 = 直接改归属（不必"取消收藏 → 再收藏 → 重选"）。
-                    // 用 `InkWell` 而不是 `IconButton`：不改变卡片第一行的排版与高度。
-                    InkWell(
-                      key: Key('record.star.${log.id}'),
-                      customBorder: const CircleBorder(),
-                      onTap: onFavoriteTap,
-                      child: Padding(
-                        padding: const EdgeInsets.all(2),
-                        child: Icon(
+                    //
+                    // 热区 48×48（Material 最小可点尺寸）：之前只有 Icon + 2dp padding
+                    // ≈ 22dp，MIUI 上手指容易点不中。图标本身仍是 18dp、贴顶对齐，
+                    // 所以**只有"已收藏"的卡片**第一行会因此变成 48dp 高。
+                    SizedBox(
+                      width: 48,
+                      height: 48,
+                      child: IconButton(
+                        key: Key('record.star.${log.id}'),
+                        tooltip: '加入收藏夹',
+                        padding: EdgeInsets.zero,
+                        alignment: Alignment.topCenter,
+                        onPressed: onStarTap,
+                        icon: Icon(
                           favoriteFilledIcon,
                           size: 18,
                           color: colors.primary,
@@ -926,7 +923,7 @@ class _GroupPickSheetState extends ConsumerState<_GroupPickSheet> {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final List<FavoriteGroup> groups =
-        ref.watch(_favoriteGroupsProvider).value ?? const <FavoriteGroup>[];
+        ref.watch(favoriteGroupsProvider).value ?? const <FavoriteGroup>[];
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -1019,7 +1016,7 @@ class _ManageGroupsSheet extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final List<FavoriteGroup> groups =
-        ref.watch(_favoriteGroupsProvider).value ?? const <FavoriteGroup>[];
+        ref.watch(favoriteGroupsProvider).value ?? const <FavoriteGroup>[];
 
     return SafeArea(
       child: SingleChildScrollView(

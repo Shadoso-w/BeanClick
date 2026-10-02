@@ -103,3 +103,12 @@ final grinderListProvider = StreamProvider<List<Grinder>>(
 final brewLogListProvider = StreamProvider<List<BrewLog>>(
   (ref) => ref.watch(brewLogRepositoryProvider).watchAll(),
 );
+
+/// 全部收藏夹（按展示顺序：`sortOrder` 小的在前）。
+///
+/// 与 [brewLogListProvider] 的分工：`brew_logs.isFavorite` 才是「是否收藏」的
+/// 判据，这份只提供**分组的名字与顺序**；某条记录属于哪些夹看
+/// `BrewLog.favoriteGroupIds`（由仓储联表附着）。
+final favoriteGroupsProvider = StreamProvider<List<FavoriteGroup>>(
+  (ref) => ref.watch(brewLogRepositoryProvider).watchFavoriteGroups(),
+);
