@@ -809,11 +809,6 @@ void main() {
   /// **S3**：ⓘ 弹窗里的「每圈 click / 零点」要按**各自**的来源措辞 ——
   /// 磨豆机字段为空时取的是记录里的快照，不能一概说成「这台磨豆机」的。
   group('M3-T22 越界历史值放行与 3600 可达', () {
-    // 坑：`harness.useOverrides` 注册的覆盖**会一直留着**（`reset()` 每次都重新
-    // 应用它），上一组「豆库读取出错」的覆盖会漏进本组，下拉框里就没有豆子了。
-    // 本组显式清空，免得测试成败取决于它在文件里的位置。
-    setUp(() => harness.useOverrides(() => const []));
-
     Future<void> pumpForm(WidgetTester tester, {BrewLog? existing}) async {
       await tester.pumpWidget(
         harness.app(MaterialApp(home: BrewLogFormPage(existing: existing))),

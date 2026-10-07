@@ -1,6 +1,6 @@
 /// widget 测试脚手架。
 ///
-/// ## 两个真实踩过的坑
+/// ## 已知的坑
 ///
 /// **坑 1：测试失败时 flutter_test 不会卸载 widget 树。**
 /// `_runTestBody` 里是这么写的：
@@ -18,6 +18,13 @@
 ///
 /// **坑 2：`ProviderContainer.dispose()` 与 `AppDatabase.close()` 都可能永久等待。**
 /// 它们在 widget 还订阅着的时候会等订阅取消，等不到就永远不返回。
+///
+/// **坑 3：`useOverrides` 只对当前用例有效（T24 修复后新出现的失效面）。**
+/// [reset] 在每个用例开始时会把覆盖清空，所以覆盖**不能放进 `setUpAll`** ——
+/// `setUpAll` 注册的那份会在首个用例开始前就被清掉，覆盖**静默失效**：
+/// 不报错、不飘红，只是没覆盖上。要在多个用例里共用一份覆盖，只能在每个用例
+/// （或每个用例都会跑的 `setUp`）里各自注册一次。当前仓库没有 `setUpAll` 用法，
+/// 这条是防回归的说明。
 ///
 /// ## 本脚手架的取舍
 ///
@@ -135,6 +142,13 @@ class WidgetTestHarness {
 
   /// 设置额外覆盖（例如把导出目录指向临时目录）。
   ///
+  /// **覆盖只在当前用例内有效**：每个用例开始时 [reset] 会把覆盖清空，
+  /// 所以某个用例（或某个 `setUp`）注册的覆盖**不会漏进同一文件里的
+  /// 后续用例**，测试成败与用例在文件里的位置无关。
+  ///
+  /// **不要放进 `setUpAll`** —— 覆盖只对当前用例有效，`setUpAll` 注册的那份
+  /// 会在首个用例开始前就被 [reset] 清掉、**静默失效**（不报错，只是没覆盖上）。
+  ///
   /// 注意时序坑：flutter_test 里**先注册的 setUp 先执行**，而
   /// [setUpWidgetTest] 在 `main()` 顶部就注册了 [reset]，
   /// 所以业务测试里后注册的 `setUp` 一定在 reset **之后**才跑。
@@ -145,13 +159,20 @@ class WidgetTestHarness {
     rebuild();
   }
 
+  /// 当前用例待应用的覆盖构造器；由 [reset] 在每个用例开头清空。
   List<Override> Function()? _extraOverridesBuilder;
 
   /// 重建数据库与容器。
   ///
   /// 由 [setUpWidgetTest] 注册为 setUp（保证测试之间互相隔离），
   /// 也由 [useOverrides] 立即调用一次。
-  Future<void> reset() async => rebuild();
+  ///
+  /// 覆盖的清理**只能发生在这里**（[rebuild] 之前）：[useOverrides] 内部
+  /// 调的就是 [rebuild]，清在 rebuild 里会让覆盖刚注册就自清、永不生效。
+  Future<void> reset() async {
+    _extraOverridesBuilder = null;
+    rebuild();
+  }
 
   void rebuild() {
     _db = AppDatabase.memory();
