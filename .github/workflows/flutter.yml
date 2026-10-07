@@ -12,6 +12,16 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# 依赖源必须与 pubspec.lock 里记录的一致。
+#
+# lock 里的包来自中国镜像（开发机的 PUB_HOSTED_URL）。若 CI 用默认的 pub.dev，
+# pub 会认为这些 lock 条目来自「别的源」而**重新解析**，于是绕过 lock 中钉住的
+# 版本 —— 实测后果是解析到 analyzer 14.5.0，它移除了 build_runner 2.16.1 依赖的
+# 一个 setter，导致「Generate Drift code」这一步直接编译失败。
+# 指定同一个源后，CI 会照 lock 原样安装（= 本地验证过的那一套版本）。
+env:
+  PUB_HOSTED_URL: https://pub.flutter-io.cn
+
 jobs:
   analyze-and-test:
     name: Analyze & Test
