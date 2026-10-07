@@ -10,6 +10,49 @@ import '../../domain/enums.dart';
 import '../beans/bean_form_page.dart';
 import '../beans/grinder_form_page.dart';
 
+// ── M3-T26：核心参数的上下限（同源） ─────────────────────────────────────────
+//
+// 每一组上下限**只在这里写一次数字**：`_rangeError` 的 min/max、范围串、以及
+// 「…应在 … 之间」的报错文案全部由这几个常量派生 —— 改上限只改这一处。
+// 数字走 [formatNumber]（`100.0` → `100`、`0.1` → `0.1`）。
+
+/// 一组上下限：min/max 与**派生的**范围串。
+///
+/// [range] 里的分隔符是**短破折号 `–`**（U+2013），不是连字符 ——
+/// 既有 19 处断言逐字钉着这批文案，别改成 `-`。
+class _Limit {
+  const _Limit({required this.min, required this.max, this.unit = ''});
+
+  final double min;
+  final double max;
+
+  /// 单位后缀（`g` / `℃` / `秒`）。「分」「秒」两个**框**的范围串本身不带单位。
+  final String unit;
+
+  String get range => unit.isEmpty
+      ? '${formatNumber(min)}–${formatNumber(max)}'
+      : '${formatNumber(min)}–${formatNumber(max)} $unit';
+}
+
+/// 粉量：单支粉量、拼配里每支的克数、拼配总粉量共用这一组（M3-T25）。
+const _Limit _doseLimit = _Limit(min: 0.1, max: 100, unit: 'g');
+
+/// 水量：可以比粉量多，也可以是 0。
+const _Limit _waterLimit = _Limit(min: 0, max: 2000, unit: 'g');
+
+/// 水温。
+const _Limit _waterTempLimit = _Limit(min: 0, max: 100, unit: '℃');
+
+/// 总时间（秒）。
+const _Limit _totalTimeLimit = _Limit(min: 0, max: 3600, unit: '秒');
+
+/// 「分」框：上限是 **60** 而不是 59（M3-T22）—— 60 分 = 3600 秒要合法，
+/// 否则 `total > 3600` 那条校验成了死代码。
+const _Limit _minutesLimit = _Limit(min: 0, max: 60);
+
+/// 「秒」框。
+const _Limit _secondsLimit = _Limit(min: 0, max: 59);
+
 /// 冲煮记录表单（手册 §7「冲煮记录」）。
 ///
 /// 三种入口：
@@ -561,8 +604,8 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
           numberToText(total),
           numberToText(originalTotal),
         );
-    if ((total < 0.1 || total > 100) && !totalUnchanged) {
-      _showMessage('粉量应在 0.1–100 g 之间');
+    if ((total < _doseLimit.min || total > _doseLimit.max) && !totalUnchanged) {
+      _showMessage('粉量应在 ${_doseLimit.range} 之间');
       return false;
     }
     final List<int> ids = _picks
@@ -932,9 +975,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                           validator: (String? value) => _rangeError(
                             value,
                             label: '粉量',
-                            range: '0.1–100 g',
-                            min: 0.1,
-                            max: 100,
+                            limit: _doseLimit,
                             original: _originalDoseText,
                           ),
                           onChanged: (_) => setState(() {}),
@@ -952,9 +993,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                     validator: (String? value) => _rangeError(
                       value,
                       label: '水量',
-                      range: '0–2000 g',
-                      min: 0,
-                      max: 2000,
+                      limit: _waterLimit,
                       original: _originalWaterText,
                     ),
                     onChanged: (_) => setState(() {}),
@@ -970,9 +1009,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
                     validator: (String? value) => _rangeError(
                       value,
                       label: '水温',
-                      range: '0–100 ℃',
-                      min: 0,
-                      max: 100,
+                      limit: _waterTempLimit,
                       original: _originalWaterTempText,
                     ),
                   ),
@@ -2105,7 +2142,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   String? _validateMinutes(String? value) {
     // 历史记录里的越界总时间（如 7200 秒 → 分框 120）原样不动就放行。
     if (_totalSecondsInput == _originalTotalSeconds) return null;
-    return _rangeError(value, label: '分', range: '0–60', min: 0, max: 60);
+    return _rangeError(value, label: '分', limit: _minutesLimit);
   }
 
   /// 「秒」框：本框 0–59，另外把 M3-T12 的 0–3600 上限落到**总分**上。
@@ -2116,9 +2153,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     final String? fieldError = _rangeError(
       value,
       label: '秒',
-      range: '0–59',
-      min: 0,
-      max: 59,
+      limit: _secondsLimit,
     );
     if (fieldError != null) return fieldError;
 
@@ -2133,7 +2168,11 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     if (total == null) return null;
     // 没改动过的历史值放行（B1）。
     if (total == _originalTotalSeconds) return null;
-    if (total > 3600) return '总时间应在 0–3600 秒之间';
+    if (total > _totalTimeLimit.max) {
+      // 「秒」是中文单位：这里**不留** `g`/`℃` 那种 `… 之间` 的空格，
+      // 既有断言逐字钉着 `总时间应在 0–3600 秒之间`（无空格）。
+      return '总时间应在 ${_totalTimeLimit.range}之间';
+    }
     return null;
   }
 
@@ -2147,17 +2186,13 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     final String? minutesError = _rangeError(
       _totalTimeMin.text,
       label: '分',
-      range: '0–60',
-      min: 0,
-      max: 60,
+      limit: _minutesLimit,
     );
     if (minutesError != null) return minutesError;
     final String? secondsError = _rangeError(
       _totalTimeSec.text,
       label: '秒',
-      range: '0–59',
-      min: 0,
-      max: 59,
+      limit: _secondsLimit,
     );
     if (secondsError != null) return secondsError;
     return _totalTimeError();
@@ -2179,25 +2214,19 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
         _rangeError(
           _dose.text,
           label: '粉量',
-          range: '0.1–100 g',
-          min: 0.1,
-          max: 100,
+          limit: _doseLimit,
           original: _originalDoseText,
         ),
       _rangeError(
         _water.text,
         label: '水量',
-        range: '0–2000 g',
-        min: 0,
-        max: 2000,
+        limit: _waterLimit,
         original: _originalWaterText,
       ),
       _rangeError(
         _waterTemp.text,
         label: '水温',
-        range: '0–100 ℃',
-        min: 0,
-        max: 100,
+        limit: _waterTempLimit,
         original: _originalWaterTempText,
       ),
       _timeRangeError(),
@@ -2226,9 +2255,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   String? _gramsRangeError(_BeanPick pick) => _rangeError(
     pick.grams.text,
     label: '克数',
-    range: '0.1–100 g',
-    min: 0.1,
-    max: 100,
+    limit: _doseLimit,
     original: pick.originalGrams,
   );
 
@@ -2242,9 +2269,7 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
   String? _rangeError(
     String? raw, {
     required String label,
-    required String range,
-    required double min,
-    required double max,
+    required _Limit limit,
     String? original,
   }) {
     final String text = raw?.trim() ?? '';
@@ -2252,7 +2277,9 @@ class _BrewLogFormPageState extends ConsumerState<BrewLogFormPage> {
     if (_unchangedFromOriginal(text, original)) return null;
     final double? value = parseNumber(text);
     if (value == null) return '$label请填数字';
-    if (value < min || value > max) return '$label应在 $range 之间';
+    if (value < limit.min || value > limit.max) {
+      return '$label应在 ${limit.range} 之间';
+    }
     return null;
   }
 
